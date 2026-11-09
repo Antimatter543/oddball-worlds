@@ -19,6 +19,9 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest", "ruff"]
+rubin = [
+    "alerce>=2.4.0",
+]
 
 [build-system]
 requires = ["hatchling"]
