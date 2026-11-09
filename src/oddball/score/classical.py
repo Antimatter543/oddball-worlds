@@ -39,7 +39,9 @@ Sub-scores (higher = weirder) are listed in ``SUBSCORES``. Each is turned into a
 Common-mode systematics (v0): a bin of a light curve is *anomalous* when the centred 2-h box
 of the detrended residual is below -3 sigma. For each channel x CCD x time bin, the map is the
 fraction of stars with that bin anomalous. A bin is *common-mode* when that fraction is far
-above the CCD's typical level (``cm_threshold``). Per light curve, ``cm_frac`` is the share
+above the CCD's typical level (``cm_threshold``, for a full sector), or, for a small population
+such as an injection set, when its count is binomially improbable
+(``common_mode_bins_binomial``). Per light curve, ``cm_frac`` is the share
 of its anomalous bins that are common-mode, ``dump_frac`` the share within one bin of its own
 momentum-dump flags (QUALITY bit 32), and ``sys_frac`` the share that is either one. Shares are
 weighted by each bin's SNR^2, so a few strong dips outweigh many marginal systematic bins.
@@ -408,6 +410,24 @@ def common_mode_bins(num, den, thresh, min_count: int = 5, min_frac: float = 0.0
     with np.errstate(invalid="ignore", divide="ignore"):
         frac = np.where(den > 0, num / den, 0.0)
     return (frac > np.maximum(thresh, min_frac)[:, :, None]) & (num >= min_count)
+
+
+def common_mode_bins_binomial(num, den, p_max: float = 1e-7, min_count: int = 5,
+                              min_den: int = 20):
+    """Common-mode cells for a small population (an injection set, ~200 LCs per CCD).
+
+    A cell is common-mode when its count of anomalous light curves is improbably high under a
+    binomial with that (channel, CCD)'s median anomalous fraction: upper-tail p < ``p_max``
+    (~40k cells, so ~0.004 false cells expected from binomial noise alone).
+    """
+    from scipy.stats import binom
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        frac = np.where(den >= min_den, num / den, np.nan)
+    p0 = np.nanmedian(frac, axis=2)  # (2, 16)
+    p0 = np.where(np.isfinite(p0), np.clip(p0, 1e-4, 0.999), 0.999)
+    pv = binom.sf(num - 1, den.astype(np.int64), p0[:, :, None])
+    return (pv < p_max) & (num >= min_count) & (den >= min_den)
 
 
 def systematics_features(res: DirResult, cm: np.ndarray) -> pd.DataFrame:

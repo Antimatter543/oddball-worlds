@@ -120,6 +120,13 @@ def load(scorer: str, sector: int, inj_name: str) -> EvalData:
     inj["tmag_bin"] = np.asarray(TMAG_LABELS, dtype=object)[tmag_bin(inj.tmag)]
     for name, cut in TOPS.items():
         inj[name] = inj.pct >= cut
+    if "sys_flag" in inj and "sys_flag" in real:
+        # Symmetric veto: flagged light curves (real and injected) drop to the bottom, then
+        # everything is re-ranked, so the top-1% cut is recomputed without flagged real stars.
+        rv = ref.assign(score=np.where(ref.sys_flag.astype(bool), -np.inf, ref.score))
+        iv = inj.assign(score=np.where(inj.sys_flag.astype(bool), -np.inf, inj.score))
+        inj["pct_veto"] = rank_within(rv, iv, ["split", "stratum"])
+        inj["top1%_veto"] = (inj.pct_veto >= TOPS["top1%"]) & ~inj.sys_flag.astype(bool)
     return EvalData(scorer, sector, inj_name, real, inj)
 
 

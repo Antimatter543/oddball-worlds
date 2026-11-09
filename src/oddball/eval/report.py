@@ -249,10 +249,11 @@ def write_report(ed: EvalData, out: Path, command: str = "") -> dict:
     if len(nt):
         L += ["Per event:", "", md_table(nt, "{:.3g}"), ""]
 
-    if "sys_flag" in ed.inj:
+    if "top1%_veto" in ed.inj:
         L += ["## Systematics flag (common-mode v0): with and without the veto", "",
-              ("`veto` = light curves with `sys_flag` are removed (counted as not recovered). "
-               "Shows what the flag buys on nulls and what it costs on real injections."), ""]
+              ("`veto` = light curves with `sys_flag` (real and injected) are sent to the bottom and "
+               "everything is re-ranked; a flagged injection counts as not recovered. Shows what "
+               "the flag buys on nulls and what it costs on astrophysical injections."), ""]
         rows = []
         for split in ("test", "val"):
             s = ed.inj[ed.inj.split == split]
@@ -266,7 +267,7 @@ def write_report(ed: EvalData, out: Path, command: str = "") -> dict:
                 rows.append({"split": split, "set": lab, "n": len(gg),
                              "flag_rate": gg.sys_flag.mean(),
                              "top1%_without": gg["top1%"].mean(),
-                             "top1%_with_veto": (gg["top1%"] & ~gg.sys_flag).mean()})
+                             "top1%_with_veto": gg["top1%_veto"].mean()})
         L += [md_table(pd.DataFrame(rows), "{:.3f}"), ""]
 
     L += ["## Known positives in S32 (blind)", "", md_table(known, "{:.4g}"), ""]
@@ -309,6 +310,12 @@ def write_compare(eds: list[EvalData], out: Path, command: str = "", split: str 
                                                                                 np.nan),
             "known top1%": f"{g['known_in_top1']}/{g['n_known']}", "gate": g["pass"],
         })  # fmt: skip
+        if "top1%_veto" in e.inj:
+            nul = e.inj[e.inj.is_null & (e.inj.split == split)]
+            at = astro[astro.depth_bin == GATE_DEPTH]
+            rows[-1].update({"null FPR (veto)": nul["top1%_veto"].mean(),
+                             "recall@1% all (veto)": astro["top1%_veto"].mean(),
+                             "recall@1% ~0.3% (veto)": at["top1%_veto"].mean()})
     L += ["## Headline", "", md_table(pd.DataFrame(rows), "{:.3f}"), ""]
 
     for d in SCORECARD_DEPTHS:

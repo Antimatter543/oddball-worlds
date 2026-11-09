@@ -63,10 +63,12 @@ momentum-dump-adjacent bins, recomputes everything, then rank-averages.
 **Common-mode map:** for each channel x CCD x 30-min bin, the fraction of stars whose centred
 2-h box residual is below -3 sigma. A cell is common-mode when that fraction exceeds the CCD's
 median + 8 x robust sigma (floor 1%) and at least 5 stars dip. For an injection set, the map
-is the real map OR the set's own map, thresholded against the set's own typical level (floor
-5%). Every light curve in an injection set carries a signal, so a fixed fraction would flag
-the injections themselves. Only time-aligned excesses survive, which is what an instrument
-event looks like.
+is the real map OR the set's own map. In the set's own map a cell counts only when its number
+of dipping light curves is binomially improbable (upper-tail p < 1e-7, at least 5 LCs) given
+the set's own median rate. Every light curve in an injection set carries a signal (about 10%
+of LCs are anomalous in any bin), so a fixed fraction would flag the injections themselves.
+Only time-aligned excesses survive, which is what an instrument event looks like. The rule
+was tuned on val only.
 
 **Per-light-curve systematics feature:** `cm_frac`, `dump_frac` and `sys_frac` are the shares
 of the star's anomalous-bin evidence (weighted by SNR^2) that sit in common-mode bins, next to

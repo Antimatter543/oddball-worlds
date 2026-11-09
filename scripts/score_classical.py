@@ -18,9 +18,10 @@ Every score file also carries the unmasked pass's ``cm_frac``, ``dump_frac``, ``
 
 Calibration (sub-score and combined percentiles) is always against the **real** light curves
 of the sector, within Tmag bin x camera/CCD strata (each variant against its own real pass).
-The common-mode map for an injection set is the real map OR-ed with the set's own map,
-thresholded against the set's own typical level, so an instrument event shared by the set's
-hosts on one CCD is visible to it, while the set's scattered astrophysical signals are not.
+The common-mode map for an injection set is the real map OR-ed with the set's own map, where a
+cell counts only if its number of dipping light curves is binomially improbable given the set's
+own background rate, so an instrument event shared by the set's hosts on one CCD is visible to
+it, while the set's scattered astrophysical signals are not.
 
 Cost: two passes over the real sector (~8 min each for S32 on this machine), seconds for
 injection sets. ``--reuse-real`` reuses the cached real passes.
@@ -48,7 +49,7 @@ VARIANTS = {  # variant -> (feature pass, combine rule)
     "classical_tail": ("raw", "tail"),
     "classical_cm": ("masked", "mean"),
 }
-DIR_CM_MIN_FRAC = 0.05  # floor on an injection set's own common-mode threshold (and >= 5 LCs)
+DIR_CM_PMAX = 1e-7  # binomial upper-tail p for an injection set's own common-mode cells
 
 
 def log(msg: str) -> None:
@@ -175,13 +176,12 @@ def main() -> None:
             meta_i = dir_metadata(d)
             res_i = {"raw": run_pass(d, grid, meta_i, cache, f"inj_{name}_{split}", False,
                                      a.batch_rows)}  # fmt: skip
-            # The set's own map, thresholded against its *own* typical level: every light curve
-            # in an injection set carries a signal, so a fixed fraction would flag the
-            # astrophysical injections themselves. Only time-aligned excesses survive.
-            th_i = C.cm_threshold(anomaly_fraction(res_i["raw"]), res_i["raw"].map_den,
-                                  floor=DIR_CM_MIN_FRAC)  # fmt: skip
-            cm_i = cm_r | C.common_mode_bins(res_i["raw"].map_num, res_i["raw"].map_den, th_i,
-                                             min_count=5)  # fmt: skip
+            # The set's own map, tested against its *own* typical level: every light curve in
+            # an injection set carries a signal (background ~10% of LCs anomalous per bin), so
+            # a fixed fraction would flag the injections themselves. A binomial tail test on
+            # ~200 LCs per CCD keeps only time-aligned excesses (tuned on val only).
+            cm_i = cm_r | C.common_mode_bins_binomial(res_i["raw"].map_num, res_i["raw"].map_den,
+                                                      p_max=DIR_CM_PMAX)  # fmt: skip
             n_extra = int((cm_i & ~cm_r).sum())
             log(f"  {name}/{split}: {n_extra} extra common-mode (channel, CCD, bin) cells from "
                 "the set's own map")
@@ -205,7 +205,7 @@ def main() -> None:
     prov = {"sector": sec, "variants": {k: list(v) for k, v in VARIANTS.items()},
             "inj": a.inj, "subscores": cals["raw"].cols,
             "grid": [grid.g0, grid.length, grid.bin_days],
-            "dir_cm_min_frac": DIR_CM_MIN_FRAC, "seconds": round(time.time() - t_start),
+            "dir_cm_pmax": DIR_CM_PMAX, "seconds": round(time.time() - t_start),
             "source_provenance": str(sdir / "provenance.json")}  # fmt: skip
     for v in VARIANTS:
         p = outputs_root() / "scores" / v / f"s{sec:04d}" / "provenance.json"
