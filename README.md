@@ -29,7 +29,7 @@ Most anomaly searches of TESS used the first two years, or only the ~20k stars o
 
 A planned second track watches the Vera Rubin Observatory's public alert stream for **young stars that suddenly flare up**. These are FU Orionis and EXor outbursts: a forming star swallows a burst of material from its disk and brightens 100-fold for months to years. The professional alert brokers mostly chase supernovae in other galaxies, so these young stars in our own galaxy get little attention. We'd check each candidate against catalogues of young stars and look back at its earlier TESS light curve.
 
-See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, validation strategy and failure catalogue.
+See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, validation strategy and failure catalogue, and [`docs/ML_DESIGN.md`](docs/ML_DESIGN.md) for how the models are trained and evaluated.
 
 ## Status
 

@@ -1,6 +1,6 @@
 # oddball-worlds: agent notes
 
-Read `docs/PLAN.md` first. It holds the milestones, the go/no-go gate and the failure catalogue.
+Read `docs/PLAN.md` first (milestones, go/no-go gate, failure catalogue). Any training or scoring work must follow `docs/ML_DESIGN.md`.
 
 ## Hard rules
 - **Never commit data.** All data lives under `data/` (gitignored), or under `$ODDBALL_DATA` if set.
