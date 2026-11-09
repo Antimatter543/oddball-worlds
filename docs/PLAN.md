@@ -44,3 +44,16 @@ A completeness-calibrated **anomaly hunt** across TESS extended-mission (Sector 
 
 ## Track B (parked): Gaia DR4 neural orbit fitter
 Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimation for stars with 0, 1 or 2 hidden companions, plus a per-source detection-completeness map for the 100 pc volume. Novelty: no published NPE on Gaia orbits (as of Nov 2026). Competition: Flatiron "Epochalypse" (arXiv:2611.06915), DPAC's own NSS tables. Revisit in December.
+
+## Results log
+
+### 2026-11-09: classical baseline on S32 (test split) — gate FAIL
+- Recall within the top 1% at ~0.3% / ~1% / ~3% depth: **0.03 / 0.09 / 0.28**. AUROC 0.87. Even at 17–30% depth, recall only reaches ~0.5–0.65. Report: `outputs/eval/classical/s0032/report.md`.
+- Known positives: 11 of 18 in the top 1% of their stratum. PDS 110 is at 0.994, β Pic at 0.834, and the lowest at 0.787.
+- Null (instrument-like) false-positive rate: 17.7%. A `sys_flag` veto cuts it to 1.3%.
+- **Why:** the real top 1% (~1,600 stars) is dominated by genuine eclipsing binaries and big-amplitude variables, plus a scattered-light ramp in SAP at BTJD 2185.5. A score that can't explain away known variable classes can't rank a 1% dip above a 40%-deep eclipsing binary. Rank-*averaging* sub-scores also penalises events that are extreme in only one feature.
+
+**Gate clarifications, fixed before any ML result was seen:**
+1. The known-positive criterion is the strict reading: **all** S32 known positives in the top 1%. The fraction is reported alongside.
+2. The gate itself is unchanged. Recall against **injected SNR** (depth ÷ robust scatter × √bins in the event) is added as a diagnostic, because a 0.3% dip sits below the noise for T ≳ 12 stars and no method can find it there.
+3. The known-class explain-away score (ML_DESIGN §4.5) is a prerequisite for a fair gate test. The gate is re-run once it exists, and both numbers will be reported.
