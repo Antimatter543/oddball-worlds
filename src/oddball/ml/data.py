@@ -513,7 +513,7 @@ def mixed_order(rows: np.ndarray, sig_rows: np.ndarray, frac: float, batch_size:
     replacement) from ``sig_rows`` and the rest from a permutation of ``rows``."""
     if frac <= 0 or len(sig_rows) == 0:
         return rng.permutation(rows)
-    n_sig = int(round(frac * batch_size))
+    n_sig = round(frac * batch_size)
     base = rng.permutation(rows)
     n_b = int(np.ceil(len(base) / (batch_size - n_sig)))
     out = []

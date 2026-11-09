@@ -32,7 +32,8 @@ COMBINE = ("score_knn", "score_recon", "score_iforest")
 
 @torch.no_grad()
 def encode_and_surprise(model, cache: Cache, rows, obs_mask=None, drop_sap=False, n_masks=5,
-                        batch_size=256, seed=0, surprise_out=None, amp=True, log=print):  # fmt: skip
+                        batch_size=256, seed=0, surprise_out=None, amp=True, log=print,
+                        block=4):  # fmt: skip
     """Pooled embeddings and reconstruction surprise for ``rows`` of ``cache``.
 
     ``surprise_out``: optional writable array [len(rows), L] (e.g. a memmap) that receives the
@@ -51,7 +52,7 @@ def encode_and_surprise(model, cache: Cache, rows, obs_mask=None, drop_sap=False
         B = len(x)
         with torch.autocast("cuda", dtype=torch.float16, enabled=amp and dev.type == "cuda"):
             pooled.append(model.embed_pooled(inp).float().cpu().numpy())
-            masks = np.stack([scoring_masks(P, n_masks, rng) for _ in range(B)], 1)  # [M,B,P]
+            masks = np.stack([scoring_masks(P, n_masks, rng, block) for _ in range(B)], 1)  # [M,B,P]
             s_sum = torch.zeros(B, 2, inp.shape[1] * PATCH, device=dev)
             s_cnt = torch.zeros_like(s_sum)
             for mi in range(n_masks):

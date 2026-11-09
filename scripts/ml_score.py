@@ -56,7 +56,7 @@ def log(s):
 
 
 def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, seed: int,
-                obs_mask):  # fmt: skip
+                obs_mask, block: int = 4):  # fmt: skip
     rows = np.arange(len(cache))
     enc_file = workdir / f"enc_{tag}.npz"
     if enc_file.exists() and (workdir / f"surprise_{tag}.npy").exists():
@@ -71,7 +71,7 @@ def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, 
         t0 = time.time()
         pooled, rpk, rmn, rsap = encode_and_surprise(
             model, cache, rows, obs_mask=obs_mask, drop_sap=ck["train_cfg"]["drop_sap"],
-            n_masks=n_masks, seed=seed, surprise_out=sur, amp=False, log=log,
+            n_masks=n_masks, seed=seed, surprise_out=sur, amp=False, log=log, block=block,
         )  # fmt: skip
         sur.flush()
         del sur
@@ -149,6 +149,8 @@ def main() -> None:
     ap.add_argument("--name", default=None, help="injection set name (default: from the path)")
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--n-masks", type=int, default=5)
+    ap.add_argument("--mask-block", type=int, default=8,
+                    help="scoring-mask block in patches (ssl_v1: 4; 8 chosen on val injections)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rescore-real", action="store_true")
     a = ap.parse_args()
@@ -168,13 +170,13 @@ def main() -> None:
         f"{ck.get('sectors')}; s{a.sector:04d} held out: {held_out}")
 
     # ---------------- real stars (reference) ----------------
-    ref_file = work / f"real_sub_{sdir}.parquet"
+    ref_file = work / f"real_sub_{sdir}_b{a.mask_block}.parquet"
     real_cache = Cache(build_cache(sector_dir(a.sector), cache_dir_for(sector_dir(a.sector)),
                                    log=log))  # fmt: skip
     obs_mask = obs_mask_for(ck, a.sector, real_cache, work, log)
     if a.rescore_real or not ref_file.exists():
-        sub, pooled, ctx = score_cache(model, ck, real_cache, work, f"real_{sdir}", a.n_masks,
-                                       a.seed, obs_mask)  # fmt: skip
+        sub, pooled, ctx = score_cache(model, ck, real_cache, work, f"real_{sdir}_b{a.mask_block}",
+                                       a.n_masks, a.seed, obs_mask, a.mask_block)  # fmt: skip
         is_ref = sub.split.isin(["train", "val"]).to_numpy()
         stats = fit_embedding_stats(pooled[is_ref], ctx[is_ref])
         emb = embedding_matrix(pooled, ctx, stats)
@@ -199,7 +201,8 @@ def main() -> None:
     ml_dir.mkdir(parents=True, exist_ok=True)
     (ml_dir / "score_meta.json").write_text(json.dumps({
         "run": str(run), "epoch": ck["epoch"], "val_nll": ck["val_nll"], "k": a.k,
-        "n_masks": a.n_masks, "scorers": {k: list(v) for k, v in scorers.items()},
+        "n_masks": a.n_masks, "mask_block": a.mask_block,
+        "scorers": {k: list(v) for k, v in scorers.items()},
         "trained_on_sectors": ck.get("sectors"), "held_out": held_out,
         "reference": "real train+val", "data_root": str(data_root()),
         "sys_columns": "copied from outputs/scores/classical (sys_flag veto)",
@@ -222,9 +225,9 @@ def main() -> None:
             log(f"scoring injection shards {p}")
             cache = Cache(build_cache(p, cache_dir_for(p), origin=real_cache.info["origin"],
                                       log=log))  # fmt: skip
-            tag = "inj_" + "_".join(cache.dir.name.split("__")[-3:])
+            tag = "inj_" + "_".join(cache.dir.name.split("__")[-3:]) + f"_b{a.mask_block}"
             sub, pooled, ctx = score_cache(model, ck, cache, work, tag, a.n_masks, a.seed,
-                                           obs_mask)  # fmt: skip
+                                           obs_mask, a.mask_block)  # fmt: skip
             emb = embedding_matrix(pooled, ctx, st["stats"])
             sub["score_knn"] = knn_score(emb, sub.host_tic.to_numpy(), ref_emb, ref_tic, k=a.k)
             sub["score_iforest"] = -st["iforest"].score_samples(emb)
@@ -232,8 +235,8 @@ def main() -> None:
             sub["_sur"] = str(work / f"surprise_{tag}.npy")
             frames.append(sub)
         allsub = attach_sys(pd.concat(frames, ignore_index=True), a.sector, f"inj_{name}")
-        allsub.drop(columns=["_sur"]).to_parquet(work / f"inj_{name}_sub_{sdir}.parquet",
-                                                 index=False)  # fmt: skip
+        sub_file = work / f"inj_{name}_sub_{sdir}_b{a.mask_block}.parquet"
+        allsub.drop(columns=["_sur"]).to_parquet(sub_file, index=False)
         emit(allsub, real_sub, scorers, sdir, f"inj_{name}.parquet", real=False)
         for p, f in zip(parts, frames, strict=True):
             save_time_resolved(f, Path(f["_sur"].iloc[0]),

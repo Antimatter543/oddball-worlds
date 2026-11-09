@@ -265,7 +265,7 @@ def train(cfg: TrainConfig, mcfg: ModelConfig, log=print) -> Path:
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             scaler.step(opt)
             scaler.update()
-            lv = float(loss)
+            lv = float(loss.detach())
             if not math.isfinite(lv):
                 log(f"  non-finite loss at step {step}")
             run_loss += lv
