@@ -57,6 +57,16 @@ def _write_prov(source: str, info: dict) -> None:
     p.write_text(json.dumps(old, indent=1))
 
 
+def _note_server(source: str, chunk: int) -> None:
+    """Record which VizieR mirror served each chunk (mirrors hold the same tables)."""
+    p = raw_dir(source) / "provenance.json"
+    prov = json.loads(p.read_text()) if p.exists() else {}
+    got = prov.setdefault("chunk_servers", {}).setdefault(VIZIER_SERVER, [])
+    if chunk not in got:
+        got.append(chunk)
+    p.write_text(json.dumps(prov, indent=1))
+
+
 def _chunks(targets: pd.DataFrame, size: int):
     for i, s in enumerate(range(0, len(targets), size)):
         yield i, targets.iloc[s : s + size]
@@ -154,6 +164,7 @@ def fetch_cone(source: str, catalog: str, columns: list[str], radius: float,
         if df.empty:
             df = pd.DataFrame({"tic": pd.Series(dtype=np.int64)})
         df.to_parquet(f, index=False)
+        _note_server(source, i)
         if failed:
             ff = out / "failed_tics.txt"
             with ff.open("a") as fh:
