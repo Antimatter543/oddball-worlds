@@ -18,6 +18,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+cloud = [
+    "kaggle>=2.1",
+]
 dev = ["pytest", "ruff"]
 rubin = [
     "alerce>=2.4.0",
