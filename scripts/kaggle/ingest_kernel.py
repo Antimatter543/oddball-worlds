@@ -106,7 +106,7 @@ def main():
         log("deadline reached: interrupting ingest")
         _thread.interrupt_main()
 
-    timer = threading.Timer(max(60.0, deadline), on_deadline)
+    timer = threading.Timer(max(5.0, deadline), on_deadline)
     timer.daemon = True
     timer.start()
 
