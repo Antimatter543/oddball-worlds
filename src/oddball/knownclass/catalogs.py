@@ -36,6 +36,8 @@ VSX_CAT = "B/vsx/vsx"
 PRSA_CAT = "J/ApJS/258/16"
 VSX_RADIUS = 21.0  # arcsec
 GAIA_RADIUS = 3.0  # arcsec
+EMPTY_RETRIES = 4
+SUB_CHUNK = 1000  # positions per request (a cached chunk file holds ``chunk`` positions)
 
 
 def raw_dir(source: str) -> Path:
@@ -127,7 +129,28 @@ def fetch_cone(source: str, catalog: str, columns: list[str], radius: float,
         if f.exists():
             continue
         failed: list[int] = []
-        df = _cone_multi(v, part, catalog, radius, log, failed)
+        subs, ok = [], True
+        for s0 in range(0, len(part), SUB_CHUNK):
+            sub = part.iloc[s0 : s0 + SUB_CHUNK]
+            d = _cone_multi(v, sub, catalog, radius, log, failed)
+            for k in range(EMPTY_RETRIES):
+                # The mirror sometimes answers a list with an empty table and no error. For
+                # >= 500 stars that is implausible (~50-300 matches expected), so treat it as a
+                # failure: wait, retry, and never cache it.
+                if not (d.empty and len(sub) >= 500):
+                    break
+                log(f"  {source} chunk {i + 1}: empty answer, retry {k + 1}/{EMPTY_RETRIES}")
+                time.sleep(30.0 * (k + 1))
+                d = _cone_multi(v, sub, catalog, radius, log, failed)
+            if d.empty and len(sub) >= 500:
+                ok = False
+                break
+            subs.append(d)
+        if not ok:
+            log(f"  {source} chunk {i + 1}: still empty, left for a later run")
+            continue
+        subs = [d for d in subs if not d.empty]
+        df = pd.concat(subs, ignore_index=True) if subs else pd.DataFrame()
         if df.empty:
             df = pd.DataFrame({"tic": pd.Series(dtype=np.int64)})
         df.to_parquet(f, index=False)

@@ -119,7 +119,7 @@ def test_training_targets_gates():
         "flagged_any": [True, True, False, True, False, True],
     })  # fmt: skip
     f = _feat(6, [0.9, 0.05, 0.05, 0.05, 0.05, 0.9], [30, 4, 4, 4, 4, 30], [3, 3, 3, 3, 3, 3])
-    y = training_targets(f, labels).tolist()
+    y = training_targets(f, labels, other=True).tolist()
     # EB that varies; EB flat in this sector dropped; quiet; flagged-but-flat is not quiet but
     # "other"; excluded stars are never targets (not quiet, not other, label unused)
     assert y == ["EB", "", "quiet", "other", "", ""]

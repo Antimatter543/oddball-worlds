@@ -9,14 +9,18 @@ Training targets are per light curve (``tic, sector``):
   in the noise of a faint star, would otherwise teach "flat light curve = EB";
 * ``quiet`` = no catalogue flags at all (not excluded, no VSX entry within one TESS pixel, no
   Prsa EB, no Gaia variability) **and** a light curve consistent with noise (``lc_quiet``);
-* ``other`` = not excluded, no usable catalogue class, and not quiet: the unlabelled bulk of mildly
-  variable stars, generic catalogue variables (VSX ``VAR``/``MISC``) and blends. Without it, a
-  closed-set classifier pushes every ordinary or injected light curve into some known class
-  with high confidence (dry run: 0.1%-deep injections were "ROT/DSCT/EB" at median p = 0.94).
-  ``other`` never explains anything away (``explain.ExplainAway``), so uncatalogued oddballs in
-  it are not hidden; catalogued anomaly-target types (``labels``: excluded) are never in it;
+* optional ``other`` (``training_targets(other=True)``, an ablation): not excluded, no usable
+  catalogue class, not quiet. It never explains anything away.
 * everything else (catalogued stars flat in this sector, excluded stars, injections) is not a
   target.
+
+**Closed set + typicality.** A closed-set classifier pushes every light curve into some known
+class with high confidence (dry run: 0.1%-deep injections were "ROT/DSCT/EB" at median
+p = 0.94; trees extrapolate flat). The guard is *typicality*: a kNN check, in shape-feature space
+only, of how far a light curve sits from the training members of each class, calibrated on the
+members' own distances (``fit_typicality``). ``kc_w_c = p_c x t_c`` is the explaining weight.
+On S32 val injections (dry run, partial labels) this beat the ``other`` catch-all: objective
+0.174 vs 0.155 (mean val recall in the top 1% at ~0.3/1/3% depth; base 0.127).
 
 Splits come only from ``oddball.common.splits``: fit on ``train``, early stopping and
 temperature on ``val``. ``known`` (known positives) and ``test`` are never used here.
@@ -50,7 +54,7 @@ def lc_variable(f: pd.DataFrame) -> np.ndarray:
             | (np.nan_to_num(f.pdc_dip_snr.to_numpy()) > VAR_MIN_DIP_SNR))  # fmt: skip
 
 
-def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, other: bool = True) -> pd.Series:
+def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, other: bool = False) -> pd.Series:
     """Per-row target class ('' = not a target) for real light curves of a feature table."""
     lab = labels.set_index("tic")
     cat = lab.label.reindex(feat.tic).fillna("").to_numpy(object)

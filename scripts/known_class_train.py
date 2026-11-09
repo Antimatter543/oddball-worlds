@@ -56,6 +56,9 @@ def main() -> None:
     ap.add_argument("--predict", type=int, nargs="*", default=[32])
     ap.add_argument("--inj", nargs="*", default=["v1"])
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--other", action="store_true",
+                    help="add the 'other' catch-all class (ablation; default is a closed set of "
+                         "known classes guarded by typicality)")
     a = ap.parse_args()
     out = outputs_root() / "knownclass" / a.name
     out.mkdir(parents=True, exist_ok=True)
@@ -65,7 +68,7 @@ def main() -> None:
     for s in a.sectors:
         f = load_table(a.features, s, "real")
         f["split"] = split_array(f.tic.to_numpy())
-        f["y"] = M.training_targets(f, labels).to_numpy()
+        f["y"] = M.training_targets(f, labels, other=a.other).to_numpy()
         all_targets.append(f[["tic", "sector", "split", "y"]])
         rows.append(f[(f.y != "") & f.split.isin(["train", "val"])])
         log(f"s{s}: {len(f)} light curves, {int((f.y != '').sum())} targets")
@@ -138,7 +141,7 @@ def main() -> None:
                 lab = labels.set_index("tic")
                 res["cat_label"] = lab.label.reindex(f.tic).fillna("").to_numpy()
                 res["cat_excluded"] = lab.excluded.reindex(f.tic).fillna(False).to_numpy()
-                res["target"] = M.training_targets(f, labels).to_numpy()
+                res["target"] = M.training_targets(f, labels, other=a.other).to_numpy()
             res.to_parquet(d / f"{part}.parquet", index=False)
             log(f"predicted s{s} {part}: {len(res)} rows; "
                 f"pred mix {res.kc_pred.value_counts(normalize=True).round(3).to_dict()}")
@@ -149,7 +152,7 @@ def main() -> None:
         "name": a.name, "built_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "git_sha": sha, "features": a.features, "feature_cols": cols, "sectors": a.sectors,
         "classes": model.classes, "temperature": model.temperature,
-        "n_iter": int(model.clf.n_iter_), "params": model.params,
+        "n_iter": int(model.clf.n_iter_), "params": model.params, "other_class": a.other,
         "class_weights": model.class_weights,
         "n_train": len(tr), "n_val_capped": len(va_cap), "n_val": len(va),
         "val_accuracy": float(rep.recall.iloc[-1]),
