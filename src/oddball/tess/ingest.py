@@ -174,6 +174,14 @@ class ShardWriter:
     def add(self, meta: dict, binned) -> None:
         meta["shard"] = self.index
         meta["bin0"] = binned.bin0
+        # Downcast to storage dtypes now: the buffer holds shard_size LCs, and float64 doubles
+        # it (~1 GB vs ~0.5 GB at 10k rows).
+        binned.flux = binned.flux.astype(np.float32)
+        binned.flux_err = binned.flux_err.astype(np.float32)
+        binned.npts = binned.npts.astype(np.uint16)
+        binned.extras = {
+            k: v.astype(np.int32 if k == "qflags" else np.float32) for k, v in binned.extras.items()
+        }
         self.metas.append(meta)
         self.bins.append(binned)
         if len(self.bins) >= self.shard_size:

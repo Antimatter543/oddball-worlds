@@ -61,7 +61,7 @@ def _figure(lcs, meta, labels, title, path):
     axes[-1, 0].set_xlabel("BTJD (BJD - 2457000)")
     axes[0, 0].legend(fontsize=7, loc="upper right", markerscale=4)
     fig.suptitle(title, fontsize=10)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.45 / (1.9 * n + 0.6)))  # leave room for suptitle
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110)
     plt.close(fig)
