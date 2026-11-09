@@ -55,10 +55,43 @@ Verified by hand on **2026-11-09** (probe scripts plus `src/oddball/rubin/alerce
 ## Coverage and depth (as of 2026-11-09)
 
 - **Volume.** 10,474,330 LSST objects. `firstmjd` values go back to **MJD 60973 (2025-10-26)**, before the public stream opened on 24 Feb 2026. `lastmjd` reaches 61352 (2026-11-08), so the data is current to the previous night.
-- **Light-curve depth in practice.** Forced photometry is only served for visits after the DIAObject was created. In the young-star fields I checked, objects had 3–4 detections and about 2 forced points. **The promised "up to 12 months of precovery forced photometry" is not present** in what ALeRCE serves. An object's history starts at its first alert.
+- **Light-curve depth in practice.** Forced photometry is only served from about **MJD 61203 (2026-07-15)** onward, and only for a subset of visits. For example, objects detected since MJD 60983 with about 190 detections have about 50 forced points, all after 61203. No forced point predates an object's first detection. **The promised "up to 12 months of precovery forced photometry" is not present** in what ALeRCE serves.
+- **Consequences for the light curves:**
+  - Most epochs are alert detections. These exist only when the star differs from the template.
+  - Quiescent epochs of a star in outburst are usually missing, so the detector falls back to `templateFlux` (carried on every detection) as the baseline.
+  - The young-star matches have only 2–6 points each.
 - **Galactic plane.** **Almost no alerts.** One-degree cones on Orion, Lupus 3, Cha I, CrA, Carina, the Lagoon (M8), Serpens and many |b| < 5° grid points return **zero** LSST objects. The YSO-bearing fields that do have alerts are mainly Upper Sco / ρ Oph and the bulge outskirts. The tile run below gives the numbers. This is presumably a template-availability limitation of year-1 alert production (no difference imaging without a template). It is not a broker filter: ALeRCE's ZTF holdings in the same cones are full.
 
-COVERAGE_TABLE_PLACEHOLDER
+This table summarises the young-star tile run (`scripts/rubin_crossmatch.py`, then `scripts/rubin_coverage_summary.py`, on 2026-11-09).
+- **Tiles:** 2° cells holding at least one SPICY, Gaia DR3 YSO or known-YSO entry, Dec ≤ +35°.
+- **Objects counted:** only LSST objects with n_det ≥ 2.
+- **Star mode:** in tiles with ≤ 50 catalogue stars and > 200 objects, only objects within 2.5" of a catalogue star were pulled. The last column therefore undercounts the field total.
+
+| \|b\| (deg) | tiles | tiles with LSST objects | YSO catalogue rows | rows in those tiles | LSST objects returned |
+|---|---|---|---|---|---|
+| 0–2 | 254 | **0 (0.0%)** | 118,822 | 0 | 0 |
+| 2–5 | 377 | 1 (0.3%) | 22,065 | 91 | 182 |
+| 5–10 | 538 | 28 (5.2%) | 9,880 | 279 | 226 |
+| 10–20 | 912 | 98 (10.7%) | 20,474 | 2,406 | 30,386 |
+| > 20 | 1,313 | 116 (8.8%) | 5,649 | 1,475 | 23,309 |
+
+The YSO-bearing fields that do have alerts are dominated by **Upper Sco / ρ Oph** (l ≈ 352–356°, b ≈ +14 to +22°).
+
+### Time coverage: an ingestion gap
+
+These are global object counts by first-detection window:
+
+| First detection | Objects |
+|---|---|
+| 2025-10-26 – 2026-02-24 (MJD 60970–61101) | ~3.25 M |
+| 2026-02-24 – 2026-05-24 (61101–61193) | ~18.6 k |
+| 2026-05-24 – 2026-08-16 (61193–61236) | ~7.06 M (3.8 M in the last 12 days) |
+| 2026-08-16 – 2026-10-31 (61236–61343) | **0** |
+| 2026-10-31 onward | resumes (e.g. EDFS RA 60, Dec −48; RA 300–340) |
+
+- From these counts alone I can't tell whether the gap is a Rubin downtime or an ALeRCE ingestion gap.
+- In the young-star fields (Upper Sco and the bulge edge), **no object has data after MJD 61235 (2026-08-16)**. Upper Sco is now in evening twilight, so it won't come back this year.
+- The effective backtest window for young stars is therefore **2026-06-25 to 2026-08-16, about 7 weeks**.
 
 ## Not used: Lasair, Fink
 

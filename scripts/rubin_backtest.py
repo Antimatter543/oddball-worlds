@@ -73,28 +73,44 @@ def main() -> int:
     ap.add_argument("--min-points", type=int, default=2,
                     help="min n_det+n_forced (2 suffices with a template baseline)")
     ap.add_argument("--near-miss-plots", type=int, default=10)
+    ap.add_argument("--field", action="store_true",
+                    help="catalogue-agnostic control: every well-sampled LSST object in the "
+                         "YSO-bearing tiles, not just catalogue matches")
+    ap.add_argument("--field-min-ndet", type=int, default=4)
+    ap.add_argument("--field-min-span", type=float, default=5.0, help="days")
     args = ap.parse_args()
     root = data_root() / "rubin"
-    out = Path("outputs/rubin")
+    out = Path("outputs/rubin/field" if args.field else "outputs/rubin")
     (out / "plots").mkdir(parents=True, exist_ok=True)
 
-    m = pd.read_parquet(root / "matches.parquet")
     objs = pd.read_parquet(root / "rubin_objects.parquet").set_index("oid")
-    m = m[m["sep_arcsec"] <= args.sep]
-    # one row per Rubin object, carrying every catalogue identity that matched it
-    agg = m.sort_values("sep_arcsec").groupby("oid").agg(
-        cat_ids=("cat_id", lambda s: "|".join(dict.fromkeys(s))),
-        cats=("cat", lambda s: ",".join(sorted(set(s)))),
-        sep_arcsec=("sep_arcsec", "min"), n_rubin_near=("n_rubin_near", "max"),
-        n_cat_rows=("cat_id", "size"))
-    agg = agg.join(objs[["meanra", "meandec", "n_det", "n_forced", "firstmjd", "lastmjd",
-                         "class_name", "classifier_name"]])
-    agg["name"] = agg["cat_ids"].str.split("|").str[0]
+    obj_cols = ["meanra", "meandec", "n_det", "n_forced", "firstmjd", "lastmjd", "class_name",
+                "classifier_name"]
+    if args.field:
+        sel = (objs["n_det"] >= args.field_min_ndet) & (
+            (objs["lastmjd"] - objs["firstmjd"]) >= args.field_min_span)
+        agg = objs.loc[sel, obj_cols].copy()
+        agg["cat_ids"] = ""
+        agg["cats"] = ""
+        agg["sep_arcsec"] = np.nan
+        agg["n_rubin_near"] = np.nan
+        agg["name"] = "LSST " + agg.index.astype(str)
+    else:
+        m = pd.read_parquet(root / "matches.parquet")
+        m = m[m["sep_arcsec"] <= args.sep]
+        # one row per Rubin object, carrying every catalogue identity that matched it
+        agg = m.sort_values("sep_arcsec").groupby("oid").agg(
+            cat_ids=("cat_id", lambda s: "|".join(dict.fromkeys(s))),
+            cats=("cat", lambda s: ",".join(sorted(set(s)))),
+            sep_arcsec=("sep_arcsec", "min"), n_rubin_near=("n_rubin_near", "max"),
+            n_cat_rows=("cat_id", "size"))
+        agg = agg.join(objs[obj_cols])
+        agg["name"] = agg["cat_ids"].str.split("|").str[0]
     eligible = agg[(agg["n_det"].fillna(0) + agg["n_forced"].fillna(0)) >= args.min_points]
     if args.limit:
         eligible = eligible.head(args.limit)
-    print(f"matched Rubin objects: {len(agg)}; eligible (n_det+n_forced>={args.min_points}): {len(eligible)}",
-          flush=True)
+    print(f"{'field' if args.field else 'matched'} Rubin objects: {len(agg)}; "
+          f"eligible (n_det+n_forced>={args.min_points}): {len(eligible)}", flush=True)
 
     cfg = DetectConfig()
     rows, keep = [], {}
@@ -114,7 +130,8 @@ def main() -> int:
     res_df = pd.DataFrame(rows).set_index("oid").join(agg, how="left").reset_index()
     c = SkyCoord(ra=res_df["meanra"].to_numpy() * u.deg, dec=res_df["meandec"].to_numpy() * u.deg)
     res_df["l"], res_df["b"] = c.galactic.l.deg, c.galactic.b.deg
-    res_df.to_parquet(root / "backtest_results.parquet", index=False)
+    res_df.to_parquet(root / ("backtest_field_results.parquet" if args.field
+                              else "backtest_results.parquet"), index=False)
 
     cand = res_df[res_df["flagged"].astype(bool)].copy()
     cand = cand.sort_values(["p_peak_dmag"], ascending=False)
@@ -143,7 +160,8 @@ def main() -> int:
     near.to_csv(out / "near_misses.csv", index=False)
     reasons = res_df["reasons"].fillna("").str.split(":").str[0].value_counts().to_dict()
     prov = {"run_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "api": BASE_URL,
-            "config": cfg.__dict__, "matched_objects": len(agg), "eligible": len(eligible),
+            "mode": "field" if args.field else "catalogue_matches",
+            "config": cfg.__dict__, "objects": len(agg), "eligible": len(eligible),
             "processed": len(res_df), "errors": int((res_df["error"].fillna("") != "").sum()),
             "candidates": len(cand), "reasons": reasons,
             "lc_mjd_range": [float(res_df["lc_mjd_min"].min()), float(res_df["lc_mjd_max"].max())]}
