@@ -57,3 +57,11 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 1. The known-positive criterion is the strict reading: **all** S32 known positives in the top 1%. The fraction is reported alongside.
 2. The gate itself is unchanged. Recall against **injected SNR** (depth ÷ robust scatter × √bins in the event) is added as a diagnostic, because a 0.3% dip sits below the noise for T ≳ 12 stars and no method can find it there.
 3. The known-class explain-away score (ML_DESIGN §4.5) is a prerequisite for a fair gate test. The gate is re-run once it exists, and both numbers will be reported.
+
+### 2026-11-09: first ML scorer `ssl_v1` on S32 (test split) — gate FAIL, complementary to classical
+- Patch-MAE transformer (2.0M params, 6 epochs, not converged). Report: `outputs/eval/compare/s0032/classical__ssl_v1/report.md`.
+- Recall within the top 1% at ~0.3% / ~1% / ~3% depth: **0.23 / 0.53 / 0.52** (classical 0.03 / 0.09 / 0.28). AUROC 0.91 (classical 0.87).
+- Null (instrument-like) false-positive rate **0.41** (classical 0.18, 0.013 with its `sys_flag` veto). No veto applied to ssl_v1 yet.
+- Known positives: **2 of 18** in the top 1% (β Pic, TIC 43488669); classical 11 of 18. Real dippers sit inside the cloud of ordinary variables in embedding space, so kNN density misses them.
+- **Caveats:** the reconstruction head collapsed to "predict the median" (now fixed with sin-cos positions, not yet retrained), so `score_recon` is really a learned-scatter deviation score. The embedding still reads camera at 55% vs 26% chance, mostly via the SAP channel. Combined-score top-100 overlap across two seeds is 0.28, below the §6 bar, so no ranking from it is reported. The reconstruction sub-score alone is stable (0.71).
+- **Reading:** ML finds injected events far better; classical finds real dippers and rejects instrument events better. Neither passes. Next: retrain with sin-cos positions and no SAP channel, apply the common-mode veto to ML scores, then the known-class explain-away score (§4.5).
