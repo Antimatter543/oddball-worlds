@@ -194,7 +194,8 @@ def train(cfg: TrainConfig, mcfg: ModelConfig, log=print) -> Path:
             m = torch.from_numpy(contiguous_block_mask(len(x), P, cfg.mask_ratio, mrng)).to(device)
             with torch.autocast("cuda", dtype=torch.float16, enabled=amp):
                 mu, logv, _ = model(inp, m)
-            loss = gaussian_nll(mu, logv, tgt, err, obs, sobs, patch_to_bin(m), mcfg.sap_weight)
+            loss = gaussian_nll(mu, logv, tgt, err, obs, sobs, patch_to_bin(m), mcfg.sap_weight,
+                                beta=mcfg.nll_beta)
             opt.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)

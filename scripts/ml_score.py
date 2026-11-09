@@ -43,15 +43,26 @@ def log(s):
 
 def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, seed: int):
     rows = np.arange(len(cache))
-    sur = np.lib.format.open_memmap(workdir / f"surprise_{tag}.npy", mode="w+",
-                                    dtype=np.float16, shape=(len(rows), cache.x.shape[2]))  # fmt: skip
-    t0 = time.time()
-    pooled, rpk, rmn, rsap = encode_and_surprise(
-        model, cache, rows, obs_mask=ck.get("obs_mask"), drop_sap=ck["train_cfg"]["drop_sap"],
-        n_masks=n_masks, seed=seed, surprise_out=sur, amp=False, log=log,
-    )  # fmt: skip
-    sur.flush()
-    log(f"  encoded {len(rows)} rows in {time.time() - t0:.0f} s")
+    enc_file = workdir / f"enc_{tag}.npz"
+    if enc_file.exists() and (workdir / f"surprise_{tag}.npy").exists():
+        d = np.load(enc_file)
+        if len(d["pooled"]) == len(rows):  # resume: encoding is the slow part
+            log(f"  reusing encodings {enc_file}")
+            pooled, rpk, rmn, rsap = d["pooled"], d["rpk"], d["rmn"], d["rsap"]
+            rows = None
+    if rows is not None:
+        sur = np.lib.format.open_memmap(workdir / f"surprise_{tag}.npy", mode="w+",
+                                        dtype=np.float16, shape=(len(rows), cache.x.shape[2]))  # fmt: skip
+        t0 = time.time()
+        pooled, rpk, rmn, rsap = encode_and_surprise(
+            model, cache, rows, obs_mask=ck.get("obs_mask"), drop_sap=ck["train_cfg"]["drop_sap"],
+            n_masks=n_masks, seed=seed, surprise_out=sur, amp=False, log=log,
+        )  # fmt: skip
+        sur.flush()
+        del sur
+        np.savez(enc_file, pooled=pooled, rpk=rpk, rmn=rmn, rsap=rsap)
+        log(f"  encoded {len(pooled)} rows in {time.time() - t0:.0f} s")
+    rows = np.arange(len(cache))
     idx = cache.index.reset_index(drop=True)
     sub = idx[["tic", "sector", "inj_id", "host_tic", "camera", "ccd", "tmag", "split"]].copy()
     sub["score_recon"] = rpk

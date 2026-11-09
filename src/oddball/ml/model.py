@@ -31,6 +31,10 @@ class ModelConfig:
     patch: int = PATCH
     in_ch: int = 4
     sap_weight: float = 0.5
+    # beta-NLL (Seitzer et al. 2022): per-bin NLL x stopgrad(var)^beta. With beta=0 the mean's
+    # gradient is scaled by 1/var and the model collapses to "predict the median, inflate the
+    # variance" (observed in run ssl_v1_s0, beta=0). 0.5 keeps noisy bins down-weighted.
+    nll_beta: float = 0.5
     arch: str = "transformer"  # or "cnn" (fallback)
 
     def to_dict(self) -> dict:
@@ -102,13 +106,16 @@ def n_params(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def gaussian_nll(mu, logv, target, err, obs, sap_obs, bin_mask, sap_weight=0.5, reduce=True):
+def gaussian_nll(mu, logv, target, err, obs, sap_obs, bin_mask, sap_weight=0.5, reduce=True,
+                 beta=0.0):
     """Per-bin Gaussian NLL (constant dropped) on observed bins where ``bin_mask`` [B,L] is True.
 
     Returns the scalar mean loss (``reduce``) or the per-bin pdc and sap NLL tensors."""
     mu, logv, target = mu.float(), logv.float(), target.float()
     var = err.float()[:, None, :] ** 2 + F.softplus(logv) + 1e-4
     nll = 0.5 * ((target - mu) ** 2 / var + torch.log(var))
+    if beta and reduce:
+        nll = nll * var.detach() ** beta
     w_pdc = (obs & bin_mask).float()
     w_sap = (sap_obs & bin_mask).float()
     if not reduce:

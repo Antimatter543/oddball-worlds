@@ -141,7 +141,12 @@ def main() -> None:
     res["known_n"] = len(kt)
     print(kt.to_string(index=False))
 
-    nk = sub[sub.split != "known"].sort_values("score", ascending=False, kind="stable")
+    # Within the extreme tail the stratified percentile mostly encodes stratum size (the #1 star
+    # of a 2,000-star stratum beats the #1 of a 500-star one), so the gallery takes stars in the
+    # top 0.2% of their stratum and orders them by the global rank-average.
+    nk = sub[sub.split != "known"].copy()
+    nk["_tail"] = nk.score >= 0.998
+    nk = nk.sort_values(["_tail", "score_rankavg"], ascending=False, kind="stable")
     nk = nk.assign(rank=np.arange(1, len(nk) + 1))
     top = nk.head(a.top)
     top.drop(columns=[c for c in top if c.startswith("_")]).to_csv(od / f"top{a.top}_{sdir}.csv",

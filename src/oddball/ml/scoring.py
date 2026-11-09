@@ -22,9 +22,9 @@ import numpy as np
 import pandas as pd
 import torch
 
+from oddball.common import strata as _strata
 from oddball.ml.data import PATCH, Cache, iter_batches, make_inputs, scoring_masks
 
-TMAG_EDGES = (9.0, 10.0, 11.0, 12.0, 13.0, 14.0)
 MIN_STRATUM = 300
 CTX_WEIGHT = 2.0
 COMBINE = ("score_knn", "score_recon", "score_iforest")
@@ -96,9 +96,20 @@ def fit_embedding_stats(pooled_ref: np.ndarray, ctx_ref: np.ndarray) -> dict:
 
 @torch.no_grad()
 def knn_score(q: np.ndarray, q_tic: np.ndarray, ref: np.ndarray, ref_tic: np.ndarray, k: int = 20,
-              chunk: int = 1024, device=None) -> np.ndarray:  # fmt: skip
-    """Mean cosine distance to the k nearest reference rows, excluding rows with the query's TIC."""
+              chunk: int = 256, device=None) -> np.ndarray:  # fmt: skip
+    """Mean cosine distance to the k nearest reference rows, excluding rows with the query's TIC.
+    Falls back to CPU if the (shared) GPU runs out of memory."""
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        try:
+            return _knn(q, q_tic, ref, ref_tic, k, chunk, device)
+        except torch.OutOfMemoryError:
+            torch.cuda.empty_cache()
+            device = torch.device("cpu")
+    return _knn(q, q_tic, ref, ref_tic, k, chunk, device)
+
+
+def _knn(q, q_tic, ref, ref_tic, k, chunk, device):
     R = torch.nn.functional.normalize(torch.from_numpy(ref).to(device), dim=1)
     rt = torch.from_numpy(ref_tic.astype(np.int64)).to(device)
     out = np.empty(len(q), dtype=np.float32)
@@ -115,14 +126,13 @@ def knn_score(q: np.ndarray, q_tic: np.ndarray, ref: np.ndarray, ref_tic: np.nda
 
 
 def tmag_bin(tmag: np.ndarray) -> np.ndarray:
-    return np.digitize(np.asarray(tmag, dtype=float), TMAG_EDGES)
+    return _strata.tmag_bin(tmag)
 
 
 def strata(camera, ccd, tmag) -> tuple[np.ndarray, np.ndarray]:
-    """(fine, coarse) stratum keys: Tmag-bin x camera/CCD, and Tmag-bin alone (fallback)."""
-    tb = tmag_bin(tmag)
-    fine = tb * 100 + np.asarray(camera) * 10 + np.asarray(ccd)
-    return fine.astype(np.int64), tb.astype(np.int64)
+    """(fine, coarse) stratum keys: the shared Tmag-bin x camera/CCD id
+    (``oddball.common.strata``, same definition as the evaluator), and Tmag bin alone."""
+    return _strata.stratum_id(tmag, camera, ccd), _strata.tmag_bin(tmag)
 
 
 def percentile_vs(ref: np.ndarray, x: np.ndarray) -> np.ndarray:
