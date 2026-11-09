@@ -27,9 +27,11 @@ Most anomaly searches of TESS used the first two years, or only the ~20k stars o
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, validation strategy and failure catalogue, and [`docs/ML_DESIGN.md`](docs/ML_DESIGN.md) for how the models are trained and evaluated.
 
-## Next: exploding stars
+## Parked: young stars flaring up (Rubin)
 
-A planned second track watches the Vera Rubin Observatory's public alert stream for **young stars that suddenly flare up**. These are FU Orionis and EXor outbursts: a forming star swallows a burst of material from its disk and brightens 100-fold for months to years. The professional alert brokers mostly chase supernovae in other galaxies, so these young stars in our own galaxy get little attention. We'd check each candidate against catalogues of young stars and look back at its earlier TESS light curve.
+**Status (Nov 2026): built, tested, parked.** As of Nov 2026, Rubin isn't sending alerts from the Galactic plane, where the young stars are: 0 of 118k catalogued young stars have plane coverage, and only 25 young stars match any Rubin object at all. The detector works on real Rubin supernovae as a positive control. We'll re-run `scripts/rubin_coverage_summary.py` monthly and resume when the plane gets alerts. Access notes: [`docs/rubin_access.md`](docs/rubin_access.md).
+
+This track watches the Vera Rubin Observatory's public alert stream for **young stars that suddenly flare up**. These are FU Orionis and EXor outbursts: a forming star swallows a burst of material from its disk and brightens 100-fold for months to years. The professional alert brokers mostly chase supernovae in other galaxies, so these young stars in our own galaxy get little attention. We'd check each candidate against catalogues of young stars and look back at its earlier TESS light curve.
 
 ## Status
 
