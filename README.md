@@ -33,7 +33,21 @@ A planned second track watches the Vera Rubin Observatory's public alert stream 
 
 ## Status
 
-🚧 Day 0: scaffolding. Nothing to see yet.
+🚧 Milestone 1a/1b: data pipeline and known-positive list.
+
+```bash
+uv sync
+uv run python -I scripts/ingest_sector.py 32 --limit 2000 --include-known   # quick subset
+uv run python -I scripts/ingest_sector.py 32                                # full sector (resumable)
+uv run python -I scripts/plot_sanity.py 32                                  # -> outputs/sanity_*.png
+uv run python -I scripts/build_known_positives.py                           # -> docs/known_positives.csv
+uv run pytest
+```
+
+Each sector becomes `data/tess-spoc/sNNNN/` (or `$ODDBALL_DATA/...`): Parquet shards of
+median-normalised PDCSAP flux binned to 30 min on a global BTJD grid (plus per-bin error, point
+count, OR of quality flags, SAP flux and background), a metadata table and `provenance.json`.
+No FITS is kept; nothing is detrended at ingest. Layout details: `src/oddball/tess/ingest.py`.
 
 ## Parked: Gaia DR4
 

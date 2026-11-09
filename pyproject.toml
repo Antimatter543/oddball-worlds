@@ -13,6 +13,8 @@ dependencies = [
     "astroquery",
     "lightkurve",
     "matplotlib",
+    "requests>=2.34.2",
+    "tess-point>=0.9.5.post1",
 ]
 
 [dependency-groups]
