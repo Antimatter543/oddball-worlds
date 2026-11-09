@@ -39,9 +39,10 @@ Sub-scores (higher = weirder) are listed in ``SUBSCORES``. Each is turned into a
 Common-mode systematics (v0): a bin of a light curve is *anomalous* when the centred 2-h box
 of the detrended residual is below -3 sigma. For each channel x CCD x time bin, the map is the
 fraction of stars with that bin anomalous. A bin is *common-mode* when that fraction is far
-above the CCD's typical level (``cm_threshold``). Per light curve, ``cm_frac`` is the fraction
-of its anomalous bins that are common-mode, ``dump_frac`` the fraction within one bin of its own
-momentum-dump flags (QUALITY bit 32), and ``sys_frac`` the fraction that is either one.
+above the CCD's typical level (``cm_threshold``). Per light curve, ``cm_frac`` is the share
+of its anomalous bins that are common-mode, ``dump_frac`` the share within one bin of its own
+momentum-dump flags (QUALITY bit 32), and ``sys_frac`` the share that is either one. Shares are
+weighted by each bin's SNR^2, so a few strong dips outweigh many marginal systematic bins.
 ``sys_flag = sys_frac >= 0.5 and n_anom >= 4``.
 """
 
@@ -239,6 +240,7 @@ class ChannelOut:
     feats: dict
     anom: np.ndarray  # (n, L) bool: anomalous bins
     valid: np.ndarray  # (n, L) bool
+    snr4: np.ndarray  # (n, L) 2-h box dip SNR of the detrended residual
 
 
 def channel_features(f: np.ndarray, err: np.ndarray, t: np.ndarray, bin_days: float):
@@ -285,7 +287,7 @@ def channel_features(f: np.ndarray, err: np.ndarray, t: np.ndarray, bin_days: fl
         "dip_t": t[imin], "bump_snr": bump_snr, "xs_var": xs_var, "frac_neg3": frac_neg3,
     }  # fmt: skip
     feats = {k: np.where(nan_row, np.nan, v).astype(np.float64) for k, v in feats.items()}
-    return ChannelOut(feats, anom, valid)
+    return ChannelOut(feats, anom, valid, snr4)
 
 
 def subscores(feat: pd.DataFrame) -> pd.DataFrame:
@@ -316,23 +318,31 @@ def subscores(feat: pd.DataFrame) -> pd.DataFrame:
 @dataclass
 class DirResult:
     feats: pd.DataFrame  # one row per light curve: tic, inj_id, features
-    anom: dict  # channel -> packed bits (n, ceil(L/8)) of anomalous bins
-    dumpadj: np.ndarray  # packed bits: within 1 bin of a QUALITY bit-32 flag
+    # channel -> sparse anomalous bins: rows (LC index), cols (grid bin), w (SNR^2),
+    # dump (bin within 1 bin of the LC's own QUALITY bit-32 momentum-dump flag)
+    anom: dict
     ccd: np.ndarray  # (n,) ccd index 0..15
     map_num: np.ndarray  # (2, 16, L) anomalous counts
     map_den: np.ndarray  # (2, 16, L) valid counts
 
 
-def featurize_dir(d, grid: Grid, meta: pd.DataFrame, batch_rows: int = 2000, log=None):
+def featurize_dir(
+    d, grid: Grid, meta: pd.DataFrame, batch_rows: int = 2000, log=None,
+    mask: np.ndarray | None = None,
+):
     """Features + common-mode counts for every light curve under shard directory ``d``.
 
     ``meta``: metadata with tic, camera, ccd, crowdsap (and inj_id for injection sets).
-    """
+    ``mask``: optional (2, 16, L) bool of (channel, CCD, bin) to remove before computing
+    features (the systematics filter: common-mode bins); bins within one bin of each light
+    curve's own momentum-dump flag are removed too when a mask is given.
+    """  # fmt: skip
     key = "inj_id" if "inj_id" in meta.columns else "tic"
     m = meta.set_index(key)
     t = grid.time
     L = grid.length
-    rows, packs, dpacks, ccds = [], {c: [] for c in CHANNELS}, [], []
+    rows, ccds = [], []
+    sparse = {c: {"rows": [], "cols": [], "w": [], "dump": []} for c in CHANNELS}
     num = np.zeros((2, 16, L))
     den = np.zeros((2, 16, L))
     nb = 0
@@ -343,8 +353,16 @@ def featurize_dir(d, grid: Grid, meta: pd.DataFrame, batch_rows: int = 2000, log
         crowd = mm.crowdsap.to_numpy(np.float64)
         crowd = np.where(np.isfinite(crowd) & (crowd > 0) & (crowd <= 1), crowd, 1.0)
         ci = ccd_index(mm.camera.to_numpy(), mm.ccd.to_numpy())
-        pdc = channel_features(b["flux"], b["flux_err"], t, grid.bin_days)
-        sap = channel_features(b["sap_flux"], b["flux_err"] * crowd[:, None], t, grid.bin_days)
+        dump = (b["qflags"] & 32) > 0
+        dadj = dump.copy()
+        dadj[:, 1:] |= dump[:, :-1]
+        dadj[:, :-1] |= dump[:, 1:]
+        fp, fs = b["flux"], b["sap_flux"]
+        if mask is not None:
+            fp = np.where(mask[0][ci] | dadj, np.nan, fp)
+            fs = np.where(mask[1][ci] | dadj, np.nan, fs)
+        pdc = channel_features(fp, b["flux_err"], t, grid.bin_days)
+        sap = channel_features(fs, b["flux_err"] * crowd[:, None], t, grid.bin_days)
         df = pd.DataFrame({"tic": b["tic"]})
         df["inj_id"] = b["inj_id"] if b["inj_id"] is not None else None
         for ch, o in (("pdc", pdc), ("sap", sap)):
@@ -353,24 +371,22 @@ def featurize_dir(d, grid: Grid, meta: pd.DataFrame, batch_rows: int = 2000, log
         df["n_valid"] = pdc.valid.sum(1)
         rows.append(df)
         for c, (ch, o) in enumerate((("pdc", pdc), ("sap", sap))):
-            packs[ch].append(np.packbits(o.anom, axis=1))
+            rr, cc = np.nonzero(o.anom)
+            sp = sparse[ch]
+            sp["rows"].append((rr + nb).astype(np.int32))
+            sp["cols"].append(cc.astype(np.int16))
+            sp["w"].append((o.snr4[rr, cc] ** 2).astype(np.float32))
+            sp["dump"].append(dadj[rr, cc])
             for k in np.unique(ci):
                 s = ci == k
                 num[c, k] += o.anom[s].sum(0)
                 den[c, k] += o.valid[s].sum(0)
-        dump = (b["qflags"] & 32) > 0
-        dadj = dump.copy()
-        dadj[:, 1:] |= dump[:, :-1]
-        dadj[:, :-1] |= dump[:, 1:]
-        dpacks.append(np.packbits(dadj, axis=1))
         ccds.append(ci)
         nb += len(df)
         if log:
             log(f"    {b['shard_file']}: {nb} light curves")
-    return DirResult(
-        pd.concat(rows, ignore_index=True), {c: np.concatenate(packs[c]) for c in CHANNELS},
-        np.concatenate(dpacks), np.concatenate(ccds), num, den,
-    )  # fmt: skip
+    anom = {c: {k: np.concatenate(v) for k, v in sparse[c].items()} for c in CHANNELS}
+    return DirResult(pd.concat(rows, ignore_index=True), anom, np.concatenate(ccds), num, den)
 
 
 def cm_threshold(frac: np.ndarray, den: np.ndarray, k: float = 8.0, floor: float = 0.01):
@@ -394,26 +410,31 @@ def common_mode_bins(num, den, thresh, min_count: int = 5, min_frac: float = 0.0
     return (frac > np.maximum(thresh, min_frac)[:, :, None]) & (num >= min_count)
 
 
-def systematics_features(res: DirResult, cm: np.ndarray, L: int, chunk: int = 10000):
-    """cm_frac / dump_frac / sys_frac per light curve given common-mode bins (2, 16, L)."""
+def systematics_features(res: DirResult, cm: np.ndarray) -> pd.DataFrame:
+    """Per light curve: the share of its dip evidence that sits in systematic bins.
+
+    Each anomalous bin is weighted by its SNR^2 (its contribution to the dip chi^2), so a
+    strong astrophysical dip is not outvoted by a host's many weak systematic bins.
+    ``cm_frac``: share in common-mode bins (``cm``: (2, 16, L) bool); ``dump_frac``: share
+    within one bin of the light curve's own momentum-dump flags; ``sys_frac``: either.
+    """
     n = len(res.ccd)
-    n_a, n_cm, n_dp, n_sys = (np.zeros(n) for _ in range(4))
-    for s in range(0, n, chunk):  # chunked: unpacked (n, L) bool arrays are 8x the packed size
-        e = min(n, s + chunk)
-        dadj = np.unpackbits(res.dumpadj[s:e], axis=1, count=L).astype(bool)
-        for c, ch in enumerate(CHANNELS):
-            a = np.unpackbits(res.anom[ch][s:e], axis=1, count=L).astype(bool)
-            cmb = cm[c][res.ccd[s:e]]
-            n_a[s:e] += a.sum(1)
-            n_cm[s:e] += (a & cmb).sum(1)
-            n_dp[s:e] += (a & dadj).sum(1)
-            n_sys[s:e] += (a & (cmb | dadj)).sum(1)
+    tot, w_cm, w_dp, w_sys, n_a = (np.zeros(n) for _ in range(5))
+    for c, ch in enumerate(CHANNELS):
+        sp = res.anom[ch]
+        r, w = sp["rows"], sp["w"].astype(np.float64)
+        is_cm = cm[c][res.ccd[r], sp["cols"]]
+        tot += np.bincount(r, weights=w, minlength=n)
+        w_cm += np.bincount(r, weights=w * is_cm, minlength=n)
+        w_dp += np.bincount(r, weights=w * sp["dump"], minlength=n)
+        w_sys += np.bincount(r, weights=w * (is_cm | sp["dump"]), minlength=n)
+        n_a += np.bincount(r, minlength=n)
     with np.errstate(invalid="ignore", divide="ignore"):
         out = pd.DataFrame({
             "n_anom": n_a.astype(np.int64),
-            "cm_frac": np.where(n_a > 0, n_cm / n_a, 0.0),
-            "dump_frac": np.where(n_a > 0, n_dp / n_a, 0.0),
-            "sys_frac": np.where(n_a > 0, n_sys / n_a, 0.0),
+            "cm_frac": np.where(tot > 0, w_cm / tot, 0.0),
+            "dump_frac": np.where(tot > 0, w_dp / tot, 0.0),
+            "sys_frac": np.where(tot > 0, w_sys / tot, 0.0),
         })  # fmt: skip
     out["sys_flag"] = (out.sys_frac >= 0.5) & (out.n_anom >= 4)
     return out

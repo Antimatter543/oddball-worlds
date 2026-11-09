@@ -86,6 +86,12 @@ def test_rank_within_uses_matching_split_and_stratum():
     np.testing.assert_allclose(rank_within(real, q, ["split", "stratum"]), [1.0, 0.0, 0.0])
 
 
+def test_rank_within_single_key():
+    real = pd.DataFrame({"stratum": [1, 1, 2], "score": [0.1, 0.2, 0.9]})
+    q = pd.DataFrame({"stratum": [1, 2], "score": [0.3, 0.3]})
+    np.testing.assert_allclose(rank_within(real, q, ["stratum"]), [1.0, 0.0])
+
+
 def test_strata_definition():
     assert list(tmag_bin([9.0, 10.0, 10.5, 12.9, 13.5, np.nan])) == [0, 0, 1, 3, 4, 4]
     assert stratum_id(11.5, 4, 4) == 2 * 16 + 15

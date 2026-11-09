@@ -74,9 +74,13 @@ def midrank_pct(ref_sorted: np.ndarray, x: np.ndarray) -> np.ndarray:
 def rank_within(ref: pd.DataFrame, q: pd.DataFrame, keys: list[str]) -> np.ndarray:
     """Percentile of each ``q.score`` among ``ref.score`` rows sharing ``keys``."""
     out = np.full(len(q), np.nan)
-    groups = {k: np.sort(g.score.to_numpy()) for k, g in ref.groupby(keys)}
+
+    def norm(k):  # pandas returns 1-tuples for some single-key groupbys and scalars for others
+        return k if isinstance(k, tuple) else (k,)
+
+    groups = {norm(k): np.sort(g.score.to_numpy()) for k, g in ref.groupby(keys)}
     for k, idx in q.groupby(keys).indices.items():
-        r = groups.get(k)
+        r = groups.get(norm(k))
         if r is None or len(r) == 0:
             continue
         out[idx] = midrank_pct(r, q.score.to_numpy()[idx])
