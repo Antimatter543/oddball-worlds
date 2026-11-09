@@ -8,7 +8,10 @@ Writes ``outputs/knownclass/<kc>/sNNNN/report_<ka>.md``:
   stars the explain-away scorer drops out of it, by predicted known class and catalogue label;
 * the composition of the explain-away scorer's own top 1%;
 * injection recall in the top 1% by the host's catalogue class (the host keeps its catalogue
-  class even though hosts are never training labels), for the requested split.
+  class even though hosts are never training labels), for the requested split;
+* the known positives (``docs/known_positives.csv``, ``split == "known"``): stratum percentile
+  under both scorers, the class the model gives them and the explained share ``E``. "Wrongly
+  explained away" = in the base top 1% but not in the explain-away top 1%. Evaluation only.
 
 It reads score files and the known-class outputs only; nothing is tuned here.
 """
@@ -25,15 +28,19 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from oddball.common.paths import data_root, outputs_root
-from oddball.eval.harness import load, rank_within
+from oddball.eval.harness import known_table, load, rank_within
 from oddball.eval.report import md_table
 
 
-def top1(ed) -> pd.Series:
+def top1(ed, veto: bool = False) -> pd.Series:
+    """Real top 1% within stratum; ``veto`` sends sys_flag light curves to the bottom first
+    (the evaluator's symmetric veto), so the top 1% is then drawn from unflagged stars only."""
     r = ed.real
+    flag = r.sys_flag.astype(bool).to_numpy() if veto else np.zeros(len(r), bool)
+    r = r.assign(score=np.where(flag, -np.inf, r.score))
     ref = r[r.split != "known"]
     pct = rank_within(ref, r, ["stratum"])
-    return pd.Series(pct >= 0.99, index=r.tic.to_numpy())
+    return pd.Series((pct >= 0.99) & ~flag, index=r.tic.to_numpy())
 
 
 def main() -> None:
@@ -83,6 +90,30 @@ def main() -> None:
     s4, _ = comp(new, f"new in {a.ka} top 1%")
     parts += [s1, s2, s3, s4]
 
+    # the same with the sys_flag veto applied to both scorers
+    if "sys_flag" in real and "sys_flag" in eb.real:
+        vb, vk = top1(eb, veto=True), top1(ek, veto=True)
+        vb, vk = vb[~known.reindex(vb.index).to_numpy()], vk[~known.reindex(vk.index).to_numpy()]
+        vin_b, vin_k = vb[vb].index, vk[vk].index
+        parts.append("## With the sys_flag veto (flagged light curves ranked last)")
+        parts += [comp(vin_b, f"{a.base} top 1%, veto")[0],
+                  comp(vin_b.difference(vin_k), "explained away, veto")[0],
+                  comp(vin_k, f"{a.ka} top 1%, veto")[0],
+                  comp(vin_k.difference(vin_b), f"new in {a.ka} top 1%, veto")[0]]  # fmt: skip
+        rows = []
+        for name, ed in ((a.base, eb), (a.ka, ek)):
+            inj = ed.inj[ed.inj.split == a.split]
+            astro = inj[~inj.is_null]
+            r = {"scorer": name, "null FPR": inj[inj.is_null]["top1%"].mean(),
+                 "null FPR (veto)": inj[inj.is_null]["top1%_veto"].mean()}  # fmt: skip
+            for dbin in ("~0.3%", "~1%", "~3%"):
+                g = astro[astro.depth_bin == dbin]
+                r[f"recall {dbin}"] = g["top1%"].mean()
+                r[f"recall {dbin} (veto)"] = g["top1%_veto"].mean()
+            rows.append(r)
+        parts.append(f"### Injection recall in the top 1% with and without the veto "
+                     f"({a.split} split)\n\n" + md_table(pd.DataFrame(rows).round(3)))
+
     # injection recall by host catalogue class
     rows = []
     for name, ed in ((a.base, eb), (a.ka, ek)):
@@ -105,6 +136,29 @@ def main() -> None:
     t = t.reset_index()
     parts.append(f"### Injection recall by host catalogue class ({a.split} split, non-null)\n\n"
                  + md_table(t))  # fmt: skip
+
+    # known positives: evaluation only (never used to tune alpha / tau)
+    pb, pk = f"pct [{a.base}]", f"pct [{a.ka}]"
+    kb, kk = known_table(eb.real, sec), known_table(ek.real, sec)
+    kt = kb[["name", "tic", "class", "tmag", "pct_stratum"]].rename(columns={"pct_stratum": pb})
+    kt = kt.merge(kk[["tic", "pct_stratum"]].rename(columns={"pct_stratum": pk}), on="tic")
+    kt["kc_pred"] = kc.kc_pred.reindex(kt.tic).to_numpy()
+    kt["kc_pmax"] = kc.kc_pmax.reindex(kt.tic).round(2).to_numpy()
+    if "kc_explained" in real:
+        kt["E"] = real.kc_explained.reindex(kt.tic).round(2).to_numpy()
+    kt["catalogue"] = kc.cat.reindex(kt.tic).to_numpy()
+    if "sys_flag" in real:
+        kt["sys_flag"] = real.sys_flag.astype(bool).reindex(kt.tic).to_numpy()
+    kin_b, kin_k = kt[pb] >= 0.99, kt[pk] >= 0.99
+    kt["lost"] = kin_b & ~kin_k
+    kt[pb], kt[pk] = kt[pb].round(3), kt[pk].round(3)
+    lost = kt[kt.lost]
+    why = ", ".join(f"{n} as {p}" for n, p in zip(lost.name, lost.kc_pred))
+    parts.append(f"### Known positives ({len(kt)} in S{sec}; evaluation only)\n\n"
+                 f"In the top 1%: {int(kin_b.sum())} under {a.base}, {int(kin_k.sum())} under "
+                 f"{a.ka}. Wrongly explained away (in {a.base} top 1%, not in {a.ka}): "
+                 f"{len(lost)}{f' ({why})' if why else ''}.\n\n"
+                 + md_table(kt.sort_values(pb, ascending=False)))  # fmt: skip
 
     out = outputs_root() / "knownclass" / a.kc / f"s{sec:04d}" / f"report_{a.ka}.md"
     out.write_text("\n\n".join(parts) + "\n")
