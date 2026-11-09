@@ -20,6 +20,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
 import pandas as pd
 
 from oddball.rubin import catalog, crossmatch
@@ -36,12 +37,18 @@ def client() -> AlerceLSST:
     return _local.api
 
 
-def query_tile(row, min_ndet: int, max_pages: int) -> tuple[dict, list[dict]]:
+def query_tile(row, stars: np.ndarray, min_ndet: int, max_pages: int,
+               star_switch: int) -> tuple[dict, list[dict]]:
+    """Page through a tile's cone. If the tile is dense (> 1 page) but holds at most
+    ``star_switch`` catalogue stars, switch to one 2.5" cone per star instead (n_cat requests
+    instead of up to ``max_pages``)."""
     api = client()
     t = time.time()
     items: list[dict] = []
     pages = 0
     truncated = False
+    has_lsst = False
+    mode = "tile"
     err = ""
     try:
         for page in range(1, max_pages + 1):
@@ -49,17 +56,25 @@ def query_tile(row, min_ndet: int, max_pages: int) -> tuple[dict, list[dict]]:
                                  radius=round(row.radius_deg * 3600, 1),
                                  n_det=[min_ndet, 1_000_000])
             pages += 1
-            items.extend((d or {}).get("items") or [])
+            got = (d or {}).get("items") or []
+            has_lsst = has_lsst or bool(got)
+            items.extend(got)
             if not (d or {}).get("has_next"):
+                break
+            if page == 1 and len(stars) <= star_switch:
+                mode = "stars"
+                items = []
+                for ra, dec in stars:
+                    items.extend(star_cone(ra, dec, min_ndet))
                 break
         else:
             truncated = True
-    except Exception as e:  # noqa: BLE001 - log and continue  # log and move on; cache makes a re-run resume
+    except Exception as e:  # noqa: BLE001 - log and move on; cache makes a re-run resume
         err = f"{type(e).__name__}: {str(e)[:120]}"
     log = {"tile_id": row.tile_id, "ra_c": row.ra_c, "dec_c": row.dec_c,
            "radius_deg": row.radius_deg, "n_cat": row.n_cat, "n_obj": len(items),
-           "pages": pages, "truncated": truncated, "error": err,
-           "seconds": round(time.time() - t, 2)}
+           "has_lsst": has_lsst, "mode": mode, "pages": pages, "truncated": truncated,
+           "error": err, "seconds": round(time.time() - t, 2)}
     return log, [{k: it.get(k) for k in OBJ_COLS} for it in items]
 
 
@@ -80,6 +95,8 @@ def main() -> int:
     ap.add_argument("--max-pages", type=int, default=100)
     ap.add_argument("--max-tiles", type=int, default=0)
     ap.add_argument("--radius", type=float, default=1.0, help="match radius, arcsec")
+    ap.add_argument("--star-switch", type=int, default=50,
+                    help="dense tiles with <= this many catalogue stars use per-star cones")
     args = ap.parse_args()
 
     out_dir = data_root() / "rubin"
@@ -89,20 +106,23 @@ def main() -> int:
     if args.max_tiles:
         tiles = tiles.head(args.max_tiles)
     print(f"{len(cat)} catalogue rows, {len(tiles)} tiles", flush=True)
+    tid_all = crossmatch.tile_ids(cat["ra"], cat["dec"], cell_deg=args.cell_deg)
+    stars_by_tile = {k: v[["ra", "dec"]].to_numpy()
+                     for k, v in cat.assign(tile_id=tid_all).groupby("tile_id")}
 
     logs, objs = [], []
     t0 = time.time()
     with ThreadPoolExecutor(args.workers) as ex:
-        futs = [ex.submit(query_tile, r, args.min_ndet, args.max_pages)
-                for r in tiles.itertuples()]
+        futs = [ex.submit(query_tile, r, stars_by_tile[r.tile_id], args.min_ndet,
+                          args.max_pages, args.star_switch) for r in tiles.itertuples()]
         for k, f in enumerate(as_completed(futs), 1):
             log, items = f.result()
             logs.append(log)
             objs.extend(items)
-            if log["n_obj"] or log["error"] or k % 100 == 0:
+            if log["has_lsst"] or log["error"] or k % 100 == 0:
                 print(f"[{k}/{len(tiles)} {time.time()-t0:.0f}s] {log['tile_id']} "
                       f"ra={log['ra_c']:.1f} dec={log['dec_c']:.1f} n_cat={log['n_cat']} "
-                      f"n_obj={log['n_obj']} {log['error']}", flush=True)
+                      f"n_obj={log['n_obj']} mode={log['mode']} {log['error']}", flush=True)
             if k % 200 == 0:
                 pd.DataFrame(logs).to_csv(out_dir / "tiles.csv", index=False)
     logs_df = pd.DataFrame(logs)
@@ -112,8 +132,7 @@ def main() -> int:
     trunc = set(logs_df.loc[logs_df["truncated"].astype(bool), "tile_id"])
     n_star_cones = 0
     if trunc:
-        tid = crossmatch.tile_ids(cat["ra"], cat["dec"], cell_deg=args.cell_deg)
-        stars = cat[pd.Series(tid).isin(trunc).to_numpy()]
+        stars = cat[pd.Series(tid_all).isin(trunc).to_numpy()]
         print(f"{len(trunc)} truncated tiles -> {len(stars)} per-star cones", flush=True)
         with ThreadPoolExecutor(args.workers) as ex:
             futs = [ex.submit(star_cone, r.ra, r.dec, args.min_ndet) for r in stars.itertuples()]
@@ -130,7 +149,8 @@ def main() -> int:
     m.to_parquet(out_dir / "matches.parquet", index=False)
     prov = {"run_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "api": BASE_URL,
             "cell_deg": args.cell_deg, "min_ndet": args.min_ndet, "radius_arcsec": args.radius,
-            "tiles": len(tiles), "tiles_nonempty": int((logs_df["n_obj"] > 0).sum()),
+            "tiles": len(tiles), "tiles_with_lsst": int(logs_df["has_lsst"].sum()),
+            "tiles_star_mode": int((logs_df["mode"] == "stars").sum()),
             "tiles_error": int((logs_df["error"] != "").sum()),
             "tiles_truncated": int(logs_df["truncated"].sum()),
             "star_cones_for_truncated_tiles": n_star_cones,
