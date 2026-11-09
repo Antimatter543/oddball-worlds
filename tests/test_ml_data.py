@@ -65,7 +65,7 @@ def test_make_inputs_shapes_and_masking():
     x = torch.randn(B, 3, L)
     x[:, 2] = 1.0
     x[0, :, 10:40] = float("nan")
-    inp, tgt, err, obs, sobs = D.make_inputs(x)
+    inp, tgt, _err, obs, _sobs = D.make_inputs(x)
     assert inp.shape == (B, L // D.PATCH, D.PATCH * 4)
     assert tgt.shape == (B, 2, L) and obs.shape == (B, L)
     assert not obs[0, 10:40].any() and obs[1].all()

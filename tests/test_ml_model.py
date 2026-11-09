@@ -21,10 +21,10 @@ def _x(B=2):
 
 def test_forward_shapes_and_embedding():
     m = _model()
-    inp, tgt, err, obs, sobs = make_inputs(_x())
+    inp, _tgt, _err, _obs, _sobs = make_inputs(_x())
     mask = torch.zeros(2, GRID_LEN // PATCH, dtype=torch.bool)
     mask[:, 10:30] = True
-    mu, logv, h = m(inp, mask)
+    mu, logv, _h = m(inp, mask)
     assert mu.shape == (2, 2, GRID_LEN) and logv.shape == mu.shape
     assert m.embed_pooled(inp).shape == (2, 32)
 

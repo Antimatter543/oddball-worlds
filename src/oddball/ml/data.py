@@ -405,7 +405,7 @@ def make_inputs(x, obs_mask=None):
 def contiguous_block_mask(B: int, P: int, ratio: float, rng: np.random.Generator,
                           min_len: int = 2, max_len: int = 8) -> np.ndarray:  # fmt: skip
     """[B,P] bool: ~``ratio`` of patches hidden in contiguous blocks of min_len..max_len."""
-    target = int(round(ratio * P))
+    target = round(ratio * P)
     m = np.zeros((B, P), dtype=bool)
     for b in range(B):
         while m[b].sum() < target:
@@ -419,7 +419,7 @@ def scoring_masks(P: int, n_masks: int, rng: np.random.Generator, block: int = 4
     """[n_masks, P] bool: blocks of ``block`` patches; every block is hidden in exactly
     ``n_masks*0.4`` masks (2 of 5), so each patch gets a surprise estimate, each mask hides 40%."""
     nb = int(np.ceil(P / block))
-    per = max(1, int(round(0.4 * n_masks)))
+    per = max(1, round(0.4 * n_masks))
     perm = rng.permutation(nb)
     m = np.zeros((n_masks, P), dtype=bool)
     for j in range(nb):

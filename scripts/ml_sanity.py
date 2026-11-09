@@ -55,7 +55,7 @@ def masked_stats(model, ck, cache, rows, dev, seed=0, bs=256):
     n = 0
     for i in range(0, len(rows), bs):
         r = np.sort(rows[i : i + bs])
-        inp, tgt, err, obs, sobs = batch_inputs(cache, r, ck, dev)
+        inp, tgt, err, obs, _sobs = batch_inputs(cache, r, ck, dev)
         m = torch.from_numpy(contiguous_block_mask(len(r), model.cfg.n_patches, 0.4, rng)).to(dev)
         mu, logv, _ = model(inp, m)
         var = err**2 + torch.nn.functional.softplus(logv[:, 0]) + 1e-4
