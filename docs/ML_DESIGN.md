@@ -51,6 +51,14 @@ Compute several scores and keep them all:
    - the asymmetry of the largest dip
    - excess variance
 
+5. **Known-class score (open-set recognition):** train a light classifier on the embeddings using catalogue labels for the common variable types:
+   - Gaia DR3 `vari_classifier_result`
+   - TESS eclipsing-binary catalogues
+   - VSX types (EB, δ Scuti/γ Dor, RR Lyr, rotational/spotted, Cepheid, …)
+   - plus a "quiet" class
+
+   A star that confidently matches a known class (high max-probability, low energy score) is **explained away** and down-weighted. "Weird" means far from the crowds **and** fits no known class. Never train this on the anomaly target classes (dippers, Boyajian-like, exocomets). They must stay out-of-distribution.
+
 Combine scores by **rank-averaging**. **Conditional calibration:** convert each score to a percentile *within strata* of Tmag bin × camera/CCD. Faint stars are noisier, and noise shouldn't count as "weird".
 
 ## 5. Systematics rejection
