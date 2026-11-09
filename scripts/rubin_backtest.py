@@ -3,11 +3,16 @@
 Needs data/rubin/matches.parquet + rubin_objects.parquet (scripts/rubin_crossmatch.py).
 
     uv run python -I scripts/rubin_backtest.py [--workers 2] [--limit N] [--sep 1.0]
+        [--near-miss-dmag 0.7 --near-miss-plots 10]
+    uv run python -I scripts/rubin_backtest.py --field   # catalogue-agnostic control run
 
-Outputs:
+Outputs (field mode: backtest_field_results.parquet and outputs/rubin/field/):
     data/rubin/backtest_results.parquet  one row per matched Rubin object (all verdicts)
+    outputs/rubin/all_results.csv        same, as CSV (input for rubin_crosscheck.py)
     outputs/rubin/candidates.csv         flagged objects, ranked
-    outputs/rubin/plots/<oid>.png        light curves of candidates (+ near misses)
+    outputs/rubin/near_misses.csv        unflagged objects with peak dmag >= --near-miss-dmag
+    outputs/rubin/plots/{cand,near}_<oid>.png  light curves
+    outputs/rubin/backtest_provenance.json
 """
 
 from __future__ import annotations
@@ -73,6 +78,8 @@ def main() -> int:
     ap.add_argument("--min-points", type=int, default=2,
                     help="min n_det+n_forced (2 suffices with a template baseline)")
     ap.add_argument("--near-miss-plots", type=int, default=10)
+    ap.add_argument("--near-miss-dmag", type=float, default=0.7,
+                    help="unflagged objects with peak dmag >= this are plotted as near misses")
     ap.add_argument("--field", action="store_true",
                     help="catalogue-agnostic control: every well-sampled LSST object in the "
                          "YSO-bearing tiles, not just catalogue matches")
@@ -121,7 +128,7 @@ def main() -> int:
             s, lc, res = f.result()
             rows.append(s)
             pd_ = s.get("p_peak_dmag", np.nan)
-            if s.get("flagged") or (lc is not None and np.isfinite(pd_) and pd_ >= 0.7):
+            if s.get("flagged") or (lc is not None and np.isfinite(pd_) and pd_ >= args.near_miss_dmag):
                 keep[s["oid"]] = (lc, res)
             if k % 50 == 0 or s.get("flagged"):
                 print(f"[{k}/{len(futs)} {time.time()-t0:.0f}s] oid={s['oid']} "
@@ -135,7 +142,7 @@ def main() -> int:
 
     cand = res_df[res_df["flagged"].astype(bool)].copy()
     cand = cand.sort_values(["p_peak_dmag"], ascending=False)
-    near = res_df[~res_df["flagged"].astype(bool) & (res_df["p_peak_dmag"] >= 0.7)].sort_values(
+    near = res_df[~res_df["flagged"].astype(bool) & (res_df["p_peak_dmag"] >= args.near_miss_dmag)].sort_values(
         "p_peak_dmag", ascending=False).head(args.near_miss_plots)
     for df, tag in ((cand, "cand"), (near, "near")):
         paths = []
@@ -158,6 +165,8 @@ def main() -> int:
             "class_name", "plot"]
     cand[cols].to_csv(out / "candidates.csv", index=False)
     near.to_csv(out / "near_misses.csv", index=False)
+    res_df.to_csv(
+        out / "all_results.csv", index=False)
     reasons = res_df["reasons"].fillna("").str.split(":").str[0].value_counts().to_dict()
     prov = {"run_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "api": BASE_URL,
             "mode": "field" if args.field else "catalogue_matches",

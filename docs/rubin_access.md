@@ -100,3 +100,34 @@ Both need registration for their APIs and Kafka streams, so they are out of scop
 ## Mirrors
 
 On 2026-11-09, CDS Strasbourg (`vizier.cds.unistra.fr`, `simbad.cds.unistra.fr`, `tapvizier`) timed out from here. The pipeline therefore uses the **CfA mirrors** `vizier.cfa.harvard.edu` and `simbad.harvard.edu`. Override them with `ODDBALL_VIZIER_SERVER` and `ODDBALL_SIMBAD_SERVER`.
+
+## First backtest (2026-11-09)
+
+The catalogue numbers below come from this command chain:
+
+```
+uv run python -I scripts/rubin_fetch_catalogs.py      # SPICY 117,446; Gaia DR3 YSO 79,375; known YSO 11,671
+uv run python -I scripts/rubin_crossmatch.py --workers 3
+uv run python -I scripts/rubin_backtest.py --near-miss-dmag -10 --near-miss-plots 5
+uv run python -I scripts/rubin_crosscheck.py --csv outputs/rubin/all_results.csv
+uv run python -I scripts/rubin_backtest.py --field --workers 3     # catalogue-agnostic control
+uv run python -I scripts/rubin_positive_control.py                 # detector fires on real data?
+```
+
+**Cross-match.**
+- 3,394 tiles; 243 contain LSST objects with n_det ≥ 2.
+- **25 Rubin objects match a catalogue young star within 1"**: 18 Gaia DR3 YSOs and 8 known YSOs (one object is in both). **Zero SPICY matches.**
+- Separations: 26 of the 27 YSOs with an LSST object within 5" are inside 1", so the radius is not the limit.
+
+**Matched light curves.**
+- 24 of the 25 have only 2–6 points, all between 2026-06-25 and 2026-08-16.
+- **Candidates: 0.** Largest Δ was 0.53 mag (EDFS, a likely misclassified "YSO" at b = −48°).
+- All 25 are known YSOs or YSO candidates in SIMBAD/VSX (Or* ×8, Em* ×3, VSX "YSO" ×18).
+
+**Field control.**
+- 1,213 LSST objects in the same tiles with n_det ≥ 4 and span ≥ 5 d; 0 flagged.
+- 98% have peak Δ < 0.5 against the template. Most alert detections there are *fainter* than the template.
+
+**Positive control.**
+- 25 well-sampled ALeRCE "SN"-class objects (COSMOS, EDFS, RA 186).
+- 6 flagged, 5 of them multiband-confirmed. So the detector fires on real Rubin light curves.
