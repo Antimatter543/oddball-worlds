@@ -16,14 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
 
-from oddball.common.paths import REPO_ROOT, outputs_root  # noqa: E402
-from oddball.tess.store import load_lightcurves, metadata  # noqa: E402
+from oddball.common.paths import REPO_ROOT, outputs_root
+from oddball.tess.store import load_lightcurves, metadata
 
 KNOWN = REPO_ROOT / "docs" / "known_positives.csv"
 

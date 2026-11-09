@@ -1,0 +1,318 @@
+name,tic,class,ra,dec,tmag,sectors_spoc,sectors_qlp,sectors_any,reference,note
+beta Pic,270577175,exocomet,86.821217,-51.066504,3.696,32 33 34,32 33 34 87 95 98,32 33 34 87 95 98,"Zieba et al. 2019, A&A 625, L13; Norazman & Kennedy 2025, arXiv:2508.04673",prototype; TESS dips in S4-S7 (primary mission)
+TIC 280832588,280832588,exocomet,44.795219,-66.409814,12.051,28 29 30 68 69,28 29 30 68 69 95 96 97,28 29 30 68 69 95 96 97,"Norazman & Kennedy 2025, arXiv:2508.04673","new candidate, F2V; tentative (S1)"
+TYC 8705-361-1,73149665,exocomet,236.895045,-56.276013,11.69,,39 65 103,39 65 103,"Norazman & Kennedy 2025, arXiv:2508.04673","new candidate, G-type MS (S12)"
+TIC 143152957,143152957,exocomet,116.910627,-42.568406,12.858,,34 35 61 62 88 89,34 35 61 62 88 89,"Norazman & Kennedy 2025, arXiv:2508.04673","new candidate, G-type MS (S7)"
+TIC 110969638,110969638,exocomet,114.762288,-28.206032,12.764,,34 61 88,34 61 88,"Norazman & Kennedy 2025, arXiv:2508.04673","new candidate, giant/supergiant (S7)"
+TIC 229790952,229790952,exocomet,284.244381,69.290728,10.994,56 57 58 59 60 73 74 75 76 79 80 81 82 83 84 85,40 41 47 48 49 50 51 52 53 54 55 56 57 58 59 60 73 74 75 76 79 80 81 82 83 84 85 86,40 41 47 48 49 50 51 52 53 54 55 56 57 58 59 60 73 74 75 76 79 80 81 82 83 84 85 86,"Norazman & Kennedy 2025, arXiv:2508.04673","new candidate, giant (S15)"
+HD 172555,464405850,exocomet,281.362086,-64.871258,4.616,66,66 93 94 101 102 103 104,66 93 94 101 102 103 104,"Kiefer et al. 2014, A&A 561, L10; Norazman & Kennedy 2025, arXiv:2508.04673",spectroscopic exocomets; no TESS transit seen in S66 (NK25)
+KIC 3542116,122519163,exocomet,290.720587,38.694858,9.655,40 41 54 55 74 75,40 41 54 55 74 75,40 41 54 55 74 75,"Rappaport et al. 2018, MNRAS 474, 1453",Kepler exocomet transits
+KIC 11084727,26584368,exocomet,292.171657,48.687537,9.635,40 54 55 74 75 81 82,40 54 55 74 75 81 82,40 54 55 74 75 81 82,"Rappaport et al. 2018, MNRAS 474, 1453",Kepler exocomet transit
+KIC 8027456 (HD 182952),159719806,exocomet,291.315972,43.859324,9.576,40 41 54 55 74 75 81 82,40 41 54 55 74 75 81 82,40 41 54 55 74 75 81 82,"Kennedy et al. 2019, MNRAS 482, 5587",Kepler exocomet transit
+BD+05 4868 A,466376085,disintegrating,326.860513,6.60486,9.189,55 82,55 82,55 82,"Hon et al. 2025, arXiv:2501.05431","P=1.27 d; TESS S55, S82"
+KIC 12557548,417679385,disintegrating,290.966208,51.504718,14.987,74 76 80 81 82 83,,74 76 80 81 82 83,"Rappaport et al. 2012, ApJ 752, 1","Kepler-1520 b; T=15.0, likely below FFI-LC limits"
+K2-22,363445338,disintegrating,169.482821,2.619057,13.956,45 46 72,45 72,45 46 72,"Sanchis-Ojeda et al. 2015, ApJ 812, 112",T=14.0
+KOI-2700,272938824,disintegrating,297.003537,44.775104,14.618,81 82,,81 82,"Rappaport et al. 2014, ApJ 784, 40",T=14.6
+WD 1145+017,902906874,disintegrating,177.140124,1.483173,17.33,46 72,,46 72,"Vanderburg et al. 2015, Nature 526, 546","white dwarf debris; T=17.3, likely no FFI LC"
+KIC 8462852 (Boyajian's star),185336364,boyajian-like,301.564386,44.456886,11.352,41 54 55,41 54 55 81 82,41 54 55 81 82,"Boyajian et al. 2016, MNRAS 457, 3988",
+ASASSN-21qj,182582608,boyajian-like,123.847082,-38.989807,12.961,,34 35 61 62 88 89,34 35 61 62 88 89,"Kenworthy et al. 2023, Nature 622, 251",dust from a planetary collision
+TIC 400799224,400799224,boyajian-like,167.492441,-66.754143,11.743,,37 38 64 65,37 38 64 65,"Powell et al. 2021, AJ 162, 299",periodic-ish deep dust occultations
+EPIC 204278916,9735122,dipper/young-star,240.53157,-22.963023,12.596,,91,91,"Scaringi et al. 2016, MNRAS 463, 2265",Upper Sco; ~25 d of irregular dimming
+PDS 110,4206238,dipper/young-star,80.87921,-1.07325,9.896,32,32 98,32 98,"Osborn et al. 2017, MNRAS 471, 740",~25-d-long eclipses; also in Capistrant et al. 2022
+RZ Psc,15693497,dipper/young-star,17.425218,27.950531,10.879,57 84,57 84,57 84,"Kennedy et al. 2017, RSOS 4, 160652",UXor
+AA Tau,268510757,dipper/young-star,68.730926,24.4814,13.202,43 44 70 71,43 44 70 71,43 44 70 71,Bouvier et al. 1999; Bouvier et al. 2013,"prototype dipper, faded since 2011"
+EPIC 204376071,9855014,other-anomaly,241.042195,-22.57932,14.548,,,,"Rappaport et al. 2019, MNRAS 485, 2681",single 80%-deep 1-day occultation
+HD 139139,70652803,other-anomaly,234.275896,-19.142524,9.132,,91,91,"Rappaport et al. 2019, MNRAS 488, 2455",'random transiter': 28 aperiodic transit-like dips
+V1400 Cen (J1407),179367009,other-anomaly,211.949707,-39.76188,11.208,38,38 102,38 102,"Mamajek et al. 2012, AJ 143, 72",ring-system eclipse (2007)
+TIC 347007416,347007416,dipper/young-star,0.863115,55.550898,7.962,57 58 77 78 84 85,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 51288359,51288359,dipper/young-star,251.964162,-51.767769,8.781,39 66,39 66 93 103,39 66 93 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 406956018,406956018,dipper/young-star,1.505768,60.867214,8.96,57 58 77 78 84 85,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 201357489,201357489,dipper/young-star,57.401401,38.982098,9.115,,86,86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 376088043,376088043,dipper/young-star,3.41907,77.036363,9.121,58 59 69 73 78 79 85,52 58 59 73 78 79 85 86,52 58 59 69 73 78 79 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 159089190,159089190,dipper/young-star,88.512458,1.672762,9.131,,33 87 98,33 87 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 425368089,425368089,dipper/young-star,191.100452,-58.92267,9.136,64 65,37 38 64 65 99 100 101,37 38 64 65 99 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 16 Myr
+TIC 284730577,284730577,dipper/young-star,76.731208,10.998072,9.247,32 71,32 71 98,32 71 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 14 Myr
+TIC 172615355,172615355,dipper/young-star,234.344573,-40.299891,9.665,38 65,38 65,38 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 12 Myr
+TIC 34397579,34397579,dipper/young-star,82.297665,-6.134834,9.876,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 457231768,457231768,dipper/young-star,81.772804,0.418785,9.877,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 58467657,58467657,dipper/young-star,65.489202,28.443205,9.966,43 44 70 71,43 44 70 71,43 44 70 71,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 323354855,323354855,dipper/young-star,131.756849,-78.992883,10.102,37 38 39 64 65 66 69,37 38 39 64 65 66 93,37 38 39 64 65 66 69 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 17 Myr
+TIC 255464386,255464386,dipper/young-star,240.1855,-41.925259,10.363,65,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 314944955,314944955,dipper/young-star,279.115763,-39.04895,10.648,,66 93 104,66 93 104,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 372070676,372070676,dipper/young-star,330.428636,69.743451,10.679,57 58 69 77 78 84 85,57 58 77 78 84 85,57 58 69 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 467773418,467773418,dipper/young-star,169.466123,-64.03488,10.686,38 64,37 38 64 99 100,37 38 64 99 100,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 95977956,95977956,dipper/young-star,243.834308,-32.918083,10.713,65,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 442813719,442813719,dipper/young-star,238.714234,-31.912873,10.804,38 65,38 65 91,38 65 91,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 38090218,38090218,dipper/young-star,68.155265,-9.568208,10.809,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 14 Myr
+TIC 277671331,277671331,dipper/young-star,164.56979,-77.288106,10.869,64 66 69,38 39 64 65 66 93,38 39 64 65 66 69 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 609597649,609597649,dipper/young-star,3.417811,77.036105,10.881,,52 58 59 73 78 79 85,52 58 59 73 78 79 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 367420555,367420555,dipper/young-star,334.225246,70.062496,10.962,57 77 78 84,57 77 78 84,57 77 78 84,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 13 Myr
+TIC 442689368,442689368,dipper/young-star,237.945658,-35.945587,10.965,65,38 65 103,38 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 220496487,220496487,dipper/young-star,345.302657,-58.972708,11.071,28 68,28 68 95 102 103 104,28 68 95 102 103 104,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 24 Myr
+TIC 367286993,367286993,dipper/young-star,342.317777,75.828821,11.085,58 59 73 78 79 85,52 58 59 73 78 79 85 86,52 58 59 73 78 79 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 367420579,367420579,dipper/young-star,334.133215,70.044144,11.121,,57 77 78 84,57 77 78 84,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 58752825,58752825,dipper/young-star,239.431751,-41.727175,11.185,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 428476066,428476066,dipper/young-star,7.87784,61.980829,11.192,78,58 78 85,58 78 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 349924407,349924407,dipper/young-star,108.949287,-48.531675,11.395,61,33 35 61 62 87 88 89,33 35 61 62 87 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 47390297,47390297,dipper/young-star,341.916181,-29.846968,11.45,28 68,28 68 96,28 68 96,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 396357886,396357886,dipper/young-star,2.533996,59.216427,11.451,,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 13 Myr
+TIC 58177093,58177093,dipper/young-star,64.390534,28.346336,11.48,43 44 70 71,43 44 70 71,43 44 70 71,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 1 Myr
+TIC 90572194,90572194,dipper/young-star,52.870293,30.514769,11.505,58 70 71 85,42 43 44 58 70 71 85,42 43 44 58 70 71 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 1 Myr
+TIC 395771056,395771056,dipper/young-star,33.855606,76.588733,11.516,52 59 73,52 58 59 73 78 79 86,52 58 59 73 78 79 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 254063046,254063046,dipper/young-star,285.480187,-37.39468,11.521,,67,67,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 56640860,56640860,dipper/young-star,127.197993,-34.491641,11.559,,34 35 61 62 88 89,34 35 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 277554109,277554109,dipper/young-star,164.126618,-77.194278,11.564,66,38 39 64 65 66 93,38 39 64 65 66 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 226241509,226241509,dipper/young-star,247.515481,-42.449639,11.574,39,39 66,39 66,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 388245385,388245385,dipper/young-star,326.247484,54.381736,11.604,,56 57 76 77 83 84,56 57 76 77 83 84,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 454290777,454290777,dipper/young-star,166.678007,-76.60348,11.619,,37 39 64 65,37 39 64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 316430346,316430346,dipper/young-star,203.602555,-65.296471,11.64,38,38 65 99 101,38 65 99 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 16 Myr
+TIC 417832699,417832699,dipper/young-star,52.217434,30.751554,11.739,58 85,42 43 44 58 85,42 43 44 58 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 200639492,200639492,dipper/young-star,85.837165,9.101967,11.758,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 0 Myr
+TIC 338926351,338926351,dipper/young-star,339.153588,65.595243,11.802,,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 94159924,94159924,dipper/young-star,241.433494,-34.633071,11.809,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 19 Myr
+TIC 225023779,225023779,dipper/young-star,257.784115,-40.5323,11.857,,39 66 93,39 66 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 101033688,101033688,dipper/young-star,54.297427,33.050874,11.87,58,58,58,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 366760722,366760722,dipper/young-star,334.779352,73.837367,11.875,57 59 85,52 57 59 77 79 84 85 86,52 57 59 77 79 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 336119914,336119914,dipper/young-star,315.370644,77.043681,11.904,58 59 60 73 77 78 79 85,52 53 57 58 59 60 73 77 78 79 84 85 86,52 53 57 58 59 60 73 77 78 79 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 317873721,317873721,dipper/young-star,89.47404,-14.090365,11.938,33,33 87 98,33 87 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 57830249,57830249,dipper/young-star,174.890937,-30.666768,11.962,36 63,36 63 90 100 101,36 63 90 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 255263381,255263381,dipper/young-star,239.350044,-42.667936,11.974,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 254021762,254021762,dipper/young-star,285.006559,-36.618198,11.977,,67 94,67 94,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 467463928,467463928,dipper/young-star,336.238547,51.614323,11.982,,56 57 76 77 84,56 57 76 77 84,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 143670534,143670534,dipper/young-star,118.510657,-46.149296,11.998,34 35,34 35 61 62 88 89,34 35 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 12 Myr
+TIC 367302292,367302292,dipper/young-star,77.758618,29.991172,12.008,43 44,43 44 71,43 44 71,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 99211574,99211574,dipper/young-star,236.686372,-34.50991,12.01,65,38 65 103,38 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 436248202,436248202,dipper/young-star,84.12297,9.067409,12.053,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 367183148,367183148,dipper/young-star,340.913648,75.108394,12.085,,52 58 59 78 79 85 86,52 58 59 78 79 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 201357511,201357511,dipper/young-star,57.271357,38.938128,12.146,,86,86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 454292504,454292504,dipper/young-star,166.80025,-76.539791,12.174,,37 39 64 65,37 39 64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 143676630,143676630,dipper/young-star,118.561747,-46.433417,12.18,,34 35 61 62 88 89,34 35 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 285920558,285920558,dipper/young-star,119.798202,-50.379687,12.185,34 35 36,34 35 36 61 62 88 89,34 35 36 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 1052918018,1052918018,dipper/young-star,205.214864,-45.591529,12.208,,38 64 101 102,38 64 101 102,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 23 Myr
+TIC 323350447,323350447,dipper/young-star,131.06843,-78.985591,12.241,65,37 38 39 64 65 66 87 93,37 38 39 64 65 66 87 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 12 Myr
+TIC 200591757,200591757,dipper/young-star,85.373058,9.122333,12.287,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 261674916,261674916,dipper/young-star,185.809643,-55.671222,12.306,37 38 64,37 38 64 99 100 101,37 38 64 99 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 14 Myr
+TIC 248992945,248992945,dipper/young-star,78.18641,-1.09027,12.309,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 457995946,457995946,dipper/young-star,242.227853,-39.628652,12.31,39 65,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 350135873,350135873,dipper/young-star,329.04001,66.275879,12.318,,58 77 78 85,58 77 78 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 284158141,284158141,dipper/young-star,82.650628,10.515062,12.349,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 284583483,284583483,dipper/young-star,110.444355,-37.14111,12.4,,33 34 61 87 88,33 34 61 87 88,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 31 Myr
+TIC 97041244,97041244,dipper/young-star,74.762687,30.050094,12.414,43 44 71 73,43 44 71 73,43 44 71 73,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 302762301,302762301,dipper/young-star,82.930841,12.506108,12.432,43 44 45,32 43 44 45 71 98,32 43 44 45 71 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 238339263,238339263,dipper/young-star,120.627818,-51.816843,12.446,,34 35 36 61 62 63 88 89,34 35 36 61 62 63 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 67822046,67822046,dipper/young-star,242.208296,-28.597975,12.487,,65 91,65 91,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 427400158,427400158,dipper/young-star,83.941676,-0.96451,12.494,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 427395634,427395634,dipper/young-star,83.80935,-5.721569,12.554,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 365643370,365643370,dipper/young-star,81.539519,11.393281,12.56,,32 71 98,32 71 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 350073391,350073391,dipper/young-star,316.46632,77.371963,12.573,58 59 60 73 77 78 79 85,52 53 57 58 59 60 73 77 78 79 84 85 86,52 53 57 58 59 60 73 77 78 79 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 366674658,366674658,dipper/young-star,333.301169,73.549617,12.582,52,52 57 58 59 77 78 79 84 85 86,52 57 58 59 77 78 79 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 56624887,56624887,dipper/young-star,63.5566,28.213657,12.6,43 44 70,43 44 70 71,43 44 70 71,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 1164663109,1164663109,dipper/young-star,239.585007,-40.551624,12.625,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 360148823,360148823,dipper/young-star,187.054997,-75.918335,12.63,,38 39,38 39,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 427380721,427380721,dipper/young-star,83.834194,-2.789902,12.705,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 412308868,412308868,dipper/young-star,190.876861,-57.055163,12.708,,37 38 64 99 100 101,37 38 64 99 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 15 Myr
+TIC 427334205,427334205,dipper/young-star,83.530488,-5.229272,12.713,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 43488669,43488669,dipper/young-star,74.999985,-8.693458,12.73,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 19 Myr
+TIC 200640498,200640498,dipper/young-star,85.925334,10.039065,12.749,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 328238004,328238004,dipper/young-star,190.423497,-68.295048,12.789,,38 64 65 99 100 101,38 64 65 99 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 16 Myr
+TIC 338926355,338926355,dipper/young-star,339.163917,65.597201,12.805,,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 2042628844,2042628844,dipper/young-star,353.845472,48.677579,12.83,,57,57,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 184506694,184506694,dipper/young-star,127.415954,-40.27455,12.837,,34 35 61 62 88 89,34 35 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 391993044,391993044,dipper/young-star,245.478054,-27.86817,12.857,39,39 91,39 91,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 361957001,361957001,dipper/young-star,196.095217,-76.834856,12.866,,38 39 65 66 93 100 101,38 39 65 66 93 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 201357685,201357685,dipper/young-star,57.331427,38.744087,12.87,,86,86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 207017053,207017053,dipper/young-star,97.53972,9.689178,12.876,,33 87,33 87,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 7 Myr
+TIC 24775707,24775707,dipper/young-star,81.702952,-6.639736,12.902,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 396300742,396300742,dipper/young-star,2.406518,58.219659,12.971,77 78,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 56658816,56658816,dipper/young-star,63.913182,28.316258,12.974,43 44 70,43 44 70 71,43 44 70 71,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 1 Myr
+TIC 124072515,124072515,dipper/young-star,116.883135,-45.51132,12.989,,34 35 61 62 88 89,34 35 61 62 88 89,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 7 Myr
+TIC 11197417,11197417,dipper/young-star,84.375079,-0.814399,12.989,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 264739659,264739659,dipper/young-star,82.451648,2.913177,13.0,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 396300606,396300606,dipper/young-star,2.27022,58.280012,13.022,57 58 77 78,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 454364113,454364113,dipper/young-star,168.040965,-76.576805,13.047,,39 64 65,39 64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 193136669,193136669,dipper/young-star,157.19083,-28.510424,13.059,36 62 63,36 62 63 89 99 100,36 62 63 89 99 100,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 11 Myr
+TIC 269520098,269520098,dipper/young-star,350.72166,62.08618,13.139,,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 457251847,457251847,dipper/young-star,81.890994,4.64734,13.142,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 10 Myr
+TIC 335623526,335623526,dipper/young-star,332.928402,60.612039,13.147,,56 57 76 77 83 84 85,56 57 76 77 83 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 254487666,254487666,dipper/young-star,235.677303,-44.148015,13.149,38,38 65 103,38 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 457250759,457250759,dipper/young-star,81.943813,3.204306,13.153,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 336119910,336119910,dipper/young-star,315.220087,77.054159,13.175,,52 53 57 58 59 60 73 77 78 79 84 85 86,52 53 57 58 59 60 73 77 78 79 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 1128094885,1128094885,dipper/young-star,231.39089,-61.110275,13.18,,39 65 99 100 101 102 103,39 65 99 100 101 102 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 442960247,442960247,dipper/young-star,81.413497,-13.268528,13.182,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 11 Myr
+TIC 357956061,357956061,dipper/young-star,84.181768,82.950912,13.203,,40 52 53 59 60 73 86,40 52 53 59 60 73 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 9 Myr
+TIC 302830280,302830280,dipper/young-star,83.026708,12.489473,13.217,43 44 45,32 43 44 45 71 98,32 43 44 45 71 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 138125261,138125261,dipper/young-star,51.617565,31.202155,13.251,,42 43 44 58 85,42 43 44 58 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 316339361,316339361,dipper/young-star,280.369705,-37.822214,13.253,,104,104,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 454328868,454328868,dipper/young-star,167.706528,-77.29771,13.266,,39 64 65 66 93,39 64 65 66 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 65243533,65243533,dipper/young-star,275.627659,-33.458107,13.312,,66 91 92 93,66 91 92 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 99286102,99286102,dipper/young-star,236.607578,-31.722051,13.314,,38 65,38 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 387833145,387833145,dipper/young-star,315.637552,68.124751,13.32,,52 56 57 58 76 77 78 83 84 85 86,52 56 57 58 76 77 78 83 84 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 347113611,347113611,dipper/young-star,1.272455,59.650454,13.33,,57 58 77 78 84 85,57 58 77 78 84 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 144666684,144666684,dipper/young-star,84.822096,9.702014,13.355,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 373333074,373333074,dipper/young-star,3.333833,77.037143,13.378,,52 58 59 73 78 79 85 86,52 58 59 73 78 79 85 86,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 39 Myr
+TIC 4350574,4350574,dipper/young-star,81.483535,-2.267136,13.43,32,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 904313345,904313345,dipper/young-star,163.996499,-77.410965,13.451,64 65 66,38 39 64 65 66 93,38 39 64 65 66 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 22 Myr
+TIC 421793947,421793947,dipper/young-star,334.72678,58.7826,13.461,,56 57 76 77 83 84,56 57 76 77 83 84,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 336190656,336190656,dipper/young-star,333.585462,60.719768,13.471,,57 76 77 83 85,57 76 77 83 85,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 34472159,34472159,dipper/young-star,82.699995,-7.525665,13.474,,32 98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 279640885,279640885,dipper/young-star,85.75742,-8.080717,13.522,,32,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 50625209,50625209,dipper/young-star,82.346927,-1.420959,13.535,32,32,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 302830374,302830374,dipper/young-star,83.027094,12.401227,13.556,,32,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 53053490,53053490,dipper/young-star,125.906211,-43.97173,14.162,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 12 Myr
+TIC 243324939,243324939,dipper/young-star,204.409995,-47.608255,13.61,,64 101 102,64 101 102,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 16 Myr
+TIC 80719093,80719093,dipper/young-star,122.093185,-47.183201,13.618,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 12 Myr
+TIC 101166802,101166802,dipper/young-star,55.288071,31.743864,13.623,58,,58,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 220281682,220281682,dipper/young-star,99.922778,9.77212,13.638,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 81611586,81611586,dipper/young-star,123.341235,-47.88595,13.644,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 11 Myr
+TIC 210732282,210732282,dipper/young-star,245.664849,-35.218331,13.648,65,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 72914708,72914708,dipper/young-star,86.363104,-0.663959,13.656,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 94335354,94335354,dipper/young-star,58.143444,35.566369,13.66,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 59498906,59498906,dipper/young-star,240.450545,-36.146339,13.679,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 352114297,352114297,dipper/young-star,15.090952,71.240132,13.682,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 343564048,343564048,dipper/young-star,310.767123,64.321111,13.7,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 59334299,59334299,dipper/young-star,240.205973,-41.501089,13.704,,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 393878922,393878922,dipper/young-star,196.73927,-77.39489,13.718,38 39,,38 39,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 279644771,279644771,dipper/young-star,85.841969,-8.14642,13.722,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 408339697,408339697,dipper/young-star,68.856286,34.317091,13.73,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 113274213,113274213,dipper/young-star,284.202628,-36.444376,13.741,,67,67,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 454258470,454258470,dipper/young-star,166.177497,-77.699214,13.744,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 436650857,436650857,dipper/young-star,72.666856,16.329455,13.745,43 44 70 71,43 44 70 71 98,43 44 70 71 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 60609654,60609654,dipper/young-star,112.902848,-47.003671,13.772,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 220322339,220322339,dipper/young-star,100.210794,9.91592,13.775,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 713067496,713067496,dipper/young-star,81.441332,1.763895,13.781,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 357104316,357104316,dipper/young-star,180.435135,-78.324046,13.782,,39 65 66 93,39 65 66 93,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 16 Myr
+TIC 99286096,99286096,dipper/young-star,236.604851,-31.725259,13.786,,65,65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 50661105,50661105,dipper/young-star,82.660025,-5.428793,13.799,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 279540475,279540475,dipper/young-star,85.388435,-7.917296,13.821,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 343412488,343412488,dipper/young-star,310.256271,65.285309,13.826,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 9 Myr
+TIC 393878678,393878678,dipper/young-star,196.952076,-77.689327,13.826,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 149809200,149809200,dipper/young-star,233.452234,-40.924034,13.834,,65 103,65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 454290773,454290773,dipper/young-star,166.674124,-76.596962,13.837,64 65,,64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 150286027,150286027,dipper/young-star,117.339901,-34.723081,13.841,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 436013947,436013947,dipper/young-star,83.549839,11.55465,13.847,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 50749771,50749771,dipper/young-star,83.10705,-1.953128,13.865,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 125641411,125641411,dipper/young-star,105.994145,-11.493811,13.888,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 427453750,427453750,dipper/young-star,84.028786,-4.343726,13.894,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 55995777,55995777,dipper/young-star,69.264426,-6.739048,13.903,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 18 Myr
+TIC 332969781,332969781,dipper/young-star,85.021042,-6.490177,13.926,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 199780336,199780336,dipper/young-star,83.03243,-6.926925,13.928,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 182307759,182307759,dipper/young-star,123.385308,-38.4234,13.935,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 42 Myr
+TIC 336197099,336197099,dipper/young-star,333.97127,60.613106,13.959,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 457229780,457229780,dipper/young-star,81.739173,3.249625,13.995,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 393878734,393878734,dipper/young-star,196.847401,-77.623121,14.0,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 334999132,334999132,dipper/young-star,194.301678,-71.326263,14.018,,65 99 100 101,65 99 100 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 15 Myr
+TIC 146725602,146725602,dipper/young-star,44.756171,-42.538995,14.036,30 31,31 97,30 31 97,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 28 Myr
+TIC 279540150,279540150,dipper/young-star,85.360413,-8.977651,14.057,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 367243118,367243118,dipper/young-star,341.520855,75.057755,14.085,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 167303776,167303776,dipper/young-star,98.033244,-68.178329,14.147,27 28 29 30 31 32 33 34 35 36 37 38 39 61 62 63 64 65 66 67 68 69,31 35 36 37 39 61 62 63 64 65 66 67 68 69 87 88 89 90 93 95 96 97 98,27 28 29 30 31 32 33 34 35 36 37 38 39 61 62 63 64 65 66 67 68 69 87 88 89 90 93 95 96 97 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 30 Myr
+TIC 457229782,457229782,dipper/young-star,81.740084,3.248699,14.194,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 266079454,266079454,dipper/young-star,174.875627,-59.062392,14.216,,37 64 99 100,37 64 99 100,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 16 Myr
+TIC 266842406,266842406,dipper/young-star,175.571305,-57.134058,14.233,37,37 64 99 100,37 64 99 100,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 28 Myr
+TIC 144616195,144616195,dipper/young-star,84.659527,9.408984,14.243,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 171078069,171078069,dipper/young-star,67.662964,35.747176,14.25,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 207045924,207045924,dipper/young-star,97.829507,9.71211,14.287,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 427459842,427459842,dipper/young-star,83.393319,-6.231258,14.299,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 389417519,389417519,dipper/young-star,22.47689,63.05898,14.307,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 50721545,50721545,dipper/young-star,82.741036,-0.677157,14.339,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 284158620,284158620,dipper/young-star,82.703282,10.089371,14.341,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 126970139,126970139,dipper/young-star,216.438653,-46.91273,14.342,,65 102,65 102,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 20 Myr
+TIC 311410991,311410991,dipper/young-star,33.598536,-50.193778,14.342,29 30 69,69 96 97 104,29 30 69 96 97 104,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 24 Myr
+TIC 454328866,454328866,dipper/young-star,167.711412,-77.300882,14.347,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 382639653,382639653,dipper/young-star,243.189264,-37.193183,14.355,,39 65 103,39 65 103,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 15 Myr
+TIC 361958490,361958490,dipper/young-star,196.302819,-77.514602,14.368,65 66,,65 66,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 264541453,264541453,dipper/young-star,81.730728,1.672889,14.371,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 426186475,426186475,dipper/young-star,83.364913,10.795256,14.372,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 454365494,454365494,dipper/young-star,168.602161,-77.551778,14.388,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 436159171,436159171,dipper/young-star,83.92674,10.943331,14.392,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 954890399,954890399,dipper/young-star,195.223287,-77.152334,14.393,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 182306992,182306992,dipper/young-star,123.266597,-38.656682,14.431,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 315810194,315810194,dipper/young-star,314.761752,75.758336,14.432,52 53 57 58 59 69 73 77 78 79,,52 53 57 58 59 69 73 77 78 79,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 50525865,50525865,dipper/young-star,81.737739,-3.896723,14.445,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 436243662,436243662,dipper/young-star,84.160757,9.584861,14.47,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 11199550,11199550,dipper/young-star,84.519893,-1.288554,14.486,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 11199441,11199441,dipper/young-star,84.538501,-1.178667,14.507,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 11411658,11411658,dipper/young-star,85.394699,-2.290052,14.52,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 0 Myr
+TIC 954767237,954767237,dipper/young-star,197.4587,-77.956694,14.527,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 11284400,11284400,dipper/young-star,84.706232,-4.852307,14.533,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 454291734,454291734,dipper/young-star,166.992063,-77.711487,14.538,64 66,39 64 66,39 64 66,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 50749753,50749753,dipper/young-star,83.062359,-1.973992,14.539,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 269117420,269117420,dipper/young-star,80.964482,0.616846,14.546,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 454327459,454327459,dipper/young-star,167.212118,-76.420468,14.569,64 65,37 39 64 65,37 39 64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 241626984,241626984,dipper/young-star,207.668074,-52.292871,14.58,38,65 99 101 102,38 65 99 101 102,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 17 Myr
+TIC 158867831,158867831,dipper/young-star,87.710101,2.44699,14.592,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 276661407,276661407,dipper/young-star,84.311085,-1.030706,14.615,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 365643369,365643369,dipper/young-star,81.540688,11.393681,14.618,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 38044097,38044097,dipper/young-star,67.849455,-11.154702,14.619,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 36 Myr
+TIC 393878779,393878779,dipper/young-star,196.627147,-77.566713,14.639,65 66,39 65 66 93 101,39 65 66 93 101,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 200587752,200587752,dipper/young-star,83.317656,10.464686,14.661,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 302672869,302672869,dipper/young-star,82.651614,12.615729,14.671,43 44 45,,43 44 45,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 436013289,436013289,dipper/young-star,83.516381,9.87007,14.682,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 11286037,11286037,dipper/young-star,84.662632,-2.75895,14.684,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 454258687,454258687,dipper/young-star,166.237541,-77.265848,14.695,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 90650249,90650249,dipper/young-star,53.137515,31.039357,14.729,42 43 44,,42 43 44,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 200771597,200771597,dipper/young-star,53.67,41.5071,14.756,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 356471230,356471230,dipper/young-star,71.111215,54.126356,14.774,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 11 Myr
+TIC 419954392,419954392,dipper/young-star,202.717985,-52.316079,14.805,,64 65 99 100 101 102,64 65 99 100 101 102,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 269117422,269117422,dipper/young-star,80.964892,0.617737,14.83,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 60609638,60609638,dipper/young-star,112.940147,-46.988235,14.831,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 171013450,171013450,dipper/young-star,67.618447,35.544991,14.835,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 277671333,277671333,dipper/young-star,164.575209,-77.28888,14.84,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 2 Myr
+TIC 308749877,308749877,dipper/young-star,122.092542,-64.732683,14.848,28 31 35 36 37 38 61 62 64 65 68 69,31 35 36 37 61 62 64 65 68 69 88 89 90 95 96,28 31 35 36 37 38 61 62 64 65 68 69 88 89 90 95 96,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 21 Myr
+TIC 29502449,29502449,dipper/young-star,133.161102,-42.135356,14.892,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 309795677,309795677,dipper/young-star,85.72981,9.246999,14.906,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 50625269,50625269,dipper/young-star,82.411705,-1.32169,14.917,32,98,32 98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 284283995,284283995,dipper/young-star,85.961121,9.206931,14.985,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 454327547,454327547,dipper/young-star,167.325617,-76.508122,14.989,64 65,,64 65,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 50744570,50744570,dipper/young-star,82.970587,-1.659405,14.991,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 3 Myr
+TIC 142930997,142930997,dipper/young-star,52.350921,-35.241474,14.992,,31 97,31 97,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 15 Myr
+TIC 436153664,436153664,dipper/young-star,83.920997,9.222121,14.996,,98,98,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 10 Myr
+TIC 442652560,442652560,dipper/young-star,237.783766,-33.762155,15.002,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 24 Myr
+TIC 436161611,436161611,dipper/young-star,83.957247,8.796103,15.019,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 365846027,365846027,dipper/young-star,82.104047,9.117964,15.037,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 1354328238,1354328238,dipper/young-star,259.549902,-32.461043,15.054,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 200518711,200518711,dipper/young-star,83.009239,10.234091,15.057,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 7 Myr
+TIC 436248216,436248216,dipper/young-star,84.128443,9.166934,15.064,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 6 Myr
+TIC 359445425,359445425,dipper/young-star,140.644483,-63.294821,15.084,36 37 63 64,,36 37 63 64,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 14 Myr
+TIC 290174208,290174208,dipper/young-star,85.499053,9.314379,15.124,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 382699910,382699910,dipper/young-star,242.362416,-38.607482,15.13,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 41626821,41626821,dipper/young-star,256.370431,-35.558112,15.18,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 248473577,248473577,dipper/young-star,78.010231,-3.320161,15.181,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 199780139,199780139,dipper/young-star,83.04611,-6.60665,15.202,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 284284812,284284812,dipper/young-star,85.933976,9.844167,15.203,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 276661634,276661634,dipper/young-star,84.249323,-1.340145,15.211,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 284284126,284284126,dipper/young-star,85.985779,9.304681,15.218,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 436098573,436098573,dipper/young-star,83.800759,9.884763,15.253,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 11 Myr
+TIC 11409171,11409171,dipper/young-star,85.437575,-4.267587,15.27,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 279578264,279578264,dipper/young-star,85.4778,-7.98676,15.279,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 1 Myr
+TIC 50745441,50745441,dipper/young-star,82.981262,-2.872021,15.292,32,,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 144697607,144697607,dipper/young-star,84.95005,9.850736,15.296,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 4 Myr
+TIC 279644770,279644770,dipper/young-star,85.843102,-8.147237,15.299,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",known dipper; age 5 Myr
+TIC 279640846,279640846,dipper/young-star,85.743113,-8.017197,15.321,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 50583973,50583973,dipper/young-star,81.997246,-1.940316,15.398,32,,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 50658071,50658071,dipper/young-star,82.513502,-1.645235,15.403,32,,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 200515741,200515741,dipper/young-star,82.891119,10.538852,15.406,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 359343200,359343200,dipper/young-star,1.98324,65.566702,15.461,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 454365495,454365495,dipper/young-star,168.608772,-77.551232,15.462,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 268915006,268915006,dipper/young-star,118.089316,-48.799606,15.513,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 427376833,427376833,dipper/young-star,83.726826,-1.746487,15.517,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 190123032,190123032,dipper/young-star,132.367386,-41.745548,15.586,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 427397135,427397135,dipper/young-star,83.91038,-4.642297,15.586,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 248473576,248473576,dipper/young-star,78.011,-3.31683,15.598,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 5 Myr
+TIC 715848097,715848097,dipper/young-star,85.846624,9.091813,15.6,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 454364807,454364807,dipper/young-star,168.014593,-77.433569,15.621,64 65 66,,64 65 66,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 199899712,199899712,dipper/young-star,85.590633,0.987459,15.673,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 4 Myr
+TIC 190255415,190255415,dipper/young-star,132.789183,-41.753524,15.682,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 435933026,435933026,dipper/young-star,83.487942,11.556449,15.71,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 8 Myr
+TIC 715881035,715881035,dipper/young-star,85.925387,10.039409,15.711,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 30747148,30747148,dipper/young-star,134.54947,-43.35759,15.74,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 190122229,190122229,dipper/young-star,132.280742,-41.424942,15.754,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 9 Myr
+TIC 143211493,143211493,dipper/young-star,94.157677,-8.937705,15.764,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 10 Myr
+TIC 279640956,279640956,dipper/young-star,85.785382,-8.192306,15.792,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
+TIC 4350339,4350339,dipper/young-star,81.483415,-1.908918,15.805,32,,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 143211542,143211542,dipper/young-star,94.173335,-8.904926,15.864,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 50721548,50721548,dipper/young-star,82.744574,-0.678579,15.865,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 7 Myr
+TIC 4294664,4294664,dipper/young-star,81.310499,-0.940717,15.881,32,,32,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 367089511,367089511,dipper/young-star,339.563448,75.122348,15.978,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 6 Myr
+TIC 29502967,29502967,dipper/young-star,133.192967,-42.335135,15.992,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 12 Myr
+TIC 190124801,190124801,dipper/young-star,132.409033,-41.505484,16.0,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 3 Myr
+TIC 715878312,715878312,dipper/young-star,85.778243,9.730101,16.371,,,,"Capistrant et al. 2022, ApJS 263, 14 (VizieR J/ApJS/263/14)",new dipper candidate; age 2 Myr
