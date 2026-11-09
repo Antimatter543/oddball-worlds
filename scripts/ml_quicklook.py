@@ -30,7 +30,8 @@ def known_table(real: pd.DataFrame, sub: pd.DataFrame) -> pd.DataFrame:
     n = len(real)
     order = real.score.rank(ascending=False, method="min")
     rank = dict(zip(real.tic, order, strict=True))
-    cols = ["score_knn", "score_recon", "score_iforest", "score_recon_sap"]
+    cols = [c for c in ("score_knn", "score_recon", "score_iforest", "score_recon_sap")
+            if c in real]  # ssl_v2 has no SAP channel
     out = k[["tic", "name", "class", "tmag", "camera", "ccd"]].copy()
     out["score_pct"] = (100 * k.score.to_numpy()).round(2)
     out["global_rank"] = [int(rank[t]) for t in k.tic]
@@ -122,6 +123,9 @@ def main() -> None:
     ap.add_argument("--scorer", default="ssl_v1")
     ap.add_argument("--sector", type=int, default=32)
     ap.add_argument("--top", type=int, default=20)
+    ap.add_argument("--ml-scorer", default=None,
+                    help="scorer whose outputs/ml dir holds the time-resolved maps (e.g. ssl_v2 "
+                         "for the ssl_v2_recon variant)")
     ap.add_argument("--compare", nargs="*", default=[])
     ap.add_argument("--no-umap", action="store_true")
     a = ap.parse_args()
@@ -129,7 +133,9 @@ def main() -> None:
     sdir = f"s{a.sector:04d}"
     od = outputs_root() / "ml" / a.scorer
     real = pd.read_parquet(outputs_root() / "scores" / a.scorer / sdir / "real.parquet")
-    sub = pd.read_parquet(run / "score" / f"real_sub_{sdir}.parquet")
+    # ml_score.py names it real_sub_sNNNN_b<mask block>.parquet (ssl_v1 runs: no suffix)
+    subs = sorted((run / "score").glob(f"real_sub_{sdir}*.parquet"), key=lambda p: p.stat().st_mtime)
+    sub = pd.read_parquet(subs[-1])
     from oddball.ml.data import sector_origin
 
     origin = sector_origin(a.sector)  # the scored sector's grid (ssl_v2 trained on others)
@@ -152,7 +158,8 @@ def main() -> None:
     top = nk.head(a.top)
     top.drop(columns=[c for c in top if c.startswith("_")]).to_csv(od / f"top{a.top}_{sdir}.csv",
                                                                   index=False)  # fmt: skip
-    tr = pd.read_parquet(od / f"timeresolved_{sdir}_real.parquet")
+    tr_dir = outputs_root() / "ml" / (a.ml_scorer or a.scorer)  # variants share the run's maps
+    tr = pd.read_parquet(tr_dir / f"timeresolved_{sdir}_real.parquet")
     half = (len(top) + 1) // 2
     for j, part in enumerate((top.iloc[:half], top.iloc[half:])):
         plot_gallery(part, tr, origin, a.sector, od / f"top{a.top}_{sdir}_{j}.png")
