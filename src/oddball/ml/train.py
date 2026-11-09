@@ -28,8 +28,8 @@ from oddball.ml.data import (
     augment,
     contiguous_block_mask,
     make_inputs,
-    sector_gap_masks,
     mixed_order,
+    sector_gap_masks,
     signal_dominated,
     signal_flags,
 )
@@ -65,7 +65,7 @@ class TrainConfig:
 def git_sha() -> str:
     try:
         sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True)
-        dirty = subprocess.run(["git", "diff", "--quiet"], cwd=REPO_ROOT).returncode != 0
+        dirty = subprocess.run(["git", "diff", "--quiet"], cwd=REPO_ROOT, check=False).returncode != 0
         return sha.strip() + ("-dirty" if dirty else "")
     except Exception:  # noqa: BLE001
         return "unknown"

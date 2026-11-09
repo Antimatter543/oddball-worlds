@@ -65,3 +65,13 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - Known positives: **2 of 18** in the top 1% (β Pic, TIC 43488669); classical 11 of 18. Real dippers sit inside the cloud of ordinary variables in embedding space, so kNN density misses them.
 - **Caveats:** the reconstruction head collapsed to "predict the median" (now fixed with sin-cos positions, not yet retrained), so `score_recon` is really a learned-scatter deviation score. The embedding still reads camera at 55% vs 26% chance, mostly via the SAP channel. Combined-score top-100 overlap across two seeds is 0.28, below the §6 bar, so no ranking from it is reported. The reconstruction sub-score alone is stable (0.71).
 - **Reading:** ML finds injected events far better; classical finds real dippers and rejects instrument events better. Neither passes. Next: retrain with sin-cos positions and no SAP channel, apply the common-mode veto to ML scores, then the known-class explain-away score (§4.5).
+
+### 2026-11-10: `ssl_v2`, trained on S33/38/43/44/55, scored on held-out S32 (test split) — gate FAIL
+- Hybrid conv-stem + transformer patch-MAE (1.91M params), no SAP channel, 12k steps, 3 seeds. Details and deviations: ML_DESIGN §10. Report: `outputs/eval/compare/s0032/classical__ssl_v1__ssl_v2__ssl_v2_recon__ssl_v2_iforest/report.md`.
+- **The reconstruction now uses context.** On held-out S32 signal-dominated stars, masked-bin MSE 0.93 vs 1.52 for predicting the median (ssl_v1: 1.64 vs 1.70); hidden 0.7-d sinusoid correlation 0.87-0.89 (ssl_v1 ~0). The pure transformer still collapsed with sin-cos positions; a 3-block conv stem fixed it.
+- Recall within the top 1% at ~0.3% / all depths: `ssl_v2` **0.23 / 0.52** (ssl_v1 0.23 / 0.39, classical 0.03 / 0.25); top 0.1% 0.32. Val-selected `ssl_v2_iforest`: **0.30** / 0.47. AUROC 0.92.
+- Null false-positive rate: `ssl_v2` 0.53, **0.16 with the classical `sys_flag` veto**; `ssl_v2_iforest` 0.25, 0.03 with veto (0.25-0.48 across seeds). Veto costs recall: all depths 0.52 -> 0.45.
+- Known positives in the top 1%: `ssl_v2` 6/18 (ssl_v1 2, classical 11). PDS 110 drops to 0.86 without SAP.
+- Nuisance probe: camera 0.37 vs chance 0.26 (ssl_v1 0.55), camera+CCD 0.16 vs 0.07.
+- Stability: combined top-100 overlap 0.41 (fails, kNN 0.20); `ssl_v2_recon` 0.76 and `ssl_v2_iforest` 0.70 pass. No combined ranking is reported.
+- **Reading:** ML leads on injections at every depth; on nulls it still needs the veto and stays worse than vetoed classical (0.16 vs 0.013). Nothing reaches 50% at 0.3%, and known dippers still sit with the variables. Next: the known-class explain-away score (§4.5), then the gate re-run.

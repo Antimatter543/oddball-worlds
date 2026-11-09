@@ -138,3 +138,62 @@ to §1-4, each measured:
   `sigcopy`/`ml_sanity.py --copy` on signal-dominated stars. The shipped `score_recon` is
   effectively "deviation from the star's median in units of a learned per-star scatter". It
   localises events well (see the time-resolved maps) but is not a learned prediction.
+
+### `ssl_v2` (train S33/38/43/44/55, score held-out S32, 2026-11-09)
+
+Run `ssl_v2_s{0,1,2}` (3 seeds). Same data module, splits and exclusions as `ssl_v1`; reasoned
+changes, each measured:
+- **Held-out sector.** Trained on the `train` split of S33, S38, S43, S44, S55 (625,665 light
+  curves, `MultiCache`), S32 never seen. Each sector keeps its own grid origin and its own
+  common-gap mask; S32's mask is computed at scoring time from its real train + val stars
+  (which bins have data, no labels): 1128 of 1280 bins, as for `ssl_v1`.
+- **No SAP channel** (`--drop-sap`): PDCSAP + error + mask + scalar context only. Cost: PDS 110,
+  whose dip PDC suppresses, falls from the 0.976 to the ~0.85 percentile.
+- **Hybrid encoder** (`arch="hybrid"`): 3 residual dilated-conv blocks over the patch tokens
+  (receptive field +-14 patches), then 8 pre-norm transformer layers; LayerNorm on the patch
+  embedding before the sin-cos positions are added (`embed_norm`). 1.91M parameters.
+  **Why:** the sin-cos fix alone did not stop the collapse. Measured with
+  `oddball.ml.diagnostics` (masked-bin MSE on 600-1000 signal-dominated val stars, and a
+  synthetic-sinusoid test): the pure transformer + `embed_norm` on S33, 1,200 steps: gain over
+  predicting the median +0.03, sinusoid correlation 0.00. On pure synthetic sinusoids it reached
+  correlation 0.15 after 900 steps, while the hybrid reached 0.90 in 300 steps and the
+  CNN fallback 0.85 in 400. The hybrid on S33 at 1,600 steps: gain +0.18, sinusoid 0.53. A
+  transformer with only absolute positions learns positional attention very slowly; a local conv
+  stem gives a hidden token its neighbours at once.
+- **Training length.** 8 x 1,500 steps of 256 (12,000 steps, ~4.9 passes over the training
+  set), cosine LR, fp32, ~80 min per seed on the GTX 1650S. Val NLL still falling slowly at the
+  end (0.5233 -> 0.4655 for seed 0).
+- **Scoring mask block 8 patches** (was 4). Chosen on **val** injections only (test and known
+  untouched): reconstruction-surprise AUROC 0.818 -> 0.836, recall@1% 0.427 -> 0.462, null
+  FPR 0.553 -> 0.497 (block 2: worse; 16: similar to 8).
+- **Systematics veto.** Every ML score file carries `cm_frac, dump_frac, sys_frac, sys_flag,
+  n_anom` copied from the classical scorer's files for the same light curve (by TIC; by
+  `inj_id` for injections), i.e. `oddball.score.classical.systematics_features` with the
+  binomial common-mode test for injection sets. Nothing is reimplemented; the evaluator applies
+  the veto symmetrically. Caveat: `sys_flag` is set on 77.5% of real S32 stars, so "with veto"
+  ranks among the unflagged 22.5%.
+- **Variants written** (same model, same sub-scores): `ssl_v2` (pre-registered rank-average of
+  kNN, recon, IsoForest), `ssl_v2_recon` (recon only), `ssl_v2_iforest` (IsoForest only;
+  best on val at ~0.3% depth and null FPR, so it is a val-selected variant, not pre-registered).
+- **Stability bar.** §6 gives no number; we read "stable" as a mean pairwise top-100 overlap of
+  at least 0.5 across the 3 seeds (`scripts/ml_stability.py`, same rule as `ml_quicklook.py`).
+- **Reconstruction now uses context** (held-out S32, `ml_sanity.py --context`, seeds 0 / 1):
+  on 725 signal-dominated val stars (median error < 0.3 robust sigma), masked-bin MSE with
+  training-like 40% block masks is 0.930 / 0.922 vs 1.521 for predicting the median (gain
+  0.39) and 2.031 for linear interpolation; with single hidden 8-h patches 0.741 / 0.702 vs
+  1.556 (gain 0.52-0.55). Clean 0.7-d sinusoids behind one hidden patch: correlation 0.87 /
+  0.88 (4 hidden patches: 0.90 / 0.94); 2-d sinusoids, pooled correlation 0.95. `ssl_v1` scored
+  1.64 vs 1.70 and ~0 on the same checks.
+- **Nuisance probe** (pooled embedding, held-out S32, train-split fit / val-split test): camera
+  0.368 / 0.363 vs chance 0.259 (`ssl_v1`: 0.55 vs 0.26); camera+CCD 0.160 / 0.152 vs 0.069;
+  Tmag bin 0.50 vs 0.41. Smaller but not zero: some instrument signature remains.
+- **Seed stability (3 seeds, real S32, mean pairwise top-100 overlap).** Combined `score`
+  0.41 (fails), `score_knn` 0.20, `score_recon` 0.84, `score_iforest` 0.78. The variant files'
+  stratified `score`: `ssl_v2_recon` 0.76, `ssl_v2_iforest` 0.70 (both pass). kNN is the
+  unstable part: larger k does not help (seeds 0/1 kNN overlap 0.13 / 0.13 / 0.18 at
+  k = 20 / 100 / 300; combined 0.39 / 0.37 / 0.25). So no ranking from the combined `ssl_v2`
+  score is reported; rankings come from `ssl_v2_recon` or `ssl_v2_iforest`.
+- **Headline (S32 test, seed 0; seeds 1-2 within ~0.02 except IsoForest null FPR):** see
+  PLAN.md results log. Null FPR is worse than `ssl_v1` without the veto (0.53 vs 0.41) and
+  0.16 with it; the val-selected `ssl_v2_iforest` has 0.25 (0.03 with veto), but its null FPR
+  varies by seed (0.25 / 0.48 / 0.24).

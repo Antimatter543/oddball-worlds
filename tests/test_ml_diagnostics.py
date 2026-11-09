@@ -4,7 +4,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from oddball.ml.data import GRID_LEN, PATCH
-from oddball.ml.diagnostics import interp_baseline, synthetic_sinusoids, sinusoid_test
+from oddball.ml.diagnostics import interp_baseline, sinusoid_test, synthetic_sinusoids
 
 
 def test_interp_baseline_linear_across_hidden_block():

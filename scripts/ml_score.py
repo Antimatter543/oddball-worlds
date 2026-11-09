@@ -194,7 +194,7 @@ def main() -> None:
         with open(work / "ref_state.pkl", "wb") as fh:
             pickle.dump({"stats": stats, "iforest": iso, "is_ref": is_ref}, fh)
         sub.to_parquet(ref_file, index=False)
-        save_time_resolved(sub, work / f"surprise_real_{sdir}.npy",
+        save_time_resolved(sub, work / f"surprise_real_{sdir}_b{a.mask_block}.npy",
                            ml_dir / f"timeresolved_{sdir}_real.parquet", TOP_TIME_RESOLVED)  # fmt: skip
     real_sub = pd.read_parquet(ref_file)
     emit(real_sub, real_sub, scorers, sdir, "real.parquet", real=True)
