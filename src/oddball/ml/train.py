@@ -246,7 +246,10 @@ def train(cfg: TrainConfig, mcfg: ModelConfig, log=print) -> Path:
 def load_model(ckpt_path: Path, device=None) -> tuple[PatchMAE, dict]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ck = torch.load(ckpt_path, map_location=device, weights_only=False)
-    model = PatchMAE(ModelConfig(**ck["model_cfg"])).to(device)
+    cfg = dict(ck["model_cfg"])
+    cfg.setdefault("pos_mode", "learned")  # checkpoints from before pos_mode existed
+    cfg.setdefault("nll_beta", 0.0 if "pos_mode" not in ck["model_cfg"] else 0.5)
+    model = PatchMAE(ModelConfig(**cfg)).to(device)
     model.load_state_dict(ck["model"])
     model.eval()
     return model, ck

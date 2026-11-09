@@ -127,3 +127,14 @@ to §1-4, each measured:
   reference.
 - **Calibration** uses `oddball.common.strata` (the evaluator's 5 Tmag bins x 16 CCDs). A
   stratum with fewer than 300 reference stars falls back to its Tmag bin.
+- **Known flaw in the shipped `ssl_v1` (run `ssl_v1_s0`): its reconstruction does not use
+  context.** It used learned positions initialised at std 0.02, so every hidden token was
+  `mask_token + ~0`. It predicts the median with an inflated variance at every hidden position:
+  on 727 signal-dominated val stars, masked MSE is 1.64 vs 1.70 for predicting 0, and
+  correlation with a clean 0.7-d sinusoid behind a single hidden patch is ~0. Fixed sin-cos
+  positions are now the default (`pos_mode`). beta-NLL alone did not fix it, and a 400-step
+  sin-cos trial did not yet use context either. **Next:** train the sin-cos model much longer
+  (MAE-style schedules run 100s of epochs; use Kaggle) and re-check with
+  `sigcopy`/`ml_sanity.py --copy` on signal-dominated stars. The shipped `score_recon` is
+  effectively "deviation from the star's median in units of a learned per-star scatter". It
+  localises events well (see the time-resolved maps) but is not a learned prediction.

@@ -33,6 +33,7 @@ def main() -> None:
     ap.add_argument("--d-model", type=int, default=128)
     ap.add_argument("--layers", type=int, default=10)
     ap.add_argument("--nll-beta", type=float, default=0.5)
+    ap.add_argument("--pos-mode", default="sincos", choices=["sincos", "learned"])
     a = ap.parse_args()
 
     cache = build_cache(sector_dir(a.sector), cache_dir_for(sector_dir(a.sector)))
@@ -44,7 +45,8 @@ def main() -> None:
         max_steps_per_epoch=a.max_steps_per_epoch, overfit_rows=a.overfit_rows,
         augment=not a.no_augment,
     )  # fmt: skip
-    mcfg = ModelConfig(arch=a.arch, d_model=a.d_model, n_layers=a.layers, nll_beta=a.nll_beta)
+    mcfg = ModelConfig(arch=a.arch, d_model=a.d_model, n_layers=a.layers, nll_beta=a.nll_beta,
+                       pos_mode=a.pos_mode)
     out = train(cfg, mcfg, log=lambda s: print(s, flush=True))
     print(f"run dir: {out}")
 

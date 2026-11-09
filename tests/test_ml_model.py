@@ -82,3 +82,18 @@ def test_knn_excludes_own_tic():
     s_self = knn_score(ref[:5], tic[:5], ref, tic, k=3, device=torch.device("cpu"))
     s_incl = knn_score(ref[:5], np.full(5, -1), ref, tic, k=3, device=torch.device("cpu"))
     assert (s_self > s_incl).all()  # including self would give a zero distance
+
+
+def test_masked_tokens_are_position_distinguishable():
+    """Regression for runs ssl_v1_s0 / ssl_v1b_s0: with tiny learned positions every hidden
+    token looked the same, so the model could only predict one value for all hidden patches.
+    With sin-cos positions, hidden tokens at different positions must differ at init."""
+    torch.manual_seed(0)
+    m = PatchMAE(ModelConfig(d_model=32, n_layers=2, n_heads=4)).eval()
+    inp = make_inputs(_x(1))[0]
+    mask = torch.zeros(1, GRID_LEN // PATCH, dtype=torch.bool)
+    mask[:, 10:50] = True
+    with torch.no_grad():
+        h = m.tokens(inp, mask)[0, 10:50]
+    spread = (h - h.mean(0)).norm(dim=1).mean() / h.norm(dim=1).mean()
+    assert spread > 0.3

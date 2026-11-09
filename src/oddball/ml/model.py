@@ -35,6 +35,10 @@ class ModelConfig:
     # gradient is scaled by 1/var and the model collapses to "predict the median, inflate the
     # variance" (observed in run ssl_v1_s0, beta=0). 0.5 keeps noisy bins down-weighted.
     nll_beta: float = 0.5
+    # "sincos": fixed unit-scale sin-cos positions (MAE). "learned" (std-0.02 init, as in runs
+    # ssl_v1_s0 / ssl_v1b_s0) left every masked token ~identical, so the model predicted the same
+    # value (the median) at every hidden position and never used context.
+    pos_mode: str = "sincos"
     arch: str = "transformer"  # or "cnn" (fallback)
 
     def to_dict(self) -> dict:
@@ -50,6 +54,7 @@ class PatchMAE(nn.Module):
         self.mask_token = nn.Parameter(torch.zeros(d))
         self.pos = nn.Parameter(torch.zeros(1, cfg.n_patches, d))
         nn.init.normal_(self.pos, std=0.02)
+        self.register_buffer("pos_fixed", _sincos(cfg.n_patches, d), persistent=False)
         nn.init.normal_(self.mask_token, std=0.02)
         if cfg.arch == "transformer":
             layer = nn.TransformerEncoderLayer(
@@ -74,6 +79,8 @@ class PatchMAE(nn.Module):
         if mask is not None:
             h = torch.where(mask[..., None], self.mask_token.to(h.dtype).expand_as(h), h)
         h = h + self.pos
+        if self.cfg.pos_mode == "sincos":
+            h = h + self.pos_fixed
         return self.norm(self.encoder(h))
 
     def forward(self, inp, mask=None):
@@ -91,6 +98,13 @@ class PatchMAE(nn.Module):
         has = (inp[..., 3 :: self.cfg.in_ch].sum(-1) > 0).float()  # obs channel per patch
         has = torch.where(has.sum(1, keepdim=True) > 0, has, torch.ones_like(has))
         return (h * has[..., None]).sum(1) / has.sum(1, keepdim=True)
+
+
+def _sincos(n: int, d: int) -> torch.Tensor:
+    pos = torch.arange(n, dtype=torch.float32)[:, None]
+    i = torch.arange(d // 2, dtype=torch.float32)[None, :]
+    ang = pos / (10000 ** (2 * i / d))
+    return torch.cat([torch.sin(ang), torch.cos(ang)], 1)[None]
 
 
 class _CNN(nn.Module):
