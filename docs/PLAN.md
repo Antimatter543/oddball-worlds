@@ -1,7 +1,7 @@
 # Plan
 
 ## Goal
-A completeness-calibrated search of TESS extended-mission (Sector ≥27) full-frame-image light curves for **asymmetric, single-event and variable-depth dimming**: exocomets, disintegrating planets and dippers. Unclassifiable anomalies come out as a by-product.
+A completeness-calibrated **anomaly hunt** across TESS extended-mission (Sector ≥27) full-frame-image light curves, aimed at the weirdest stars. The named classes are young stars with disks (dippers), Boyajian-like irregular dimmers, exocomets and disintegrating planets. Unclassifiable anomalies are a first-class output, not a by-product.
 
 **Deliverable:** a catalogue with injection-recovery completeness, plus a public gallery. Astronomers will judge it on completeness and false positives, not on the model architecture.
 

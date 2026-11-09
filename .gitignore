@@ -16,3 +16,6 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .ipynb_checkpoints/
+
+# agent worktrees
+.claude/worktrees/
