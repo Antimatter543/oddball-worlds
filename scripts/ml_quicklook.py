@@ -130,8 +130,9 @@ def main() -> None:
     od = outputs_root() / "ml" / a.scorer
     real = pd.read_parquet(outputs_root() / "scores" / a.scorer / sdir / "real.parquet")
     sub = pd.read_parquet(run / "score" / f"real_sub_{sdir}.parquet")
-    origin = int(__import__("torch").load(run / "best.pt", map_location="cpu",
-                                          weights_only=False)["origin"])  # fmt: skip
+    from oddball.ml.data import sector_origin
+
+    origin = sector_origin(a.sector)  # the scored sector's grid (ssl_v2 trained on others)
     res = {}
 
     kt = known_table(real, sub)

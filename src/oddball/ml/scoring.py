@@ -162,11 +162,12 @@ def stratified_percentile(x, fine_q, coarse_q, ref, fine_r, coarse_r, min_n=MIN_
     return out
 
 
-def combine(sub: pd.DataFrame, real_sub: pd.DataFrame) -> np.ndarray:
-    """Rank-average + stratified percentile, both against the real stars (``real_sub``)."""
-    ra = np.mean([percentile_vs(real_sub[c].to_numpy(), sub[c].to_numpy()) for c in COMBINE], 0)
+def combine(sub: pd.DataFrame, real_sub: pd.DataFrame, cols=COMBINE) -> np.ndarray:
+    """Rank-average of ``cols`` + stratified percentile, both against the real stars
+    (``real_sub``). With one column this is just its stratified percentile."""
+    ra = np.mean([percentile_vs(real_sub[c].to_numpy(), sub[c].to_numpy()) for c in cols], 0)
     ra_real = np.mean([percentile_vs(real_sub[c].to_numpy(), real_sub[c].to_numpy())
-                       for c in COMBINE], 0)  # fmt: skip
+                       for c in cols], 0)  # fmt: skip
     fq, cq = strata(sub.camera, sub.ccd, sub.tmag)
     fr, cr = strata(real_sub.camera, real_sub.ccd, real_sub.tmag)
     return ra, stratified_percentile(ra, fq, cq, ra_real, fr, cr)
@@ -176,3 +177,29 @@ def make_inputs_for(cache, rows, device, obs_mask=None):  # small helper for plo
     x = torch.from_numpy(np.asarray(cache.x[np.sort(rows)], dtype=np.float32)).to(device)
     om = None if obs_mask is None else torch.as_tensor(np.asarray(obs_mask), device=device)
     return make_inputs(x, om)
+
+
+def obs_mask_for(ck: dict, sector: int, real_cache: Cache, work=None, log=print):
+    """The common-gap mask for ``sector``: stored in the checkpoint if the model trained on that
+    sector, else computed from the sector's real train + val stars (which bins have data; no
+    labels) and cached as ``work/obs_mask_sNNNN.npy``. None if the model used no mask."""
+    from pathlib import Path
+
+    from oddball.ml.data import common_gap_masks
+
+    om = ck.get("obs_masks") or {}
+    if sector in om or str(sector) in om:
+        return np.asarray(om.get(sector, om.get(str(sector))), dtype=bool)
+    if not ck["train_cfg"].get("common_gap_mask"):
+        return ck.get("obs_mask")
+    f = None if work is None else Path(work) / f"obs_mask_s{sector:04d}.npy"
+    if f is not None and f.exists():
+        return np.load(f)
+    idx = real_cache.index
+    rows = idx.index[idx.split.isin(["train", "val"]) & idx.inj_id.isna()
+                     & (idx.n_obs >= 200)].to_numpy()  # fmt: skip
+    m = common_gap_masks(real_cache, rows)[0]
+    if f is not None:
+        np.save(f, m)
+    log(f"  common-gap mask for held-out s{sector:04d}: {int(m.sum())} of {len(m)} bins")
+    return m

@@ -39,7 +39,12 @@ class ModelConfig:
     # ssl_v1_s0 / ssl_v1b_s0) left every masked token ~identical, so the model predicted the same
     # value (the median) at every hidden position and never used context.
     pos_mode: str = "sincos"
-    arch: str = "transformer"  # or "cnn" (fallback)
+    # LayerNorm on the patch (content) embedding before positions are added. Without it content
+    # tokens are ~25x larger than the unit-scale sin-cos positions, so attention from a hidden
+    # (position-only) token cannot find its neighbours by position (ssl_v2, ML_DESIGN §10).
+    embed_norm: bool = False
+    arch: str = "transformer"  # or "cnn" (fallback), or "hybrid" (conv stem + transformer)
+    n_conv: int = 3  # conv stem blocks for arch="hybrid"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -51,17 +56,26 @@ class PatchMAE(nn.Module):
         self.cfg = cfg
         d = cfg.d_model
         self.embed = nn.Linear(cfg.patch * cfg.in_ch, d)
+        if cfg.embed_norm:
+            self.embed_ln = nn.LayerNorm(d)
         self.mask_token = nn.Parameter(torch.zeros(d))
         self.pos = nn.Parameter(torch.zeros(1, cfg.n_patches, d))
         nn.init.normal_(self.pos, std=0.02)
         self.register_buffer("pos_fixed", _sincos(cfg.n_patches, d), persistent=False)
         nn.init.normal_(self.mask_token, std=0.02)
-        if cfg.arch == "transformer":
+        if cfg.arch in ("transformer", "hybrid"):
             layer = nn.TransformerEncoderLayer(
                 d, cfg.n_heads, d * cfg.ff_mult, cfg.dropout, activation="gelu",
                 batch_first=True, norm_first=True,
             )  # fmt: skip
-            self.encoder = nn.TransformerEncoder(layer, cfg.n_layers, enable_nested_tensor=False)
+            tf = nn.TransformerEncoder(layer, cfg.n_layers, enable_nested_tensor=False)
+            if cfg.arch == "hybrid":
+                # residual dilated-conv stem (receptive field +-2*(1+2+4)=14 patches): a hidden
+                # token gets its neighbours' content before any attention has to be learned
+                stem = [_ConvBlock(d, 2**i) for i in range(cfg.n_conv)]
+                self.encoder = nn.Sequential(_Transpose(nn.Sequential(*stem)), tf)
+            else:
+                self.encoder = tf
         elif cfg.arch == "cnn":
             blocks = []
             for i in range(cfg.n_layers):
@@ -76,6 +90,8 @@ class PatchMAE(nn.Module):
     def tokens(self, inp: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         """inp [B,P,patch*4] -> encoder output [B,P,d]. ``mask`` [B,P] bool hides patches."""
         h = self.embed(inp)
+        if self.cfg.embed_norm:
+            h = self.embed_ln(h)
         if mask is not None:
             h = torch.where(mask[..., None], self.mask_token.to(h.dtype).expand_as(h), h)
         h = h + self.pos
@@ -105,6 +121,30 @@ def _sincos(n: int, d: int) -> torch.Tensor:
     i = torch.arange(d // 2, dtype=torch.float32)[None, :]
     ang = pos / (10000 ** (2 * i / d))
     return torch.cat([torch.sin(ang), torch.cos(ang)], 1)[None]
+
+
+class _ConvBlock(nn.Module):
+    """Pre-norm residual block on [B,d,P]: GroupNorm -> dilated conv (k=5) -> GELU -> 1x1."""
+
+    def __init__(self, d: int, dilation: int):
+        super().__init__()
+        self.f = nn.Sequential(nn.GroupNorm(8, d), nn.Conv1d(d, d, 5, padding=2 * dilation,
+                                                              dilation=dilation),
+                               nn.GELU(), nn.Conv1d(d, d, 1))  # fmt: skip
+
+    def forward(self, h):
+        return h + self.f(h)
+
+
+class _Transpose(nn.Module):
+    """Apply a [B,d,P] module to [B,P,d] tokens."""
+
+    def __init__(self, m):
+        super().__init__()
+        self.m = m
+
+    def forward(self, h):
+        return self.m(h.transpose(1, 2)).transpose(1, 2)
 
 
 class _CNN(nn.Module):
