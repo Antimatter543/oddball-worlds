@@ -1,0 +1,18 @@
+# data never goes in git
+data/
+*.fits
+*.fits.gz
+*.parquet
+*.h5
+*.npz
+checkpoints/
+runs/
+outputs/
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
