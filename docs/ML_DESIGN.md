@@ -102,3 +102,39 @@ Combine scores by **rank-averaging**. **Conditional calibration:** convert each 
 - **Injection sets:** `data/injections/<name>/s<NNNN>/{val,test}/`. Same shard schema as ingest, plus columns `inj_id` (str, unique) and `host_tic` (int), plus an `injections.parquet` table with one row per `inj_id`: `host_tic, sector, split, kind, depth, duration_d, t0_btjd, params_json, is_null`. `is_null=True` marks instrument-like null injections. Hosts are drawn **only** from the split named by the directory.
 - **Score files:** `outputs/scores/<scorer>/s<NNNN>/{real,inj_<name>}.parquet`, with columns `tic, sector, inj_id (null for real), score` (higher = weirder), plus any `score_*` sub-scores. A scorer must be runnable on any shard directory, real or injected.
 - **Evaluation** reads score files only, so any scorer (classical, EncoTESS, our encoder) plugs in identically.
+
+## 10. Implementation record: `ssl_v1` (S32, 2026-11-09)
+
+Code: `src/oddball/ml/`, `scripts/ml_{prepare,train,sanity,score,quicklook}.py`. Reasoned changes
+to §1-4, each measured:
+- **fp32, not fp16.** On the GTX 1650 Super with the torch 2.15 + cu13.2 wheel, fp16 autocast
+  was 2x slower per step (fp16 matmul 0.42 vs 2.26 TFLOPS fp32). The 2.0M-param model fits in
+  ~2 GB in fp32. `--amp` re-enables autocast.
+- **Common gap mask.** The per-CCD gap pattern alone predicts camera at 96% and CCD at 86%
+  (chance 25% / 7%; linear probe on observed fraction per patch). Every star therefore uses
+  only bins where at least 90% of stars on *every* CCD have data: 1128 of 1280 grid bins, about
+  3% of the real data. With it, the mask-only probe is at chance.
+- **Shape view compression.** Robust-sigma units, then `10*asinh(x/10)` (linear within 10
+  sigma), so 30% dips on quiet stars keep their order without exploding the NLL. Errors are
+  propagated through the transform.
+- **beta-NLL (beta=0.5) for training.** Plain Gaussian NLL with learned excess variance
+  collapsed to "predict the median, inflate the variance" (run `ssl_v1_s0`). Early stopping and
+  the reported val NLL stay plain NLL.
+- **Reconstruction surprise = excess NLL** `0.5 (z^2 - 1)`, so a star's noise level does not
+  shift its score. Star score = mean of its 4 most surprising patches. Each patch is hidden in
+  2 of 5 block masks.
+- **kNN** excludes the query's own TIC, and for injections the host TIC, from the train+val
+  reference.
+- **Calibration** uses `oddball.common.strata` (the evaluator's 5 Tmag bins x 16 CCDs). A
+  stratum with fewer than 300 reference stars falls back to its Tmag bin.
+- **Known flaw in the shipped `ssl_v1` (run `ssl_v1_s0`): its reconstruction does not use
+  context.** It used learned positions initialised at std 0.02, so every hidden token was
+  `mask_token + ~0`. It predicts the median with an inflated variance at every hidden position:
+  on 727 signal-dominated val stars, masked MSE is 1.64 vs 1.70 for predicting 0, and
+  correlation with a clean 0.7-d sinusoid behind a single hidden patch is ~0. Fixed sin-cos
+  positions are now the default (`pos_mode`). beta-NLL alone did not fix it, and a 400-step
+  sin-cos trial did not yet use context either. **Next:** train the sin-cos model much longer
+  (MAE-style schedules run 100s of epochs; use Kaggle) and re-check with
+  `sigcopy`/`ml_sanity.py --copy` on signal-dominated stars. The shipped `score_recon` is
+  effectively "deviation from the star's median in units of a learned per-star scatter". It
+  localises events well (see the time-resolved maps) but is not a learned prediction.
