@@ -18,6 +18,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+cloud = [
+    "kaggle>=2.1",
+]
 dev = ["pytest", "ruff"]
 
 [build-system]

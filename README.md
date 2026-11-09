@@ -49,6 +49,28 @@ median-normalised PDCSAP flux binned to 30 min on a global BTJD grid (plus per-b
 count, OR of quality flags, SAP flux and background), a metadata table and `provenance.json`.
 No FITS is kept; nothing is detrended at ingest. Layout details: `src/oddball/tess/ingest.py`.
 
+### Cloud ingest (Kaggle)
+
+A sector pulls ~67 GB of FITS to keep ~2.7 GB of Parquet, so the download can run in a private,
+CPU-only Kaggle kernel instead, and only the Parquet comes home. Needs an authenticated Kaggle CLI
+(`~/.kaggle`). The kernel pip-installs this repo at a pinned commit, so that commit must be on
+GitHub (default: current `main`).
+
+```bash
+uv run --group cloud python -I scripts/kaggle_ingest.py run 33 --limit 2000      # quick slice
+uv run --group cloud python -I scripts/kaggle_ingest.py run 33 34 35 36 37       # one kernel per sector
+uv run --group cloud python -I scripts/kaggle_ingest.py status 33 34 35 36 37
+uv run --group cloud python -I scripts/kaggle_ingest.py download 33              # re-pull a finished run
+uv run --group cloud python -I scripts/kaggle_ingest.py verify 33                # check a local sector dir
+```
+
+`run` keeps at most `--max-concurrent` kernels going (default 4; Kaggle allows 5 batch CPU
+sessions per account), downloads each output to `data/tess-spoc/.kaggle-staging/`, verifies it
+(shard and row counts against the metadata table and provenance, every shard decodes) and only
+then moves it to `data/tess-spoc/sNNNN/`. It never overwrites an existing sector dir.
+`provenance.json` gains a `kaggle` block (git SHA, kernel, timings, bytes downloaded) and a
+`kaggle_download` block; each run is also logged to `data/kaggle/runs.jsonl`.
+
 ## Parked: Gaia DR4
 
 Gaia DR4 lands on 2 Dec 2026. A neural orbit-fitter for stars with hidden companions may join later. See `docs/PLAN.md`.
