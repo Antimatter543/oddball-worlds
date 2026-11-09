@@ -3,7 +3,13 @@ import pandas as pd
 import pytest
 
 from oddball.knownclass import labels as L
-from oddball.knownclass.explain import ExplainAway, WeightedECDF, choose_alpha
+from oddball.knownclass.explain import (
+    ExplainAway,
+    WeightedECDF,
+    choose_alpha,
+    downweight,
+    explained_share,
+)
 from oddball.knownclass.features import (
     close_gaps,
     dip_event_features,
@@ -11,6 +17,8 @@ from oddball.knownclass.features import (
     periodogram_features,
 )
 from oddball.knownclass.model import (
+    KnownClassModel,
+    _knn_mean_dist,
     _softmax,
     cap_quiet,
     fit_temperature,
@@ -112,9 +120,10 @@ def test_training_targets_gates():
     })  # fmt: skip
     f = _feat(6, [0.9, 0.05, 0.05, 0.05, 0.05, 0.9], [30, 4, 4, 4, 4, 30], [3, 3, 3, 3, 3, 3])
     y = training_targets(f, labels).tolist()
-    # EB that varies; EB flat in this sector dropped; quiet; flagged-but-flat not quiet;
-    # excluded never quiet; excluded label never used
-    assert y == ["EB", "", "quiet", "", "", ""]
+    # EB that varies; EB flat in this sector dropped; quiet; flagged-but-flat is not quiet but
+    # "other"; excluded stars are never targets (not quiet, not other, label unused)
+    assert y == ["EB", "", "quiet", "other", "", ""]
+    assert training_targets(f, labels, other=False).tolist() == ["EB", "", "quiet", "", "", ""]
     f2 = f.assign(inj_id=["x"] * 6)
     assert set(training_targets(f2, labels)) == {""}
 
@@ -125,9 +134,10 @@ def test_lc_quiet_requires_no_dip():
 
 
 def test_cap_quiet():
-    y = pd.Series(["quiet"] * 100 + ["EB"] * 10 + ["RR"] * 3 + [""] * 5)
+    y = pd.Series(["quiet"] * 100 + ["other"] * 50 + ["EB"] * 10 + ["RR"] * 3 + [""] * 5)
     c = cap_quiet(y, cap=2.0)
-    assert (c == "quiet").sum() == 20 and (c == "EB").sum() == 10 and (c == "RR").sum() == 3
+    assert (c == "quiet").sum() == 20 and (c == "other").sum() == 20
+    assert (c == "EB").sum() == 10 and (c == "RR").sum() == 3
 
 
 # ---------------------------------------------------------------------------------------------
@@ -227,5 +237,56 @@ def test_explain_away_ranks_quiet_dip_above_ordinary_eb():
     assert ea.score(np.array([0.3]), np.array([[1.0, 0.0]]), 0.0)[0] == pytest.approx(0.3)
 
 
+def test_other_class_explains_nothing():
+    rng = np.random.default_rng(3)
+    s = rng.random(5000)
+    p = np.tile([0.5, 0.5, 0.0], (5000, 1))
+    ea = ExplainAway(["EB", "other", "RR"]).fit(s, p)  # RR: no reference mass -> identity
+    q = np.array([0.2, 0.9])
+    assert np.allclose(ea.ka(q, np.array([[0, 1.0, 0], [0, 0, 1.0]])), q)
+    assert ea.identity.tolist() == [False, True, True]
+
+
 def test_choose_alpha_prefers_smaller_on_ties():
     assert choose_alpha({0.0: 0.1, 0.5: 0.3, 1.0: 0.3}) == 0.5
+
+
+def test_downweight_and_explained_share():
+    s = np.array([0.999, 0.999, 0.5])
+    e = np.array([0.0, 1.0, 0.5])
+    out = downweight(s, e, 1.0)
+    assert out[0] == pytest.approx(0.999) and out[1] == pytest.approx(0.0)
+    assert 0.0 < out[2] < 0.5
+    assert np.allclose(downweight(s, e, 0.0), s)
+    kc = pd.DataFrame({"kc_p_EB": [0.9, 0.9, 0.2], "kc_t_EB": [0.5, 0.02, 0.5],
+                       "kc_p_other": [0.1, 0.1, 0.8]})  # no kc_t_other: other explains nothing
+    assert np.allclose(explained_share(kc, 0.1), [0.9, 0.18, 0.2])
+
+
+def test_knn_mean_dist_skips_own_tic():
+    ref = np.array([[0.0, 0.0], [10.0, 0.0], [0.0, 10.0]])
+    q = np.array([[0.0, 0.0]])
+    assert _knn_mean_dist(q, ref, 1)[0] == pytest.approx(0.0)
+    d = _knn_mean_dist(q, ref, 1, q_tic=np.array([7]), r_tic=np.array([7, 8, 9]))
+    assert d[0] == pytest.approx(10.0)
+
+
+def test_classifier_and_typicality_on_toy_classes():
+    pytest.importorskip("sklearn")
+    rng = np.random.default_rng(0)
+    n = 600
+    y = np.array(["EB"] * n + ["ROT"] * n + ["other"] * n)
+    centre = {"EB": (3.0, 0.0), "ROT": (0.0, 3.0), "other": (0.0, 0.0)}
+    xy = np.array([centre[c] for c in y]) + rng.normal(scale=0.5, size=(3 * n, 2))
+    X = pd.DataFrame({"pg_a": xy[:, 0], "pg_b": xy[:, 1], "pdc_dip_snr": rng.random(3 * n)})
+    tic = np.arange(3 * n)
+    tr = np.arange(3 * n) % 4 != 0
+    m = KnownClassModel(feature_cols=list(X.columns), params={"max_iter": 50})
+    m.fit(X[tr], y[tr], X[~tr], y[~tr])
+    m.fit_typicality(X[tr], y[tr], tic[tr])
+    assert set(m.typ) == {"EB", "ROT"} and "pdc_dip_snr" not in m.typ_cols
+    q = pd.DataFrame({"pg_a": [3.0, 9.0], "pg_b": [0.0, 0.0], "pdc_dip_snr": [0.5, 0.5]})
+    p = m.predict_frame(q)
+    assert (p.kc_pred == "EB").all()  # the tree extrapolates: far point is still "EB" ...
+    assert p.kc_t_EB[0] > 0.3 and p.kc_t_EB[1] < 0.02  # ... but typicality says it is not one
+    assert p.kc_explained[1] < 0.05

@@ -30,10 +30,18 @@ from oddball.common.paths import outputs_root, sector_dir
 from oddball.common.splits import split_array
 from oddball.common.strata import stratum_id
 from oddball.eval.harness import DEPTH_EDGES, DEPTH_LABELS, load_truth, rank_within
-from oddball.knownclass.explain import ExplainAway, choose_alpha, prob_matrix, stratum_pct
+from oddball.knownclass.explain import (
+    ExplainAway,
+    downweight,
+    explained_share,
+    prob_matrix,
+    stratum_pct,
+)
+from oddball.knownclass.labels import OTHER
 from oddball.tess.arrays import dir_metadata
 
-ALPHAS = (0.0, 0.25, 0.5, 0.75, 1.0)
+ALPHAS = (0.0, 0.25, 0.5, 0.75, 0.9, 1.0)
+TAUS = (0.05, 0.1, 0.25, 0.5, 1.0)
 TUNE_DEPTHS = ("~0.3%", "~1%", "~3%")
 PASSTHROUGH = ("sys_flag", "sys_frac", "cm_frac", "dump_frac", "n_anom")
 
@@ -67,6 +75,12 @@ def main() -> None:
     ap.add_argument("--sector", type=int, default=32)
     ap.add_argument("--inj", default="v1")
     ap.add_argument("--alpha", default="auto")
+    ap.add_argument("--tau", default=0.1, type=float, help="typicality tolerance (fixed alpha)")
+    ap.add_argument("--rule", default="downweight", choices=["downweight", "ccdf"],
+                    help="downweight: scale the base surprise by the explained share "
+                         "(probability x typicality); ccdf: class-conditional percentile")
+    ap.add_argument("--identity", nargs="*", default=["other", "quiet"],
+                    help="classes that explain nothing away (F_c(s) = s)")
     a = ap.parse_args()
     out_name = a.out or f"{a.base}_ka"
     sec = a.sector
@@ -104,46 +118,76 @@ def main() -> None:
     s_i = stratum_pct(base_r, real.stratum, base_i, inj.stratum)
     p_r, p_i = prob_matrix(real, classes), prob_matrix(inj, classes)
 
-    # 2. class-conditional ECDFs from the train-split real stars
-    ref = (real.split == "train").to_numpy()
-    ea = ExplainAway(classes).fit(s_r[ref], p_r[ref])
-    log(f"reference: {int(ref.sum())} train-split real stars; class mass "
+    # 2. class-conditional ECDFs from the train-split real stars with a catalogue / quiet target
+    ref = ((real.split == "train") & real.target.isin([c for c in classes if c != OTHER])
+           & ~real.cat_excluded.astype(bool)).to_numpy()  # fmt: skip
+    ea = ExplainAway(classes, identity_classes=tuple(a.identity)).fit(s_r[ref], p_r[ref])
+    log(f"reference: {int(ref.sum())} train-split labelled real stars; class mass "
         + ", ".join(f"{c} {m:.0f}" for c, m in ea.class_mass.items()))
 
-    # 3. alpha on val injections
+    if a.rule == "downweight" and not any(c.startswith("kc_t_") for c in real.columns):
+        raise ValueError(f"{a.kc} has no typicality columns (kc_t_*); use --rule ccdf")
+
+    def combined(al, which, tau):
+        s, p, df = (s_r, p_r, real) if which == "real" else (s_i, p_i, inj)
+        if a.rule == "downweight":
+            return downweight(s, explained_share(df, tau), al)
+        return ea.score(s, p, al)
+
+    # 3. alpha (and tau for downweight) on val injections
+    taus = TAUS if a.rule == "downweight" else (1.0,)
     sweep = {}
-    for al in ALPHAS:
-        sweep[al] = val_metrics(real, inj, ea.score(s_r, p_r, al), ea.score(s_i, p_i, al))
-        log(f"alpha {al:.2f}: val " + ", ".join(f"{k} {v:.3f}" for k, v in sweep[al].items()))
-    alpha = (choose_alpha({k: v["objective"] for k, v in sweep.items()}) if a.alpha == "auto"
-             else float(a.alpha))  # fmt: skip
-    log(f"alpha = {alpha}")
+    for tau in taus:
+        for al in ALPHAS:
+            m = val_metrics(real, inj, combined(al, "real", tau), combined(al, "inj", tau))
+            sweep[(al, tau)] = m
+            log(f"{a.rule} alpha {al:.2f} tau {tau:.2f}: val "
+                + ", ".join(f"{k} {v:.3f}" for k, v in m.items()))
+    if a.alpha == "auto":
+        best = max(v["objective"] for v in sweep.values())
+        # ties: least intervention (smallest alpha, then largest tau)
+        alpha, tau = min((k for k, v in sweep.items() if v["objective"] >= best - 1e-12),
+                         key=lambda k: (k[0], -k[1]))  # fmt: skip
+    else:
+        alpha, tau = float(a.alpha), float(a.tau)
+    log(f"alpha = {alpha}, tau = {tau}")
+
+    def ka_raw(which):  # the fully explained-away score (alpha = 1), for inspection
+        return combined(1.0, which, tau)
 
     # 4. final scores, re-percentiled within stratum against the real stars
-    c_r, c_i = ea.score(s_r, p_r, alpha), ea.score(s_i, p_i, alpha)
+    c_r, c_i = combined(alpha, "real", tau), combined(alpha, "inj", tau)
     f_r = stratum_pct(c_r, real.stratum, c_r, real.stratum)
     f_i = stratum_pct(c_r, real.stratum, c_i, inj.stratum)
     od = outputs_root() / "scores" / out_name / f"s{sec:04d}"
     od.mkdir(parents=True, exist_ok=True)
-    kc_cols = ["kc_pred", "kc_pmax", "kc_entropy", "kc_energy"]
-    for df, s, ka, fin, part in ((real, s_r, ea.ka(s_r, p_r), f_r, "real"),
-                                 (inj, s_i, ea.ka(s_i, p_i), f_i, f"inj_{a.inj}")):  # fmt: skip
+    kc_cols = ["kc_pred", "kc_pmax", "kc_entropy", "kc_energy", "kc_explained"]
+    for df, s, ka, fin, part in ((real, s_r, ka_raw("real"), f_r, "real"),
+                                 (inj, s_i, ka_raw("inj"), f_i, f"inj_{a.inj}")):  # fmt: skip
         o = pd.DataFrame({"tic": df.tic.to_numpy(), "sector": sec,
                           "inj_id": df.inj_id.to_numpy() if "inj_id" in df else None,
                           "stratum": df.stratum.to_numpy(), "score": fin,
                           "score_base": s, "score_ka_raw": ka})  # fmt: skip
         for c in kc_cols:
-            o[c] = df[c].to_numpy()
+            if c in df:
+                o[c] = df[c].to_numpy()
+        if a.rule == "downweight":
+            o["kc_explained"] = explained_share(df, tau)
         for c in PASSTHROUGH:
             if c in df:
                 o[c] = df[c].to_numpy()
         o.to_parquet(od / f"{part}.parquet", index=False)
     prov = {"scorer": out_name, "base": a.base, "kc": a.kc, "sector": sec, "inj": a.inj,
-            "alpha": alpha, "alpha_mode": a.alpha, "classes": classes,
-            "val_sweep": {str(k): v for k, v in sweep.items()},
+            "alpha": alpha, "tau": tau, "alpha_mode": a.alpha, "classes": classes,
+            "val_sweep": {f"alpha={k[0]},tau={k[1]}": v for k, v in sweep.items()},
             "class_mass": ea.class_mass, "n_reference": int(ref.sum()),
-            "rule": "score = pct_stratum((1-alpha)*s + alpha*sum_c p_c F_c(s)); F_c = p_c-weighted "
-                    "ECDF of s over train-split real stars",
+            "rule": a.rule,
+            "rule_text": {"downweight": "score = pct_stratum(1 - (1 - s)^(1 - alpha*E)), E = "
+                                        "sum over explaining classes of p_c x min(1, t_c/tau)",
+                          "ccdf": "score = pct_stratum((1-alpha)*s + alpha*sum_c p_c F_c(s)); "
+                                  "F_c = p_c-weighted ECDF of s over train-split labelled real "
+                                  "stars; F_c(s) = s for identity classes"}[a.rule],
+            "identity_classes": [c for c, i in zip(classes, ea.identity, strict=True) if i],
             "built_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}  # fmt: skip
     (od / "provenance.json").write_text(json.dumps(prov, indent=1, default=float))
     log(f"wrote {od}")

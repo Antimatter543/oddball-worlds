@@ -25,6 +25,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -88,13 +89,30 @@ def main() -> None:
                                                      va_cap.y.to_numpy(), seed=a.seed)
     log(f"fit in {time.time() - t0:.0f} s, {model.clf.n_iter_} iterations, "
         f"T = {model.temperature:.3f}")
+    t0 = time.time()
+    model.fit_typicality(tr, tr.y.to_numpy(), tr.tic.to_numpy(), seed=a.seed)
+    log(f"typicality reference in {time.time() - t0:.0f} s: "
+        + ", ".join(f"{c} {len(v['ref'])}" for c, v in model.typ.items()))
 
     # validation report on every val target (quiet not capped: per-class recall is unaffected)
-    pv = model.predict_frame(va)
+    pv = model.predict_frame(va, tic=va.tic.to_numpy())
     rep = M.per_class_report(va.y.to_numpy(), pv.kc_pred.to_numpy(), model.classes)
-    rep_cap = M.per_class_report(va_cap.y.to_numpy(), model.predict_frame(va_cap).kc_pred.to_numpy(),
+    rep_cap = M.per_class_report(va_cap.y.to_numpy(), model.predict_frame(va_cap, tic=va_cap.tic.to_numpy()).kc_pred.to_numpy(),
                                  model.classes)  # fmt: skip
     conf = M.confusion(va.y.to_numpy(), pv.kc_pred.to_numpy(), model.classes)
+    typ_rows = []
+    for c in model.typ:
+        m = va.y.to_numpy() == c
+        typ_rows.append({"class": c, "val members": int(m.sum()),
+                         "median t (members)": float(np.median(pv[f"kc_t_{c}"][m])) if m.any()
+                         else np.nan,
+                         "median t (other/quiet)": float(np.median(
+                             pv[f"kc_t_{c}"][np.isin(va.y, ["other", "quiet"])])),
+                         "mean explained (members)": float(pv.kc_explained[m].mean()) if m.any()
+                         else np.nan})  # fmt: skip
+    typ = pd.DataFrame(typ_rows)
+    typ.to_csv(out / "val_typicality.csv", index=False)
+    print(typ.to_string(index=False))
     rep.to_csv(out / "val_per_class.csv", index=False)
     conf.to_csv(out / "val_confusion.csv")
     print(rep.to_string(index=False))
@@ -114,7 +132,7 @@ def main() -> None:
         parts = ["real"] + [f"inj_{n}" for n in a.inj]
         for part in parts:
             f = load_table(a.features, s, part)
-            p = model.predict_frame(f)
+            p = model.predict_frame(f, tic=f.tic.to_numpy())
             res = pd.concat([f[["tic", "sector", "inj_id"]], p], axis=1)
             if part == "real":
                 lab = labels.set_index("tic")

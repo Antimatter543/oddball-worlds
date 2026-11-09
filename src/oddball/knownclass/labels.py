@@ -11,8 +11,7 @@ Per TIC, label priority is Prsa+2022 TESS EB > VSX (nearest entry within ``VSX_L
 pixel) or any Gaia source within ``GAIA_RADIUS`` with an excluded type excludes the TIC, since
 its variability would be blended into our light curve.
 
-``quiet`` is assigned later from the light curve itself (``model.assign_quiet``) to TICs that no
-source flags at all.
+``quiet`` and ``other`` are assigned per light curve at training time (``model.training_targets``).
 """
 
 from __future__ import annotations
@@ -25,7 +24,11 @@ import pandas as pd
 # ---------------------------------------------------------------------------------------------
 # Classes
 
-CLASSES = ("EB", "DSCT_GDOR", "RR", "CEP", "LPV", "ROT", "ELL", "BCEP_SPB", "quiet")
+KNOWN_CLASSES = ("EB", "DSCT_GDOR", "RR", "CEP", "LPV", "ROT", "ELL", "BCEP_SPB", "quiet")
+# "other": unlabelled, non-quiet light curves. A catch-all so that ordinary stars (and stars with
+# events no class explains) are not forced into a known class. It never explains anything away.
+OTHER = "other"
+CLASSES = (*KNOWN_CLASSES, OTHER)
 
 VSX_CLASS = {
     "EB": {"E", "EA", "EB", "EW", "ED", "ESD", "EAD", "EC", "EL"},

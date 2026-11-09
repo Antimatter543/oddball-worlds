@@ -4,8 +4,10 @@ Inputs per light curve: the base scorer's percentile ``s`` (within Tmag x CCD st
 the sector's real stars) and the known-class probabilities ``p_c`` from the classifier.
 
 **Rule: class-conditional percentile.** For each known class ``c``, ``F_c`` is the distribution
-of ``s`` among the reference (train-split, real) stars *weighted by their probability of being
-class c*. The explained-away score asks "how weird is this star *for the kind of star it looks
+of ``s`` among the reference stars (train-split, real, with a catalogue or quiet training
+target) *weighted by their probability of being class c*. For ``other`` (the classifier's
+catch-all for unlabelled stars) and for classes with too little reference mass, ``F_c(s) = s``:
+nothing is explained away. The explained-away score asks "how weird is this star *for the kind of star it looks
 like*":
 
     ka = sum_c p_c * F_c(s)
@@ -20,8 +22,8 @@ like*":
   dip raises its base score above typical EBs. The classifier sees the injected light curve
   (never the host's catalogue label), so real and injected stars are treated identically and a
   dip that makes the light curve look less EB-like also loosens the class match.
-* A star that fits no class (spread probabilities) gets an average of several ``F_c``, so
-  it is only partly explained away.
+* A star that fits no known class goes to ``other`` and keeps its base percentile. Spread
+  probabilities give an average of several ``F_c``, so the star is only partly explained away.
 
 ``alpha`` is the only knob. It is chosen on **val** injections (``choose_alpha``), never on the
 test split or the known positives.
@@ -57,22 +59,53 @@ class WeightedECDF:
 
 
 class ExplainAway:
-    def __init__(self, classes: list[str]):
+    """``ka = sum_c p_c F_c(s)``; ``F_c(s) = s`` (nothing explained) for ``identity_classes`` and
+    for classes whose reference mass is below ``min_mass``."""
+
+    def __init__(self, classes: list[str], identity_classes=("other",), min_mass: float = 20.0):
         self.classes = list(classes)
+        self.identity = np.array([c in identity_classes for c in self.classes])
+        self.min_mass = min_mass
 
     def fit(self, s_ref: np.ndarray, p_ref: np.ndarray) -> ExplainAway:
         self.ecdf = WeightedECDF().fit(np.asarray(s_ref, float), np.asarray(p_ref, float))
         self.class_mass = dict(zip(self.classes, self.ecdf.tot.tolist(), strict=True))
+        self.identity = self.identity | (self.ecdf.tot < self.min_mass)
         return self
 
     def ka(self, s: np.ndarray, p: np.ndarray) -> np.ndarray:
-        f = self.ecdf.transform(np.asarray(s, float))
-        f = np.nan_to_num(f, nan=0.5)  # a class with zero reference mass explains nothing
+        s = np.nan_to_num(np.asarray(s, float), nan=0.0)
+        f = self.ecdf.transform(s)
+        f[:, self.identity] = s[:, None]
         return (np.asarray(p, float) * f).sum(axis=1)
 
     def score(self, s: np.ndarray, p: np.ndarray, alpha: float) -> np.ndarray:
         s = np.asarray(s, float)
         return (1.0 - alpha) * np.nan_to_num(s, nan=0.0) + alpha * self.ka(s, p)
+
+
+def downweight(s: np.ndarray, explained: np.ndarray, alpha: float) -> np.ndarray:
+    """``1 - (1 - s) ** (1 - alpha * E)``: the base surprise ``-log(1 - s)`` scaled down by the
+    share ``E`` of the star that a known class explains (``kc_explained`` = sum over explaining
+    classes of probability x typicality). E = 1 and alpha = 1 send the star to the bottom."""
+    s = np.clip(np.nan_to_num(np.asarray(s, float), nan=0.0), 0.0, 1.0)
+    e = np.clip(np.nan_to_num(np.asarray(explained, float), nan=0.0), 0.0, 1.0)
+    return 1.0 - (1.0 - s) ** (1.0 - alpha * e)
+
+
+def explained_share(kc: pd.DataFrame, tau: float) -> np.ndarray:
+    """``E = sum_c p_c * min(1, t_c / tau)`` over the classes with a typicality column.
+
+    ``t_c`` is a p-value-like typicality (members are uniform on [0, 1]), so ``tau`` sets how
+    far into its tail a light curve may sit and still count as a full member: with tau = 0.1,
+    the 90% most typical members are fully explained, the outer 10% fade out linearly.
+    """
+    cls = [c[5:] for c in kc.columns if c.startswith("kc_t_")]
+    e = np.zeros(len(kc))
+    for c in cls:
+        t = np.nan_to_num(kc[f"kc_t_{c}"].to_numpy(np.float64), nan=0.0)
+        e += kc[f"kc_p_{c}"].to_numpy(np.float64) * np.minimum(1.0, t / tau)
+    return np.clip(e, 0.0, 1.0)
 
 
 def stratum_pct(ref_scores, ref_strata, q_scores, q_strata) -> np.ndarray:

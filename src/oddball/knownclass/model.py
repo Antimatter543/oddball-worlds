@@ -9,7 +9,14 @@ Training targets are per light curve (``tic, sector``):
   in the noise of a faint star, would otherwise teach "flat light curve = EB";
 * ``quiet`` = no catalogue flags at all (not excluded, no VSX entry within one TESS pixel, no
   Prsa EB, no Gaia variability) **and** a light curve consistent with noise (``lc_quiet``);
-* everything else (unlabelled variables, excluded stars) is not a target.
+* ``other`` = not excluded, no usable catalogue class, and not quiet: the unlabelled bulk of mildly
+  variable stars, generic catalogue variables (VSX ``VAR``/``MISC``) and blends. Without it, a
+  closed-set classifier pushes every ordinary or injected light curve into some known class
+  with high confidence (dry run: 0.1%-deep injections were "ROT/DSCT/EB" at median p = 0.94).
+  ``other`` never explains anything away (``explain.ExplainAway``), so uncatalogued oddballs in
+  it are not hidden; catalogued anomaly-target types (``labels``: excluded) are never in it;
+* everything else (catalogued stars flat in this sector, excluded stars, injections) is not a
+  target.
 
 Splits come only from ``oddball.common.splits``: fit on ``train``, early stopping and
 temperature on ``val``. ``known`` (known positives) and ``test`` are never used here.
@@ -22,14 +29,14 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from oddball.knownclass.labels import CLASSES
+from oddball.knownclass.labels import CLASSES, OTHER
 
 # Light-curve variability gates (PDCSAP features; see features.py / classical.py)
 QUIET_MAX_VAR_FRAC = 0.15  # fraction of variance above the point-to-point white noise
 QUIET_MAX_SNR = 6.0  # largest dip / bump box SNR (pure noise gives ~4)
 VAR_MIN_VAR_FRAC = 0.3
 VAR_MIN_DIP_SNR = 10.0
-QUIET_PER_CLASS_CAP = 3.0  # quiet rows are subsampled to <= this x the largest variable class
+QUIET_PER_CLASS_CAP = 3.0  # quiet / other rows: <= this x the largest catalogue class
 
 
 def lc_quiet(f: pd.DataFrame) -> np.ndarray:
@@ -43,7 +50,7 @@ def lc_variable(f: pd.DataFrame) -> np.ndarray:
             | (np.nan_to_num(f.pdc_dip_snr.to_numpy()) > VAR_MIN_DIP_SNR))  # fmt: skip
 
 
-def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, seed: int = 0) -> pd.Series:
+def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, other: bool = True) -> pd.Series:
     """Per-row target class ('' = not a target) for real light curves of a feature table."""
     lab = labels.set_index("tic")
     cat = lab.label.reindex(feat.tic).fillna("").to_numpy(object)
@@ -55,25 +62,60 @@ def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, seed: int = 0) ->
     y[is_cat & var_ok] = cat[is_cat & var_ok]
     quiet = ~excl & ~flagged & (cat == "") & lc_quiet(feat)
     y[quiet] = "quiet"
+    if other:
+        y[~excl & (cat == "") & ~quiet] = OTHER
     if feat.inj_id.notna().any():
         y[feat.inj_id.notna().to_numpy()] = ""  # injected light curves are never targets
     return pd.Series(y, index=feat.index, name="y")
 
 
-def cap_quiet(y: pd.Series, cap: float = QUIET_PER_CLASS_CAP, seed: int = 0) -> pd.Series:
-    """Subsample 'quiet' rows to ``cap`` x the largest other class (deterministic)."""
-    counts = y[(y != "") & (y != "quiet")].value_counts()
+def cap_quiet(y: pd.Series, cap: float = QUIET_PER_CLASS_CAP, seed: int = 0,
+              bulk: tuple[str, ...] = ("quiet", OTHER)) -> pd.Series:  # fmt: skip
+    """Subsample each ``bulk`` class to ``cap`` x the largest catalogue class (deterministic)."""
+    yv = y.to_numpy()
+    counts = y[(y != "") & ~np.isin(yv, bulk)].value_counts()
     if counts.empty:
         return y
     n_max = int(cap * counts.max())
-    q = np.flatnonzero(y.to_numpy() == "quiet")
-    if len(q) <= n_max:
-        return y
-    rng = np.random.default_rng(seed)
-    drop = rng.choice(q, size=len(q) - n_max, replace=False)
     y = y.copy()
-    y.iloc[drop] = ""
+    rng = np.random.default_rng(seed)
+    for cls in bulk:
+        q = np.flatnonzero(yv == cls)
+        if len(q) > n_max:
+            y.iloc[rng.choice(q, size=len(q) - n_max, replace=False)] = ""
     return y
+
+
+NON_EXPLAINING = ("quiet", OTHER)  # classes that never explain an event away
+TYP_K = 10
+TYP_MAX_PER_CLASS = 5000
+TYP_MIN_MEMBERS = 15
+# Typicality measures *shape* (periodicity, profile, event count, asymmetry), not amplitude:
+# a 40%-deep EB is still a typical EB, while one dip on a flat star is not. Amplitude, SNR and
+# stellar-context columns are left out of the typicality space (the classifier still sees them).
+TYP_AMPLITUDE_TOKENS = ("dip_snr", "dip_depth", "bump_snr", "xs_var", "sigma_w", "log_amp",
+                        "amp9005", "frac_neg3", "ctx_")
+
+
+def typicality_columns(cols: list[str]) -> list[str]:
+    return [c for c in cols if not any(t in c for t in TYP_AMPLITUDE_TOKENS)]
+
+
+def _knn_mean_dist(q: np.ndarray, ref: np.ndarray, k: int, q_tic=None, r_tic=None,
+                   chunk: int = 2048) -> np.ndarray:  # fmt: skip
+    """Mean Euclidean distance from each query row to its ``k`` nearest reference rows,
+    skipping reference rows with the query's own TIC (brute force, chunked)."""
+    out = np.full(len(q), np.nan)
+    rn = (ref.astype(np.float64) ** 2).sum(1)
+    kk = min(k, len(ref))
+    for s in range(0, len(q), chunk):
+        qq = q[s : s + chunk].astype(np.float64)
+        d2 = (qq**2).sum(1)[:, None] + rn[None, :] - 2.0 * qq @ ref.T.astype(np.float64)
+        if q_tic is not None and r_tic is not None:
+            d2[np.asarray(q_tic[s : s + chunk])[:, None] == np.asarray(r_tic)[None, :]] = np.inf
+        part = np.partition(d2, kk - 1, axis=1)[:, :kk]
+        out[s : s + chunk] = np.sqrt(np.maximum(part, 0)).mean(1)
+    return out
 
 
 def _softmax(z: np.ndarray) -> np.ndarray:
@@ -145,8 +187,58 @@ class KnownClassModel:
         z = self.clf.decision_function(X[self.feature_cols].to_numpy(np.float32))
         return z if z.ndim == 2 else np.stack([-z, z], axis=1)
 
-    def predict_frame(self, X: pd.DataFrame, batch: int = 50000) -> pd.DataFrame:
-        """Per row: kc_pred, kc_pmax, kc_entropy (normalised 0-1), kc_energy, kc_p_<class>."""
+    def fit_typicality(self, X: pd.DataFrame, y: np.ndarray, tic: np.ndarray, k: int = TYP_K,
+                       max_per_class: int = TYP_MAX_PER_CLASS, seed: int = 0) -> KnownClassModel:
+        """Per explaining class: kNN reference of its training members, for ``typicality``.
+
+        Shape features (``typicality_columns``) are quantile-transformed to N(0, 1) (NaN -> 0). A member's own distance scale
+        is its mean distance to its ``k`` nearest *other-TIC* members (the same star in another
+        sector is a near-duplicate), which gives the class's distance distribution.
+        """  # fmt: skip
+        from sklearn.preprocessing import QuantileTransformer
+
+        rng = np.random.default_rng(seed)
+        self.qt = QuantileTransformer(n_quantiles=1000, output_distribution="normal",
+                                      subsample=200_000, random_state=seed)  # fmt: skip
+        self.typ_cols = typicality_columns(self.feature_cols)
+        self.qt.fit(X[self.typ_cols].to_numpy(np.float32))
+        self.typ = {}
+        for c in self.classes:
+            if c in NON_EXPLAINING:
+                continue
+            idx = np.flatnonzero(y == c)
+            if len(idx) < TYP_MIN_MEMBERS:
+                continue
+            if len(idx) > max_per_class:
+                idx = rng.choice(idx, max_per_class, replace=False)
+            ref = self._z(X.iloc[idx])
+            d_self = _knn_mean_dist(ref, ref, k, q_tic=tic[idx], r_tic=tic[idx])
+            self.typ[c] = {"ref": ref.astype(np.float32), "tic": tic[idx],
+                           "dist": np.sort(d_self[np.isfinite(d_self)])}  # fmt: skip
+        self.typ_k = k
+        return self
+
+    def _z(self, X: pd.DataFrame) -> np.ndarray:
+        z = self.qt.transform(X[self.typ_cols].to_numpy(np.float32))
+        return np.nan_to_num(z, nan=0.0)
+
+    def typicality(self, X: pd.DataFrame, tic: np.ndarray | None = None) -> pd.DataFrame:
+        """kc_t_<class>: share of the class's own members that sit farther from their k nearest
+        fellow members than this light curve does from its k nearest members (1 = core of the
+        class, ~0 = outside it). ``tic``: exclude these TICs from each query's neighbours."""
+        z = self._z(X)
+        out = {}
+        for c, t in self.typ.items():
+            d = _knn_mean_dist(z, t["ref"], self.typ_k, q_tic=tic, r_tic=t["tic"])
+            r = t["dist"]
+            out[f"kc_t_{c}"] = 1.0 - np.searchsorted(r, d, side="left") / max(len(r), 1)
+        return pd.DataFrame(out, index=X.index)
+
+    def predict_frame(self, X: pd.DataFrame, batch: int = 50000,
+                      tic: np.ndarray | None = None) -> pd.DataFrame:  # fmt: skip
+        """Per row: kc_pred, kc_pmax, kc_entropy (normalised 0-1), kc_energy, kc_p_<class>;
+        with a typicality reference also kc_t_<class>, kc_w_<class> = p * t and
+        ``kc_explained`` = sum of kc_w over the explaining classes (all but quiet / other)."""
         parts = []
         for s in range(0, len(X), batch):
             z = self.logits(X.iloc[s : s + batch]) / self.temperature
@@ -158,7 +250,18 @@ class KnownClassModel:
                  "kc_energy": -self.temperature * _logsumexp(z)}  # fmt: skip
             for j, c in enumerate(self.classes):
                 d[f"kc_p_{c}"] = p[:, j]
-            parts.append(pd.DataFrame(d))
+            part = pd.DataFrame(d)
+            if getattr(self, "typ", None):
+                tt = self.typicality(X.iloc[s : s + batch],
+                                     None if tic is None else tic[s : s + batch])  # fmt: skip
+                expl = np.zeros(len(part))
+                for c in self.typ:
+                    tc = tt[f"kc_t_{c}"].to_numpy()
+                    part[f"kc_t_{c}"] = tc
+                    part[f"kc_w_{c}"] = part[f"kc_p_{c}"].to_numpy() * tc
+                    expl += part[f"kc_w_{c}"].to_numpy()
+                part["kc_explained"] = expl
+            parts.append(part)
         out = pd.concat(parts, ignore_index=True)
         out.index = X.index
         return out
