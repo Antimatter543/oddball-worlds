@@ -19,6 +19,13 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest", "ruff"]
+ml = [
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "tensorboard>=2.21.0",
+    "torch>=2.15.0",
+    "umap-learn>=0.5.12",
+]
 rubin = [
     "alerce>=2.4.0",
 ]
