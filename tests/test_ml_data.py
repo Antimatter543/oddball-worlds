@@ -125,3 +125,43 @@ def test_cache_build_and_no_leakage(tmp_path, monkeypatch):
         D.training_rows(c, "test")
     # idempotent rebuild
     assert D.build_cache(src, cdir, log=lambda s: None) == cdir
+
+
+def test_multicache_global_rows_and_batches(tmp_path, monkeypatch):
+    monkeypatch.setenv("ODDBALL_DATA", str(tmp_path / "data"))
+    dirs = []
+    for k, (n, sec) in enumerate(((30, 33), (20, 38))):
+        src = tmp_path / "data" / "tess-spoc" / f"s{sec:04d}" / "shards"
+        src.mkdir(parents=True)
+        t = _row_table(n, 300, 1000, tics=list(range(7000 + 100 * k, 7000 + 100 * k + n)))
+        t = t.set_column(1, "sector", pa.array([sec] * n, pa.int16()))
+        pq.write_table(t, src / "lc_00000.parquet")
+        dirs.append(D.build_cache(src.parent, D.cache_dir_for(src.parent), origin=1000,
+                                  log=lambda s: None))  # fmt: skip
+    assert [d.name for d in dirs] == ["tess-spoc__s0033", "tess-spoc__s0038"]
+    mc = D.MultiCache(dirs)
+    assert len(mc) == 50 and mc.sectors == [33, 38]
+    cid, loc = mc.split_global(np.array([0, 29, 30, 49]))
+    assert list(cid) == [0, 0, 1, 1] and list(loc) == [0, 29, 0, 19]
+    seen = []
+    for g, c, x, ctx in mc.iter_batches(np.arange(50), 16, shuffle=True, seed=1):
+        cc, ll = mc.split_global(g)
+        assert (cc == c).all() and x.shape == (len(g), 3, D.GRID_LEN) and ctx.shape == (len(g), 3)
+        for i in range(len(g)):  # the batch row really is that cache's row
+            ref = np.asarray(mc.caches[cc[i]].x[ll[i]], dtype=np.float32)
+            assert np.array_equal(np.isnan(ref), np.isnan(x[i]))
+            assert np.allclose(np.nan_to_num(ref), np.nan_to_num(x[i]))
+        seen += list(g)
+    assert sorted(seen) == list(range(50))
+    assert set(mc.index_of(mc.training_rows("train")).split) <= {"train"}
+    masks = D.sector_gap_masks(mc, np.arange(50))
+    assert masks.shape == (2, D.GRID_LEN)
+    assert masks[:, 100:200].all() and not masks[:, 0].any()  # data from bin ~0..300 only
+
+
+def test_signal_dominated():
+    x = np.full((2, 3, D.GRID_LEN), np.nan, np.float32)
+    x[:, 0, :600] = 0.0
+    x[0, 2, :600] = 0.1  # errors far below the robust scatter: variability dominates
+    x[1, 2, :600] = 1.0  # white-noise dominated
+    assert list(D.signal_dominated(x)) == [True, False]

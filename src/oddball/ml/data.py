@@ -150,7 +150,7 @@ def cache_dir_for(shard_dir: Path) -> Path:
     possible, e.g. ``ml_cache/tess-spoc__s0032`` or ``ml_cache/injections__v1__s0032__val``)."""
     p = Path(shard_dir).expanduser().resolve()
     try:
-        rel = p.relative_to(data_root())
+        rel = p.relative_to(data_root().resolve())
         tag = "__".join(rel.parts)
     except ValueError:
         import hashlib
@@ -191,7 +191,7 @@ def build_cache(
     files = find_lc_files(shard_dir)
     if not files:
         raise FileNotFoundError(f"no light-curve shards under {shard_dir}")
-    sig = [[str(f), f.stat().st_size, int(f.stat().st_mtime)] for f in files]
+    sig = [[str(f.resolve()), f.stat().st_size, int(f.stat().st_mtime)] for f in files]
     done = cache_dir / "done.json"
     if done.exists() and json.loads(done.read_text()).get("files") == sig:
         return cache_dir
@@ -427,3 +427,97 @@ def scoring_masks(P: int, n_masks: int, rng: np.random.Generator, block: int = 4
             g = (perm[j] + q) % n_masks
             m[g, j * block : (j + 1) * block] = True
     return m
+
+
+# --------------------------------------------------------------------------------------------
+# Several caches (one per sector) behind one global row index
+
+
+class MultiCache:
+    """Several caches (e.g. one per training sector) addressed by one global row index.
+
+    Global row ``g`` lives in cache ``cid = searchsorted(offsets, g, 'right') - 1`` at local row
+    ``g - offsets[cid]``. Each sector keeps its own grid origin (bins are sector-relative)."""
+
+    def __init__(self, cache_dirs):
+        self.caches = [Cache(Path(d)) for d in cache_dirs]
+        self.offsets = np.cumsum([0] + [len(c) for c in self.caches]).astype(np.int64)
+        self.sectors = [int(c.index.sector.iloc[0]) for c in self.caches]
+
+    def __len__(self) -> int:
+        return int(self.offsets[-1])
+
+    def split_global(self, g: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        cid = np.searchsorted(self.offsets, g, side="right") - 1
+        return cid, g - self.offsets[cid]
+
+    def training_rows(self, split: str) -> np.ndarray:
+        return np.concatenate([training_rows(c, split) + o
+                               for c, o in zip(self.caches, self.offsets, strict=False)])
+
+    def index_of(self, g: np.ndarray) -> pd.DataFrame:
+        cid, loc = self.split_global(np.asarray(g))
+        parts = [self.caches[c].index.loc[loc[cid == c]] for c in np.unique(cid)]
+        return pd.concat(parts)
+
+    def iter_batches(self, grows: np.ndarray, batch_size: int, shuffle: bool, seed: int = 0):
+        """Yield ``(global rows, cache id per row, x float32 [B,3,L], ctx [B,3])``; inside a batch
+        rows are grouped by cache and sorted, so each memmap read is near-sequential."""
+        grows = np.asarray(grows)
+        order = np.random.default_rng(seed).permutation(grows) if shuffle else grows
+        for i in range(0, len(order), batch_size):
+            g = np.sort(order[i : i + batch_size])
+            cid, loc = self.split_global(g)
+            xs, cs = [], []
+            for c in np.unique(cid):
+                r = loc[cid == c]
+                xs.append(np.asarray(self.caches[c].x[r], dtype=np.float32))
+                cs.append(self.caches[c].ctx(r))
+            yield g, cid, np.concatenate(xs), np.concatenate(cs)
+
+
+def sector_gap_masks(mc: MultiCache, split_rows: np.ndarray, min_frac: float = 0.9) -> np.ndarray:
+    """[n_caches, L] bool: the common-gap mask (``common_gap_masks``) of each cache, computed on
+    the given (train) rows of that cache."""
+    cid, loc = mc.split_global(split_rows)
+    return np.stack([common_gap_masks(c, loc[cid == k], min_frac)[0]
+                     for k, c in enumerate(mc.caches)])  # fmt: skip
+
+
+def signal_dominated(x: np.ndarray, max_err: float = 0.3, min_obs: int = 400) -> np.ndarray:
+    """[B] bool: stars whose median per-bin error is below ``max_err`` robust sigmas, i.e. whose
+    scatter is mostly stellar variability (predictable from context), not white noise."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        med = np.nanmedian(x[:, 2], axis=1)
+    return (med < max_err) & (np.isfinite(x[:, 0]).sum(1) >= min_obs)
+
+
+def signal_flags(cache: Cache, chunk: int = 4096) -> np.ndarray:
+    """``signal_dominated`` for every row of a cache (computed once, stored as sigdom.npy)."""
+    f = cache.dir / "sigdom.npy"
+    if f.exists():
+        return np.load(f)
+    out = np.zeros(len(cache), dtype=bool)
+    for i in range(0, len(cache), chunk):
+        out[i : i + chunk] = signal_dominated(np.asarray(cache.x[i : i + chunk], np.float32))
+    np.save(f, out)
+    return out
+
+
+def mixed_order(rows: np.ndarray, sig_rows: np.ndarray, frac: float, batch_size: int,
+                rng: np.random.Generator) -> np.ndarray:  # fmt: skip
+    """An epoch's row order in which every batch has ``frac`` of its rows drawn (with
+    replacement) from ``sig_rows`` and the rest from a permutation of ``rows``."""
+    if frac <= 0 or len(sig_rows) == 0:
+        return rng.permutation(rows)
+    n_sig = round(frac * batch_size)
+    base = rng.permutation(rows)
+    n_b = int(np.ceil(len(base) / (batch_size - n_sig)))
+    out = []
+    for b in range(n_b):
+        part = base[b * (batch_size - n_sig) : (b + 1) * (batch_size - n_sig)]
+        out += [part, rng.choice(sig_rows, n_sig)]
+    return np.concatenate(out)

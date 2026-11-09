@@ -97,3 +97,25 @@ def test_masked_tokens_are_position_distinguishable():
         h = m.tokens(inp, mask)[0, 10:50]
     spread = (h - h.mean(0)).norm(dim=1).mean() / h.norm(dim=1).mean()
     assert spread > 0.3
+
+
+@pytest.mark.parametrize("arch", ["hybrid", "cnn"])
+def test_other_archs_hide_masked_patches(arch):
+    """The conv stem / CNN mix neighbouring tokens, but a hidden patch's own content must still
+    never reach any prediction (it is replaced by the mask token before mixing)."""
+    torch.manual_seed(0)
+    m = PatchMAE(ModelConfig(d_model=32, n_layers=2, n_heads=4, arch=arch, n_conv=2,
+                             embed_norm=True)).eval()  # fmt: skip
+    x = _x()
+    mask = torch.zeros(2, GRID_LEN // PATCH, dtype=torch.bool)
+    mask[:, 20:28] = True
+    lo, hi = 20 * PATCH, 28 * PATCH
+    with torch.no_grad():
+        a, _, _ = m(make_inputs(x)[0], mask)
+        x2 = x.clone()
+        x2[:, 0, lo:hi] += 5.0
+        b, _, _ = m(make_inputs(x2)[0], mask)
+        c, _, _ = m(make_inputs(x2)[0], None)
+    assert torch.allclose(a, b, atol=1e-5)
+    assert not torch.allclose(a, c, atol=1e-3)  # unmasked, the change is visible
+    assert m.embed_pooled(make_inputs(x)[0]).shape == (2, 32)

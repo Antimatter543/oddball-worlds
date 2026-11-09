@@ -7,9 +7,12 @@
 * ``--copy``: masked-bin MSE of the model vs a "copy the neighbours" baseline (linear interpolation
   across the hidden block from the nearest visible bins) and vs predicting the median (0). If the
   model is no better than interpolation, masking is too easy / it learned to copy.
+* ``--context``: does the reconstruction use context? Signal-dominated val stars of ``--sector``
+  (held out for ssl_v2): masked MSE vs median and interpolation, plus the sinusoid test
+  (``oddball.ml.diagnostics``).
 * ``--probe``: nuisance probe (camera, camera/CCD, Tmag bin) on the trained encoder vs chance.
 * ``--plots``: reconstructions for random, faint, bright and known-weird stars.
-Results go to ``runs/<id>/sanity.json`` and ``outputs/ml/<scorer>/``.
+Results go to ``runs/<id>/sanity_sNNNN.json`` and ``outputs/ml/<scorer>/``.
 """
 
 from __future__ import annotations
@@ -32,10 +35,13 @@ from oddball.ml.data import (
     cache_dir_for,
     contiguous_block_mask,
     make_inputs,
+    signal_dominated,
     training_rows,
 )
+from oddball.ml.diagnostics import masked_errors, sinusoid_test, summarise
 from oddball.ml.model import patch_to_bin
 from oddball.ml.probe import run_probes
+from oddball.ml.scoring import obs_mask_for
 from oddball.ml.train import load_model
 
 
@@ -172,6 +178,7 @@ def main() -> None:
     ap.add_argument("--sector", type=int, default=32)
     ap.add_argument("--overfit", action="store_true")
     ap.add_argument("--copy", action="store_true")
+    ap.add_argument("--context", action="store_true")
     ap.add_argument("--probe", action="store_true")
     ap.add_argument("--plots", action="store_true")
     ap.add_argument("--all", action="store_true")
@@ -180,10 +187,37 @@ def main() -> None:
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, ck = load_model(run / "best.pt", dev)
     cache = Cache(cache_dir_for(sector_dir(a.sector)))
-    out_json = run / "sanity.json"
+    # per-sector common-gap mask (computed for a held-out sector)
+    (run / "score").mkdir(exist_ok=True)
+    ck["obs_mask"] = obs_mask_for(ck, a.sector, cache, run / "score")
+    out_json = run / f"sanity_s{a.sector:04d}.json"
     res = json.loads(out_json.read_text()) if out_json.exists() else {}
+    res["held_out_sector"] = a.sector not in [int(s) for s in ck.get("sectors", [a.sector])]
     rng = np.random.default_rng(0)
     idx = cache.index
+
+    if a.context or a.all:
+        # Does the reconstruction use context? Signal-dominated val stars of this sector,
+        # 40% block masks (training-like) and single hidden patches, vs median / interpolation.
+        cand = np.sort(rng.choice(training_rows(cache, "val"), 8000, replace=False))
+        x = np.asarray(cache.x[cand], dtype=np.float32)
+        sig = cand[signal_dominated(x)]
+        del x
+        res["context"] = {"n_signal_stars": len(sig)}
+        for name, (lo, hi, ratio) in {"blocks_2-8_40pct": (2, 8, 0.4),
+                                      "single_patch_10pct": (1, 1, 0.1)}.items():  # fmt: skip
+            sums = []
+            mr = np.random.default_rng(5)
+            for i in range(0, len(sig), 256):
+                inp, tgt, err, obs, _ = batch_inputs(cache, sig[i : i + 256], ck, dev)
+                m = contiguous_block_mask(len(inp), model.cfg.n_patches, ratio, mr, lo, hi)
+                sums.append(masked_errors(model, inp, tgt, err, obs, torch.from_numpy(m).to(dev)))
+            res["context"][name] = summarise(np.concatenate(sums))
+        res["context"]["sinusoid_0.7d"] = sinusoid_test(model, dev, ck["train_cfg"]["drop_sap"],
+                                                        n=128)  # fmt: skip
+        res["context"]["sinusoid_2.0d"] = sinusoid_test(model, dev, ck["train_cfg"]["drop_sap"],
+                                                        n=128, period_d=2.0)  # fmt: skip
+        print("context", json.dumps(res["context"], indent=1, default=float))
 
     if a.overfit_fixed:
         res["overfit_fixed"] = overfit_fixed(cache, dev, obs_mask=ck.get("obs_mask"))
