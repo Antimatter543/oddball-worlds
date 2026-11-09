@@ -29,6 +29,8 @@ from dataclasses import asdict, dataclass, field
 import numpy as np
 import pandas as pd
 
+ZP_NJY = 31.4
+
 
 @dataclass
 class DetectConfig:
@@ -46,6 +48,8 @@ class DetectConfig:
     xband_window_days: float = 2.0
     saturation_mag: float = 16.5  # Rubin 30 s visits saturate around 16-17 mag
     scatter_floor: float = 0.02
+    template_scatter_floor: float = 0.05
+    use_template: bool = True
 
 
 @dataclass
@@ -66,6 +70,7 @@ class BandResult:
     rise_resolved: bool = False
     interleave: float = np.nan
     n_bright: int = 0
+    baseline_src: str = ""  # "lc" (faint end of the light curve) or "template"
 
 
 @dataclass
@@ -134,14 +139,30 @@ def baseline_of(mag: np.ndarray, cfg: DetectConfig) -> tuple[float, float]:
     return base, scatter
 
 
-def detect_band(t, mag, err, band: str = "?", cfg: DetectConfig | None = None) -> BandResult:
+def detect_band(t, mag, err, band: str = "?", cfg: DetectConfig | None = None,
+                ref_mag: float = np.nan, ref_err: float = np.nan) -> BandResult:
+    """``ref_mag``: template (reference-image) magnitude at the object position, if known.
+
+    Alert detections only exist when the star differs from the template, so an outburst
+    from quiescence may have *no* quiescent epochs in the light curve. The template then
+    supplies the baseline. When both exist the fainter one is used (the quiescent level).
+    """
     cfg = cfg or DetectConfig()
     tn, mn, en = bin_nights(t, mag, err, cfg.night_offset)
     r = BandResult(band=band, status="too_few", n_nights=int(tn.size))
-    if tn.size < cfg.min_baseline_nights + cfg.min_nights:
+    has_ref = cfg.use_template and np.isfinite(ref_mag)
+    has_lc = tn.size >= cfg.min_baseline_nights + cfg.min_nights
+    if not has_lc and not (has_ref and tn.size >= cfg.min_nights):
         return r
-    base, scatter = baseline_of(mn, cfg)
-    r.baseline_mag, r.baseline_scatter = base, scatter
+    base, scatter, src = np.nan, np.nan, ""
+    if has_lc:
+        base, scatter = baseline_of(mn, cfg)
+        src = "lc"
+    if has_ref and not (ref_mag <= base):  # template fainter (or no LC baseline)
+        rerr = ref_err if np.isfinite(ref_err) else 0.0
+        base, scatter, src = float(ref_mag), max(float(rerr), cfg.template_scatter_floor), \
+            "template"
+    r.baseline_mag, r.baseline_scatter, r.baseline_src = base, scatter, src
     delta = base - mn
     sig = delta / np.sqrt(en**2 + scatter**2)
     bright = (delta >= cfg.dmag_min) & (sig >= cfg.snr_min)
@@ -194,8 +215,20 @@ def detect_object(lc: pd.DataFrame, cfg: DetectConfig | None = None) -> ObjectRe
         res.reasons.append("no_good_photometry")
         return res
     for b, g in df.groupby("band"):
+        ref_mag = ref_err = np.nan
+        if "template_flux" in g.columns:
+            tf = g["template_flux"].to_numpy(float)
+            te = g["template_flux_err"].to_numpy(float) if "template_flux_err" in g.columns \
+                else np.full(tf.size, np.nan)
+            ok = np.isfinite(tf) & (tf > 0)
+            if ok.any():
+                f = float(np.median(tf[ok]))
+                ref_mag = ZP_NJY - 2.5 * np.log10(f)
+                ref_err = 1.0857362 * float(np.median(te[ok])) / f if np.isfinite(te[ok]).any() \
+                    else np.nan
         res.bands[b] = detect_band(g["mjd"].to_numpy(), g["mag"].to_numpy(),
-                                   g["magerr"].to_numpy(), band=b, cfg=cfg)
+                                   g["magerr"].to_numpy(), band=b, cfg=cfg,
+                                   ref_mag=ref_mag, ref_err=ref_err)
     trig = [r for r in res.bands.values() if r.status == "triggered"]
     inter = [r for r in res.bands.values() if r.status in ("interleaved", "fragmented")]
     if not trig:
@@ -251,5 +284,7 @@ def detect_object(lc: pd.DataFrame, cfg: DetectConfig | None = None) -> ObjectRe
                     res.flags.append("diff_flux_inconsistent")
     if not p.rise_resolved:
         res.flags.append("rise_unresolved")
+    if p.baseline_src == "template":
+        res.flags.append("template_baseline")
     res.flagged = not res.reasons
     return res

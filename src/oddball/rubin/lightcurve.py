@@ -27,8 +27,8 @@ BAD_DET_FLAGS = [
     "psfFlux_flag_edge", "psfFlux_flag_noGoodPixels", "glint_trail",
 ]
 LC_COLUMNS = ["mjd", "band", "visit", "src", "sci_flux", "sci_flux_err", "diff_flux",
-              "diff_flux_err", "mag", "magerr", "is_det", "bad", "saturated", "reliability",
-              "is_dipole"]
+              "diff_flux_err", "template_flux", "template_flux_err", "mag", "magerr", "is_det",
+              "bad", "saturated", "reliability", "is_dipole"]
 
 
 def flux_to_mag(flux, flux_err):
@@ -63,6 +63,7 @@ def assemble(detections: list[dict], forced: list[dict]) -> pd.DataFrame:
             "src": "fp", "sci_flux": d.get("scienceFlux"), "sci_flux_err": d.get("scienceFluxErr"),
             "diff_flux": d.get("psfFlux"), "diff_flux_err": d.get("psfFluxErr"), "is_det": False,
             "bad": False, "saturated": False, "reliability": np.nan, "is_dipole": False,
+            "template_flux": np.nan, "template_flux_err": np.nan,
         }
     for d in detections or []:
         if d.get("ssObjectId") not in (None, 0, "0"):
@@ -73,7 +74,9 @@ def assemble(detections: list[dict], forced: list[dict]) -> pd.DataFrame:
         rel = d.get("reliability")
         extra = {"is_det": True, "bad": bad, "saturated": sat,
                  "reliability": np.nan if rel is None else float(rel),
-                 "is_dipole": _truthy(d.get("isDipole"))}
+                 "is_dipole": _truthy(d.get("isDipole")),
+                 "template_flux": d.get("templateFlux"),
+                 "template_flux_err": d.get("templateFluxErr")}
         if key in rows:
             rows[key].update(extra)
         else:
@@ -86,7 +89,8 @@ def assemble(detections: list[dict], forced: list[dict]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=LC_COLUMNS)
     df = pd.DataFrame(list(rows.values()))
-    for c in ("mjd", "sci_flux", "sci_flux_err", "diff_flux", "diff_flux_err"):
+    for c in ("mjd", "sci_flux", "sci_flux_err", "diff_flux", "diff_flux_err", "template_flux",
+              "template_flux_err"):
         df[c] = pd.to_numeric(df[c], errors="coerce")
     df["mag"], df["magerr"] = flux_to_mag(df["sci_flux"], df["sci_flux_err"])
     return df[LC_COLUMNS].sort_values("mjd").reset_index(drop=True)

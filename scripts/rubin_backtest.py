@@ -70,6 +70,8 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--sep", type=float, default=1.0, help="max match separation, arcsec")
+    ap.add_argument("--min-points", type=int, default=2,
+                    help="min n_det+n_forced (2 suffices with a template baseline)")
     ap.add_argument("--near-miss-plots", type=int, default=10)
     args = ap.parse_args()
     root = data_root() / "rubin"
@@ -88,10 +90,10 @@ def main() -> int:
     agg = agg.join(objs[["meanra", "meandec", "n_det", "n_forced", "firstmjd", "lastmjd",
                          "class_name", "classifier_name"]])
     agg["name"] = agg["cat_ids"].str.split("|").str[0]
-    eligible = agg[(agg["n_det"].fillna(0) + agg["n_forced"].fillna(0)) >= 5]
+    eligible = agg[(agg["n_det"].fillna(0) + agg["n_forced"].fillna(0)) >= args.min_points]
     if args.limit:
         eligible = eligible.head(args.limit)
-    print(f"matched Rubin objects: {len(agg)}; eligible (n_det+n_forced>=5): {len(eligible)}",
+    print(f"matched Rubin objects: {len(agg)}; eligible (n_det+n_forced>={args.min_points}): {len(eligible)}",
           flush=True)
 
     cfg = DetectConfig()

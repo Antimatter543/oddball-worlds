@@ -216,3 +216,54 @@ def test_config_threshold_respected(rng):
     lc = make_lc(rng, fuor(amp=1.5 / AMP["r"]), bands=("r",))
     assert detect_object(lc).flagged
     assert not detect_object(lc, DetectConfig(dmag_min=2.0)).flagged
+
+
+# --- template (reference image) baseline: alert-only light curves -------------------------
+
+def _alert_only(lc, keep):
+    """Mimic alert-only sampling: keep only visits that differ from the template."""
+    return lc[keep].reset_index(drop=True)
+
+
+def _with_template(lc, mags):
+    lc = lc.copy()
+    f = 10 ** (-0.4 * (lc["band"].map(mags).to_numpy() - 31.4))
+    lc["template_flux"] = f
+    lc["template_flux_err"] = 0.01 * f
+    return lc
+
+
+def test_outburst_seen_only_in_alerts_uses_template(rng):
+    # quiescent epochs never alert; only the outburst epochs are in the light curve
+    lc = make_lc(rng, fuor(t_start=61150.0, rise=5.0, amp=2.0))
+    lc = _with_template(_alert_only(lc, lc["mjd"] > 61160), BASE)
+    assert detect_object(lc, DetectConfig(use_template=False)).flagged is False
+    r = detect_object(lc)
+    assert r.flagged, r.reasons
+    assert "template_baseline" in r.flags
+    assert r.primary.baseline_mag == pytest.approx(BASE[r.primary.band], abs=0.01)
+
+
+def test_two_alert_nights_with_template_flagged_but_one_is_not(rng):
+    lc = make_lc(rng, lambda t, b: -1.5, bands=("r",))
+    nights = np.floor(lc["mjd"] - 0.667)
+    first2 = nights.isin(sorted(nights.unique())[:2])
+    first1 = nights.isin(sorted(nights.unique())[:1])
+    assert detect_object(_with_template(lc[first2], BASE)).flagged
+    assert not detect_object(_with_template(lc[first1], BASE)).flagged
+
+
+def test_dip_only_alerts_with_bright_template_not_flagged(rng):
+    # a dipper: only the dips alert; template holds the normal (bright) state
+    lc = make_lc(rng, lambda t, b: 1.5)
+    r = detect_object(_with_template(lc, BASE))
+    assert not r.flagged
+
+
+def test_template_brighter_than_lc_faint_end_keeps_lc_baseline(rng):
+    # template taken in outburst (brighter): the LC faint end is the quiescent level
+    lc = make_lc(rng, fuor(t_start=61150.0, rise=10.0, amp=2.0), bands=("r",))
+    lc = _with_template(lc, {b: m - 2.0 for b, m in BASE.items()})
+    r = detect_object(lc)
+    assert r.flagged, r.reasons
+    assert r.primary.baseline_src == "lc"
