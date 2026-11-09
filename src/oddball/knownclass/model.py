@@ -60,6 +60,8 @@ def training_targets(feat: pd.DataFrame, labels: pd.DataFrame, other: bool = Fal
     cat = lab.label.reindex(feat.tic).fillna("").to_numpy(object)
     excl = lab.excluded.reindex(feat.tic).fillna(True).to_numpy(bool)
     flagged = lab.flagged_any.reindex(feat.tic).fillna(True).to_numpy(bool)
+    if "covered" in lab:  # catalogue status unknown -> never a target
+        excl = excl | ~lab.covered.reindex(feat.tic).fillna(False).to_numpy(bool)
     y = np.full(len(feat), "", dtype=object)
     var_ok = lc_variable(feat)
     is_cat = (cat != "") & ~excl

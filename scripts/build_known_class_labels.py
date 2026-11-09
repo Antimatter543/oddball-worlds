@@ -21,6 +21,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -93,6 +94,18 @@ def main() -> None:
     excl.update({t: "known_positive" for t in known_positive_tics()})
     lab = L.build_labels(tg.tic.to_numpy(), tg.tmag.to_numpy(), vsx, prsa, gaia, excl)
     lab["split"] = split_array(lab.tic.to_numpy())
+    # Which TICs every cone-search source actually answered for (cached chunk files): a TIC
+    # outside them has unknown catalogue status, so it can be neither quiet nor a label.
+    covered = np.ones(len(tg), bool)
+    for src in ("vsx", "gaia_vclass"):
+        cov = np.zeros(len(tg), bool)
+        for f in K.raw_dir(src).glob("chunk_*.parquet"):
+            i = int(f.stem.split("_")[1])
+            cov[i * a.vsx_chunk : (i + 1) * a.vsx_chunk] = True
+        lab[f"covered_{src}"] = cov
+        covered &= cov
+    lab["covered"] = covered
+    log(f"catalogue coverage: {covered.mean():.1%} of TICs answered by every cone source")
     out = data_root() / "knownclass" / "labels.parquet"
     lab.to_parquet(out, index=False)
 
@@ -108,6 +121,7 @@ def main() -> None:
         "label_counts": {c: {k: int(v) for k, v in r.items()} for c, r in counts.iterrows()},
         "excluded": lab[lab.excluded].exclude_reason.value_counts().to_dict(),
         "flagged_any": int(lab.flagged_any.sum()),
+        "covered_frac": float(lab.covered.mean()),
         "exclusion_rules": {"vsx_exact": sorted(L.VSX_EXCLUDE_EXACT),
                             "vsx_prefix": list(L.VSX_EXCLUDE_PREFIX),
                             "gaia_classes": sorted(L.GAIA_EXCLUDE)},
@@ -119,6 +133,7 @@ def main() -> None:
     print(counts.assign(total=counts.sum(1)).to_string())
     print("excluded:", prov["excluded"])
     print("labelled by split:", lab[lab.label != ""].split.value_counts().to_dict())
+    print("labelled and covered:", int(((lab.label != "") & lab.covered).sum()))
     print("sources disagree on", int((lab.n_sources_disagree > 0).sum()), "labelled TICs")
 
 

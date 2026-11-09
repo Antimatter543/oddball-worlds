@@ -146,9 +146,9 @@ def fetch_cone(source: str, catalog: str, columns: list[str], radius: float,
                 ok = False
                 break
             subs.append(d)
-        if not ok:
-            log(f"  {source} chunk {i + 1}: still empty, left for a later run")
-            continue
+        if not ok:  # the mirror's database is down: stop this pass, resume later
+            log(f"  {source} chunk {i + 1}: still empty; stopping this pass (re-run to resume)")
+            return out
         subs = [d for d in subs if not d.empty]
         df = pd.concat(subs, ignore_index=True) if subs else pd.DataFrame()
         if df.empty:
