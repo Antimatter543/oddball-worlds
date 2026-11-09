@@ -19,3 +19,11 @@ Read `docs/PLAN.md` first (milestones, go/no-go gate, failure catalogue). Any tr
 - Library code in `src/oddball/`, runnable entry points in `scripts/`, tests in `tests/`.
 - Time system: TESS BTJD (BJD_TDB − 2457000) internally. Convert other surveys explicitly.
 - Every claim about results needs the numbers behind it and the command that produced them.
+
+## Gotchas (learned)
+- **MAST tops out near ~30 files/s** (~12 MB/s). A 10-min sector (S27–55) is ~160k light curves, ~67 GB downloaded, ~2.6 GB stored, ~1.6 h locally. 200-s sectors (S56+) move ~3× the bytes. For new sectors, prefer cloud ingest on Kaggle.
+- **PDC can suppress real signals:** a ~2% dip in PDS 110 (S32, BTJD 2190–2192) is clear in SAP but weak in PDCSAP. Detectors must look at `sap_flux` too.
+- **Faint, crowded stars (T≈15) blow up in PDCSAP** (±100% swings from the crowding correction). Don't trust their amplitudes, and stratify scores by Tmag.
+- **About 0.02% of light curves have non-positive median PDCSAP.** They're logged in `failures.csv`. A future fix is to fall back to SAP.
+- **VizieR:** use the catalogue id (e.g. `J/ApJS/263/14`), not `/table1`. The CDS Strasbourg servers sometimes time out; the CfA mirrors work.
+- **Splits:** always use `oddball.common.splits.split_of(tic)`. Never invent a new split.
