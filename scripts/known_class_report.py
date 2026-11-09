@@ -99,6 +99,9 @@ def main() -> None:
                                        values=["n", "recall top1% (all depths)",
                                                "recall top1% (~1-3%)"])  # fmt: skip
     t.columns = [f"{v} [{s}]" for v, s in t.columns]
+    for c in t.columns:
+        if c.startswith("n ["):
+            t[c] = t[c].astype("Int64").astype(str)
     t = t.reset_index()
     parts.append(f"### Injection recall by host catalogue class ({a.split} split, non-null)\n\n"
                  + md_table(t))  # fmt: skip

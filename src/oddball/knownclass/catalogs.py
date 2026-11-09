@@ -36,7 +36,7 @@ VSX_CAT = "B/vsx/vsx"
 PRSA_CAT = "J/ApJS/258/16"
 VSX_RADIUS = 21.0  # arcsec
 GAIA_RADIUS = 3.0  # arcsec
-EMPTY_RETRIES = 4
+EMPTY_RETRIES = 2
 SUB_CHUNK = 1000  # positions per request (a cached chunk file holds ``chunk`` positions)
 
 
@@ -146,9 +146,9 @@ def fetch_cone(source: str, catalog: str, columns: list[str], radius: float,
                 ok = False
                 break
             subs.append(d)
-        if not ok:  # the mirror's database is down: stop this pass, resume later
-            log(f"  {source} chunk {i + 1}: still empty; stopping this pass (re-run to resume)")
-            return out
+        if not ok:  # this part of the mirror's database is down: skip, a later pass resumes
+            log(f"  {source} chunk {i + 1}: still empty; skipped (re-run to resume)")
+            continue
         subs = [d for d in subs if not d.empty]
         df = pd.concat(subs, ignore_index=True) if subs else pd.DataFrame()
         if df.empty:
