@@ -243,6 +243,8 @@ class ChannelOut:
     anom: np.ndarray  # (n, L) bool: anomalous bins
     valid: np.ndarray  # (n, L) bool
     snr4: np.ndarray  # (n, L) 2-h box dip SNR of the detrended residual
+    resid: np.ndarray | None = None  # (n, L) detrended residual (running-median baseline)
+    x: np.ndarray | None = None  # (n, L) median-normalised flux
 
 
 def channel_features(f: np.ndarray, err: np.ndarray, t: np.ndarray, bin_days: float):
@@ -289,7 +291,7 @@ def channel_features(f: np.ndarray, err: np.ndarray, t: np.ndarray, bin_days: fl
         "dip_t": t[imin], "bump_snr": bump_snr, "xs_var": xs_var, "frac_neg3": frac_neg3,
     }  # fmt: skip
     feats = {k: np.where(nan_row, np.nan, v).astype(np.float64) for k, v in feats.items()}
-    return ChannelOut(feats, anom, valid, snr4)
+    return ChannelOut(feats, anom, valid, snr4, r, x)
 
 
 def subscores(feat: pd.DataFrame) -> pd.DataFrame:
