@@ -53,7 +53,7 @@ def main() -> None:
     ap.add_argument("--split", default="test")
     a = ap.parse_args()
     sec = a.sector
-    eb, ek = load(a.base, sec, a.inj), load(a.ka, sec, a.inj)
+    eb, ek = load(a.base, sec, a.inj, "sys_flag"), load(a.ka, sec, a.inj, "sys_flag")
     kc = pd.read_parquet(outputs_root() / "knownclass" / a.kc / f"s{sec:04d}" / "real.parquet")
     labels = pd.read_parquet(data_root() / "knownclass" / "labels.parquet")
     lab = labels.set_index("tic")

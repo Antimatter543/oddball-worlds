@@ -30,19 +30,24 @@ def main() -> None:
     g.add_argument("--scorer")
     g.add_argument("--compare", nargs="+")
     ap.add_argument("--split", default="test", help="split for compare mode headline")
+    ap.add_argument("--veto", default="cmv2", choices=["cmv2", "sys_flag", "none"],
+                    help="systematics veto for the *_veto columns (default: per-event cmv2)")
     a = ap.parse_args()
     cmd = "python scripts/evaluate.py " + " ".join(shlex.quote(x) for x in sys.argv[1:])
 
     if a.scorer:
-        ed = load(a.scorer, a.sector, a.inj)
-        out = outputs_root() / "eval" / a.scorer / f"s{a.sector:04d}"
+        ed = load(a.scorer, a.sector, a.inj, a.veto)
+        tag = "" if a.veto == "cmv2" else f"_veto-{a.veto}"
+        out = outputs_root() / "eval" / a.scorer / f"s{a.sector:04d}{tag}"
         s = write_report(ed, out, cmd)
         print(json.dumps({"gate": s["gate"]["test"], "null_fpr": s["null_fpr"]["test"]},
                          indent=1, default=float))  # fmt: skip
         print(f"report: {out / 'report.md'}")
     else:
-        eds = [load(n, a.sector, a.inj) for n in a.compare]
-        out = outputs_root() / "eval" / "compare" / f"s{a.sector:04d}" / "__".join(a.compare)
+        eds = [load(n, a.sector, a.inj, a.veto) for n in a.compare]
+        tag = "" if a.veto == "cmv2" else f"__veto-{a.veto}"
+        out = (outputs_root() / "eval" / "compare" / f"s{a.sector:04d}"
+               / ("__".join(a.compare) + tag))  # fmt: skip
         write_compare(eds, out, cmd, split=a.split)
         print(f"report: {out / 'report.md'}")
 

@@ -82,3 +82,30 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - Nuisance probe: camera 0.37 vs chance 0.26 (ssl_v1 0.55), camera+CCD 0.16 vs 0.07.
 - Stability: combined top-100 overlap 0.41 (fails, kNN 0.20); `ssl_v2_recon` 0.76 and `ssl_v2_iforest` 0.70 pass. No combined ranking is reported.
 - **Reading:** ML leads on injections at every depth; on nulls it still needs the veto and stays worse than vetoed classical (0.16 vs 0.013). Nothing reaches 50% at 0.3%, and known dippers still sit with the variables. Next: the known-class explain-away score (§4.5), then the gate re-run.
+
+### 2026-11-10: per-event veto `cmv2` and ensemble `ens_v1` on S32 (test split): gate FAIL
+- Details are in ML_DESIGN §12. Reports:
+  - `outputs/veto/cmv2/s0032/report.md` (the veto)
+  - `outputs/eval/compare/s0032/classical__ssl_v2_iforest__ens_v1__ens_v1_ka/report.md` (the compare)
+  - `outputs/eval/compare/s0032/ens_v1__ens_v1_seed1__ens_v1_seed2__ens_v1_2c__ens_v1_max/report.md` (seeds and ablations)
+- **The v0 veto was broken.** `sys_flag` flagged 77.5% of real stars, because SAP scattered light (22-26% of bins on every CCD) outweighs most stars' other dip evidence. Every earlier "with veto" number ranked only the unflagged 22%. PDS 110 was flagged because of its SAP orbit-start ramp (79% of its dip chi^2), and β Pic because of orbit-edge common-mode dips.
+- **`cmv2` works per event.** It labels each event as systematic or not: common-mode on the star's CCD or its 512-px cell, or inside the scattered-light and dump windows from QUALITY. A star is flagged only if a strong systematic event remains and no astrophysical event does. The rule uses PDCSAP with t_sys = t_res = 10, chosen on val.
+  - **Flagged real stars: 4.6%** (v0: 77.5%).
+  - **Test null FPR:** classical 0.177 -> **0.007** (v0 0.013); `ssl_v2_iforest` 0.247 -> **0.027** (v0 0.027).
+  - **Recall stays intact.** `ssl_v2_iforest` at ~0.3 / 1 / 3% depth: 0.299 / 0.422 / 0.574 with no veto, 0.286 / 0.413 / 0.574 with cmv2, 0.144 / 0.311 / 0.506 with v0. Val agrees.
+  - **Known positives vetoed:** 1 of 18 (β Pic); v0 vetoed 2.
+- **`ens_v1`** takes a weighted max of the surprises from classical, `ssl_v2_iforest` and `ssl_v2_recon` (weights 1 : 1.5 : 1.5), then applies the cmv2 veto. The rule was chosen on val from rank-average, max, weighted max, Fisher and Stouffer.
+  - Test recall at ~0.3 / 1 / 3%: **0.303 / 0.574 / 0.788**; all depths 0.614; null FPR 0.040.
+  - With `explain.downweight` (`ens_v1_ka`): **0.324 / 0.607 / 0.788**; null FPR 0.050.
+- **But only 2 of 18 known positives reach the top 1%** (classical: 12/18 with the veto). The ML weights above 1 lock classical's top stars out of the ensemble's top 1%, and val injections can't show that cost. An equal-weight max (built after seeing this, not selected) gives 0.259 / 0.510 / 0.752 and 6/18.
+- **Seeds 0 / 1 / 2:** recall at ~0.3% 0.303 / 0.286 / 0.237; known positives 2 / 4 / 2 of 18; top-100 overlap 0.68 (passes).
+- **Recall vs injected SNR** (~0.3% depth bin, test):
+  - SNR < 10: 20% of injections, recall 0.03-0.07.
+  - SNR 10-30: 41%, recall 0.17.
+  - SNR 30-100: 33%, recall 0.54.
+  - Reaching 50% overall would need ~0.64 in the SNR 10-30 bin.
+- **Gate, strict reading: fails on both counts.** The best recall at ~0.3% is 0.32 (needs 0.5). Only 2 of 18 known positives are in the top 1% (needs 18; even a majority fails).
+- **Reading:** the veto is fixed, and the ML scores and the ensemble now lead on injections at every depth. But injection recall and real-dipper recall pull in opposite directions, and tuning on val injections alone chooses against the dippers.
+- **Next:**
+  - A val target that represents real dippers without leaking the known positives. Options: injections into catalogued YSO hosts, or a held-out dipper set from another sector.
+  - Better recall at SNR 10-30.

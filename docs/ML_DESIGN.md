@@ -65,6 +65,7 @@ Combine scores by **rank-averaging**. **Conditional calibration:** convert each 
 - Mask SPOC quality-flagged cadences, plus the known scattered-light and momentum-dump windows for each sector.
 - **Common-mode test:** for each anomalous time window, measure the fraction of stars on the same CCD (and nearby on the sky) that are also anomalous in that window. If it's high, it's instrumental: down-weight or flag it.
 - Flag stars whose time-resolved anomaly falls only in orbit-edge or scattered-light windows.
+- Implemented per event as `cmv2` (§12). It replaces the per-star v0 `sys_flag` in the evaluator.
 
 ## 6. Evaluation (pre-registered)
 - **The injection set** comes from real light curves, stratified by Tmag and CCD, and is held out of training. Injected types:
@@ -173,7 +174,8 @@ changes, each measured:
   `inj_id` for injections), i.e. `oddball.score.classical.systematics_features` with the
   binomial common-mode test for injection sets. Nothing is reimplemented; the evaluator applies
   the veto symmetrically. Caveat: `sys_flag` is set on 77.5% of real S32 stars, so "with veto"
-  ranks among the unflagged 22.5%.
+  ranks among the unflagged 22.5%. Superseded by the per-event `cmv2` veto (§12), which the
+  evaluator now uses by default (`--veto sys_flag` reproduces these numbers).
 - **Variants written** (same model, same sub-scores): `ssl_v2` (pre-registered rank-average of
   kNN, recon, IsoForest), `ssl_v2_recon` (recon only), `ssl_v2_iforest` (IsoForest only;
   best on val at ~0.3% depth and null FPR, so it is a val-selected variant, not pre-registered).
@@ -218,3 +220,133 @@ Code: `src/oddball/knownclass/`, `scripts/{build_known_class_labels,known_class_
 - **What it does to the real top 1%:** 559 of 1,600 classical top-1% stars are explained away (35%; predicted ROT 305, EB 142, DSCT 86, LPV 26). 83% of their replacements carry `sys_flag`, and 139 are predicted quiet, so without the veto the freed slots go to systematics. With the veto only 213 stars (13%) swap, and the vetoed top 1% is still ROT 685 / EB 574 / DSCT 227 by prediction (EB 283 by catalogue).
 - **Known positives:** the model gives 15 of 18 an explained share E >= 0.9 (mostly "typical ROT" or "typical EB"). Typicality does not separate dippers from rotators and EBs in these features. They survive only because their base percentile is extreme and alpha < 1. TIC 4350339 drops out of the top 1% (0.993 -> 0.987, predicted ROT, E 0.96). This is a structural limit of the down-weight. Pushing alpha higher would explain away the dippers too.
 - Reports: `outputs/eval/compare/s0032/classical__classical_ka/report.md`, `outputs/knownclass/kc_v1/s0032/report_classical_ka.md`.
+
+## 12. Implementation record: per-event veto `cmv2` and ensemble `ens_v1` (S32, 2026-11-10)
+
+Code: `src/oddball/score/veto.py`, `scripts/{build_veto,tune_veto,veto_report,ensemble}.py`, the
+evaluator's `--veto` option (default `cmv2`) and the injected-SNR diagnostic in `oddball.eval`.
+Each change below was measured on **val** only. Test and the known positives were read only
+after the choices were made.
+
+**Why v0 failed.** `sys_flag` fires when at least 50% of a star's dip chi^2 sits in common-mode
+bins. SAP carries common-mode scattered light in 22-26% of every CCD's bins (orbit starts and
+ends, and the run-up to each momentum dump); PDCSAP has 2-6%. On most quiet stars the SAP ramp
+outweighs everything else, so 77.5% of real S32 stars were flagged. "With veto" then ranked only
+the remaining 22%, mostly stars with strong real variability. A weak injected dip next to a ramp
+was thrown away along with the ramp: 30% of astrophysical injections were flagged.
+- **PDS 110:** its SAP orbit-start ramp (BTJD 2174) holds 79% of its dip chi^2 and the real
+  2190-2192 dip only ~10%, so `sys_frac` is 0.81.
+- **β Pic (T = 3.7):** its strongest PDC dips are its CCD's orbit-start (2174.3) and orbit-end
+  (2185.6) common-mode dips, plus a dump-adjacent SAP dip, so `sys_frac` is 0.63.
+
+**`cmv2` design.** The module docstring has the details.
+- **Events.** One series per channel, sign and box width (2 h, 8 h, 32 h). An event is a run of
+  bins with box SNR > 3 on the running-median residual. Each series is divided by its own robust
+  scatter when that is above 1 (red noise), so an event's SNR measures how much it stands out
+  within its own light curve.
+- **Common-mode maps.** Per series x CCD, and per series x CCD x 512-px cell (4 x 4 cells from
+  `tess-point` pixel positions). A cell is common-mode when the fraction of anomalous stars
+  exceeds the median + 8 sigma, with at least 5 stars. Sigma is the MAD, floored at binomial
+  noise. Injection sets add their own binomial CCD map (p < 1e-7, as in v0).
+- **Known windows from QUALITY.** Momentum dumps: bit 32 set on most stars (BTJD 2179.48 and
+  2193.48). SPOC scattered light: bit 4096 set on at least 20% of a CCD's stars (~2185.2-2185.95
+  and 2186.95-2187.2, 25-55 bins per CCD). Both are widened by one bin.
+- **Per-event decision.** An event is systematic when at least 50% of its SNR^2 lies in
+  common-mode or scattered-light bins, or when its peak falls between 1 bin before and 1 + W/2
+  bins after a dump. Then, within each channel, an event also counts as systematic if it lies
+  mostly inside a systematic event of the same or a *narrower* box, or contains the peak of one
+  at least as strong as itself. The first version allowed any box width. The 32-h view of
+  PDS 110's real dip then touched the SAP pre-dump window and relabelled its 2-h and 8-h events.
+  A unit test now covers this case.
+- **Per star.** `cmv2_res_snr` is the strongest non-systematic event (the astrophysical
+  residual) and `cmv2_sys_snr` the strongest systematic one. Both also come in PDCSAP-only
+  versions, along with the time and label of the strongest event. The flag is
+  `cmv2_flag = sys_snr >= t_sys and res_snr < t_res`: a strong systematic event with nothing
+  astrophysical left. A star with a real dip plus a shared ramp keeps its dip.
+- **Thresholds** (`tune_veto.py`, val only). The objective is J = mean over classical and
+  `ssl_v2_iforest` of (mean recall in the top 1% at ~0.3 / 1 / 3%) minus null FPR. The grid
+  covers t_sys x t_res x {both channels, PDCSAP only}.
+  - **One-SE rule:** among grid points within 0.01 of the best J (about one standard error on
+    val), take the one that flags the fewest real stars. The tolerance was first 0.002. It was
+    changed to one SE after the flat val plateau was seen; both choices are val-only.
+  - **Chosen:** PDCSAP only, t_sys 10, t_res 10 (val J 0.274, 4.6% flagged). The best J (0.280)
+    flags 14.5%. Any both-channel rule near the top flags more than 50%.
+- **Cost:** one 3.5-min map pass and one 4.5-min event pass over S32, plus ~3 min of
+  `tess-point` (cached).
+
+**Veto results** (`outputs/veto/cmv2/s0032/report.md`). Evaluator rule: flagged real and
+injected stars go to the bottom, then everything is re-ranked. Recall is in the top 1% at
+~0.3 / 1 / 3% depth.
+
+| scorer, split | veto: none / v0 / cmv2 | flagged real | null FPR | recall ~0.3 / 1 / 3% | astro flagged |
+|---|---|---|---|---|---|
+| classical, val | | 0 / 0.774 / 0.046 | 0.187 / 0.110 / 0.010 | .020 .063 .299 / .019 .122 .423 / .025 .100 .378 | 0 / 0.30 / 0.04 |
+| ssl_v2_iforest, val | | same | 0.213 / 0.067 / 0.020 | .239 .403 .611 / .105 .289 .560 / .234 .383 .614 | same |
+| classical, test | | 0 / 0.777 / 0.047 | 0.177 / 0.013 / 0.007 | .027 .092 .275 / .033 .104 .385 / .032 .112 .330 | 0 / 0.31 / 0.03 |
+| ssl_v2_iforest, test | | same | 0.247 / 0.027 / 0.027 | .299 .422 .574 / .144 .311 .506 / .286 .413 .574 | same |
+
+- v0's higher classical recall at ~3% comes from ranking against only the unflagged 22% of real
+  stars.
+- **Known positives:** `cmv2` flags 1 of 18, v0 flagged 2 (β Pic and PDS 110).
+  - **β Pic** is flagged by PDC orbit-edge common-mode dips at SNR 17. Its strongest residual
+    event, a 6-sigma 8-h dip at 2175.2, is below t_res. Its red-noise rescale is mild (1.5-2.1).
+  - **PDS 110** is unflagged only because the rule is PDCSAP-only (its PDC systematic SNR is
+    4.0). Its SAP dip survives as a residual event, but at only ~5 sigma against the star's own
+    variability (the SNR series' scatter is 11-25x white noise). A both-channel rule would flag
+    it: its SAP orbit-start ramp has SNR 33.5.
+
+**Ensemble `ens_v1`** (`scripts/ensemble.py`).
+- **Inputs.** Each component is a stratum percentile `p_k`, with surprise `s_k = -log(1 - p_k)`.
+- **Candidate combiners:** rank-average; max; weighted max `max_k w_k s_k`, with w in {0.5, 0.75,
+  1.25, 1.5, 2} relative to classical; Fisher (sum of s_k); Stouffer.
+- **Pipeline:** combine, re-percentile within stratum, then apply `cmv2` (flagged stars get
+  score -1). The val objective is the same J as for the veto.
+- **Component set** (also chosen on val):
+  - {classical, ssl_v2_iforest}: best J 0.388 (weighted max 1 : 1.5, which is in effect ML
+    alone; ML alone scores J 0.390).
+  - Adding `ssl_v2_recon`: J **0.505** (weighted max 1 : 1.5 : 1.5; plain max 0.457, Fisher
+    0.394, rank-average 0.281). IsoForest leads at ~0.3% depth, reconstruction at 1-3%.
+- **`ens_v1_ka`** adds `explain.downweight` on top (alpha 0.25, tau 1.0; val J 0.525).
+
+Test results, with the cmv2 veto applied:
+
+| scorer | recall ~0.3 / 1 / 3% | all depths | null FPR | known top 1% |
+|---|---|---|---|---|
+| classical | 0.032 / 0.112 / 0.330 | 0.284 | 0.007 | 12/18 |
+| ssl_v2_iforest | 0.286 / 0.413 / 0.574 | 0.470 | 0.027 | 3/18 |
+| `ens_v1` | 0.303 / 0.574 / 0.788 | 0.614 | 0.040 | 2/18 |
+| `ens_v1_ka` | 0.324 / 0.607 / 0.788 | 0.628 | 0.050 | 2/18 |
+| `ens_v1_2c` (no recon) | 0.283 / 0.407 / 0.566 | 0.472 | 0.027 | 5/18 |
+| `ens_v1_max` (post hoc, equal weights) | 0.259 / 0.510 / 0.752 | 0.584 | 0.027 | 6/18 |
+
+- **The ensemble loses the known positives.** A weight above 1 on the ML scores lets their top
+  ~0.5% outrank anything classical can reach. In a stratum of ~2,000 stars, classical's best
+  percentile is ~0.9997 (s ~8), while 1.5 x s at an ML percentile of 0.995 is 7.9. Most known
+  dippers sit at classical 0.99-0.9997, so in the ensemble they fall to 0.93-0.99. Val
+  injections cannot show this cost. The known positives are evaluation-only, so the weights
+  were not changed. `ens_v1_max` was built *after* seeing this, to measure the trade-off; it is
+  not a selected scorer.
+- **Seed stability** (ssl_v2 seeds 0 / 1 / 2, same rule via `--fixed ens_v1`):
+
+  | metric | seed 0 / 1 / 2 |
+  |---|---|
+  | recall at ~0.3% | 0.303 / 0.286 / 0.237 |
+  | recall at ~1% | 0.574 / 0.614 / 0.555 |
+  | recall at ~3% | 0.788 / 0.775 / 0.778 |
+  | null FPR | 0.040 / 0.037 / 0.033 |
+  | known positives in the top 1% | 2 / 4 / 2 of 18 |
+
+  The real top-100 overlap is 0.68 (pairs 0.71 / 0.66 / 0.67), which passes the 0.5 bar;
+  `ssl_v2_iforest` alone scores 0.70.
+- **Recall vs injected SNR** (test, `ens_v1`, ~0.3% depth, n = 598):
+
+  | SNR | n | recall |
+  |---|---|---|
+  | < 3 | 32 | 0.03 |
+  | 3-10 | 88 | 0.07 |
+  | 10-30 | 248 | 0.17 |
+  | 30-100 | 197 | 0.54 |
+  | > 100 | 33 | 0.82 |
+
+  20% of the ~0.3% bin is below SNR 10 and essentially unrecoverable. Reaching 50% overall
+  would need ~0.64 in the SNR 10-30 bin.

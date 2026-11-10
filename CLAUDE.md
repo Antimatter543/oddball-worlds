@@ -27,3 +27,4 @@ Read `docs/PLAN.md` first (milestones, go/no-go gate, failure catalogue). Any tr
 - **About 0.02% of light curves have non-positive median PDCSAP.** They're logged in `failures.csv`. A future fix is to fall back to SAP.
 - **VizieR:** use the catalogue id (e.g. `J/ApJS/263/14`), not `/table1`. The CDS Strasbourg servers sometimes time out; the CfA mirrors work.
 - **Splits:** always use `oddball.common.splits.split_of(tic)`. Never invent a new split.
+- **SAP is scattered-light heavy.** 22–26% of every CCD's S32 bins are common-mode in SAP (PDCSAP 2–6%). Any per-star "share of evidence in systematic bins" rule therefore flags most quiet stars (the v0 `sys_flag` flagged 77.5%). Veto per event and on PDCSAP instead (`cmv2`, ML_DESIGN §12).
