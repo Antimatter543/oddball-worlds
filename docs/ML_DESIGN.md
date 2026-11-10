@@ -350,3 +350,196 @@ Test results, with the cmv2 veto applied:
 
   20% of the ~0.3% bin is below SNR 10 and essentially unrecoverable. Reaching 50% overall
   would need ~0.64 in the SNR 10-30 bin.
+
+## 13. Implementation record: per-event veto `cmv3`, null set `n2` and ensemble `ens_v2` (S32, 2026-11-10)
+
+Code: `src/oddball/score/veto3.py` (module docstring has every rule and threshold),
+`src/oddball/inject/nulls2.py`, `scripts/{make_nulls2,ml_score_inj,build_veto3,tune_veto3,
+veto3_report,skybot_check}.py`, `tests/test_veto3.py`. The evaluator takes `--veto cmv3`
+(the default stays `cmv2`) and `ensemble.py --veto cmv3` builds `ens_v2`. This implements
+docs/VETTING.md §4 build-order items 1 and 3 (F1, F2, F3, F4a/b, F5, F8, F12). `cmv2` is
+unchanged; its outputs are reused.
+
+**Labels.** `cmv3` adds stage-1 labels to `cmv2`'s per-event decision, before stage 2. A
+relabelled event therefore still drags its wider-box views with it, and a star keeps any real
+event the new labels do not touch.
+
+| label | VETTING | an event is systematic when |
+|---|---|---|
+| `bkg` | F1 | SAP moves >= 3 sigma, the background moves the other way by >= 0.5 of that, and `sap_flux + bkg` has box SNR < 3 |
+| `pdc` | F12 | a PDCSAP event whose SAP depth / CROWDSAP is < 0.5 of the PDCSAP depth (>= 3 sigma). SAP-deeper (PDS 110) is never labelled |
+| `gap` | F4b | within 2 box widths of an orbit edge or a >= 0.3-d gap, with mean \|d bkg/dt\| >= the CCD's 90th percentile |
+| `qbits` | F4a | >= 50% of SNR^2 in bins with QUALITY 16/128/2048/32768 (own flags, or set on >= 20% of the CCD). In S32 only 128 and 32768 occur |
+| `dumpedge` | F5 | the event run *starts or ends* within 1 + W/2 bins of a dump (a step; `cmv2` checks only the peak) |
+| `track` | F2 | a straight, steady track (5-300"/h, >= 3 stars) of short background or SAP bumps passes within 6 px during the event |
+| `flank` | F2 | a bump with a `bkg`-labelled dip of the same star 1-24 bins away (dip-spike-dip: a body crossing the aperture) |
+| `column` | F8 | >= 3 other stars within +-2 columns have an event of the same series at the same bin, Poisson p < 1e-4 against control columns 10-60 px away |
+
+Thresholds are the VETTING priors and were not tuned. Which labels to enable and the star flag
+(`sys_snr >= t_sys and res_snr < t_res`, as in `cmv2`) were chosen on val.
+
+**Null set `n2`** (`nulls2.py`; val 1,157 light curves, 329 evaluated; test 1,085, 331
+evaluated). This is the VETTING §2 list.
+- **`null_asteroid`.** A body on a straight line (15-80"/h, 3-10 d) across real stars.
+  In the aperture (1-px PSF) it adds to SAP. In the background pixels (2.5-6 px) it raises
+  `bkg` and lowers SAP by K_BKG = 0.5 of its flux. PDCSAP gets the SAP change / CROWDSAP.
+  Every star the track passes gets the signal; only stars of the set's split are evaluated
+  (the rest are `split = "carrier"` and never ranked).
+- **`null_step`.** A step at a momentum dump with exponential recovery (tau 0.5-5 d) in 20
+  stars of one CCD, random sign.
+- **`null_column`.** One event shape in every star within +-1.5 columns of one CCD column.
+- **Realism.** `n2` sets are vetoed with the real sector's common-mode maps only
+  (`--real-masks-only n2`). The set's own binomial map would see a column's ~15 hosts as a
+  CCD-wide event, which the real sky would not.
+- **Cross-star tests.** These run on the set's events together with the real sector's
+  (minus the hosts' own real copies).
+- The ML scorers score `n2` through `ml_score_inj.py` from `runs/ssl_v2_s0/ref_state.pkl`
+  (reproduces `inj_v1` exactly).
+
+**Tuning** (`tune_veto3.py`, val only).
+- **Grid:** 18 label configurations (`cmv2` alone, all labels, leave-one-out, only-one) x
+  {both channels, PDCSAP only} x t_sys {5, 6, 8, 10, 15, 20, 30} x t_res {4, 5, 6, 7, 8, 10, 15}.
+- **Objective:** J3 = mean over classical and `ssl_v2_iforest` of (mean recall@1% at ~0.3 / 1
+  / 3%, v1 injections) minus the mean over the five null types (null_ccd, null_dump,
+  null_asteroid, null_step, null_column) of val null FPR. The per-type mean keeps the 200 step
+  nulls from outweighing the 55 asteroids. As for `cmv2`, the rule is one SE: within 0.01 of
+  the best J3, take the point that flags the fewest real val stars.
+- **Chosen:** all labels, PDCSAP only, t_sys 15, t_res 10 (val J3 0.277; 2.4% of real stars
+  flagged, `cmv2` 4.6%). The best J3 (0.286) is at t_sys 5, t_res 7 and flags 24%.
+- **Ablation** (best val J3 per configuration):
+
+  | configuration | J3 |
+  |---|---|
+  | all labels | 0.286 |
+  | no `pdc` | 0.286 |
+  | no `qbits` | 0.286 |
+  | no `track` | 0.283 |
+  | no `gap` | 0.276 |
+  | no `flank` | 0.274 |
+  | no `bkg` | 0.261 |
+  | no `column` | 0.236 |
+  | no `dumpedge` | 0.201 |
+  | `cmv2` labels only | 0.123 |
+
+  `dumpedge` and `column` carry the step and column nulls, `bkg` and `flank` the asteroids.
+  `pdc` and `qbits` add nothing on S32 val. The `qbits` windows coincide with `cmv2`'s dump and
+  orbit-edge windows; no PDC-only null type exists to reward `pdc`. They are kept because they
+  cost nothing measurable.
+- **Pass 1 had no `flank`**, and track points were "run above SNR 3 <= 8 bins". It reached
+  best val J3 0.273 and chose the same rule (2.0% flagged), but flagged only 3 of the 10
+  eyeballed asteroids.
+  - **Diagnosis** (`outputs/veto/cmv3/s0032/events_watch.parquet`): a bright crossing's run
+    above SNR 3 is far longer than its core, so the brightest crossings made no track points.
+    The spike in the aperture also stayed an unlabelled residual between two `bkg`-labelled dips.
+  - **Fix:** points now use the width at half maximum, and `flank` was added. Both are
+    VETTING F1/F2 signatures ("often dip-spike-dip"). Thresholds are priors, and the rule was
+    re-tuned on val.
+  - **Caveat:** the fix was motivated by the evaluation-only triage set, so the triage numbers
+    below are not an independent test of it. Val and test nulls are.
+- **Label prevalence** (light curves with >= 1 labelled event, real): `gap` 96%, `bkg` 84%,
+  `dumpedge` 70%, `qbits` 69%, `flank` 47%, `pdc` 34%, `column` 11%, `track` 7.5%. Most of
+  these are noise-level events. Among flagged real stars, the strongest systematic event is
+  `cm_ccd` (85%), `flank` (5%), `track` (5%) or `bkg` (2%).
+- **Chance tracks:** shuffling the point times within each CCD gives 7.6k track pairs (real
+  31.9k) and 16k light curves in windows (real 21.9k). Most windowed light curves are chance
+  passes, so `track` must stay an event label (an event has to overlap the window), never a
+  star label.
+- **Cost:** 37 min for S32 (scan 3.5 min, cross-star 1 min, classify 30 min for 18
+  configurations, injections 3 min), with CPU shared with another job.
+
+**Results** (`outputs/veto/cmv3/s0032/report.md`; evaluator rule; top 1%).
+
+Test null FPR by type, veto none / `cmv2` / `cmv3`:
+
+| scorer | ccd | dump | asteroid | step | column |
+|---|---|---|---|---|---|
+| classical | .17 / .01 / .01 | .19 / .01 / .01 | .04 / .06 / .00 | .31 / .32 / .02 | .26 / .31 / .01 |
+| ssl_v2_iforest | .30 / .04 / .02 | .11 / .00 / .00 | .13 / .13 / .04 | .70 / .54 / .20 | .26 / .29 / .06 |
+| `ens_v2` | .67 / .05 / .02 | .43 / .02 / .02 | .51 / .51 / .04 | .75 / .60 / .20 | .69 / .68 / .08 |
+
+Recall@1% at ~0.3 / 1 / 3%, test, same order:
+
+| scorer | none | `cmv2` | `cmv3` |
+|---|---|---|---|
+| classical | .027 .092 .275 | .032 .112 .330 | .027 .097 .291 |
+| ssl_v2_iforest | .299 .422 .574 | .286 .413 .574 | .294 .407 .561 |
+| `ens_v2` | .306 .593 .803 | .303 .590 .788 | .321 .590 .794 |
+
+- **Step nulls stay the weakest:** test FPR 0.20 for the ML scorers (val 0.07).
+  - `cmv3` flags 70% of test step nulls (val 60%). The unflagged ones are shallow: median
+    depth 0.6%, against 3.1% for the flagged ones.
+  - Their step events are mostly labelled systematic (`cm_ccd`, `dump`, `dumpedge`) but stay
+    below t_sys = 15, and the ML scorers still rank the shape high.
+  - Only 7 test step nulls keep a residual event at >= 10 sigma away from the dump (the
+    recovery tail).
+- **Classical loses a little at 3% depth** with `cmv3` (0.330 -> 0.291), because `cmv3`
+  removes half as many real stars. Its v1 null FPR goes 0.007 -> 0.013.
+- **Astrophysical injections flagged:** val 0.05 (`cmv2` 0.04), test 0.04 (`cmv2` 0.03).
+
+Evaluation-only checks (none of them was used for tuning):
+- **Known positives:** `cmv3` flags 1 of 18 (β Pic), the same star as `cmv2`.
+- **Eyeballed S32 triage** (`labels/triage_s0032_v1.csv`, 96 stars):
+
+  | class | n | `cmv2` flags | `cmv3` flags |
+  |---|---|---|---|
+  | artefact | 29 | 0 | 11 |
+  | asteroid | 10 | 0 | 9 |
+  | scattered light | 19 | 0 | 2 |
+  | EB | 53 | 1 | 1 (167713851, flagged by both) |
+  | ordinary variable | 14 | 0 | 0 |
+
+  - The asteroid that is not flagged, 412059784, keeps a 32-h residual bump at SNR 12.
+  - The scattered-light cards are mostly quiet stars that the ML picks for shape: their
+    strongest events are at SNR 3-5, so no rule with t_sys >= 5 can flag them.
+  - **Provenance of the labels:** the first triage pass stored only counts and named examples.
+    18 unnamed artefact cards and 4 variables were re-labelled from the cards for this record
+    (`source = triage-2`), matching the original 29 / 53 / 14 counts.
+
+**`ens_v2`** = `ens_v1`'s recipe (weighted max of classical, `ssl_v2_iforest`, `ssl_v2_recon`
+surprises; rule and weights re-chosen on val) with the `cmv3` veto. The rule chosen is
+weighted max 1 : 2 : 2 (val J 0.524; 1 : 1.5 : 1.5 gives 0.519).
+
+Test, `evaluate.py --compare classical ens_v1 ens_v2 --split test --veto cmv3`, v1 injections:
+
+| scorer | recall ~0.3 / 1 / 3% | all depths | null FPR | known top 1% |
+|---|---|---|---|---|
+| classical (cmv2 veto) | 0.032 / 0.112 / 0.330 | 0.284 | 0.007 | 12/18 |
+| classical (cmv3 veto) | 0.027 / 0.097 / 0.291 | 0.261 | 0.013 | 11/18 |
+| `ens_v1` (cmv2) | 0.303 / 0.574 / 0.788 | 0.614 | 0.040 | 2/18 |
+| `ens_v2` (cmv3) | 0.321 / 0.590 / 0.794 | 0.624 | 0.020 | 3/18 |
+
+`ens_v2` still loses the known positives (3 of 18), for the reason given in §12. The larger
+ML weights do not help them.
+
+**SkyBoT (F3)** (`scripts/skybot_check.py`).
+- **Method:** a 5' cone, observer C57, asteroids only, at the epoch of each star's strongest
+  `cmv3` event. Run on the `ens_v2` top 200 that survive the veto plus the 96 triage stars:
+  296 anonymous queries, ~20 min. Responses are cached under `data/skybot/s0032/`.
+- **"Explained"** means a body with V <= 19 within 126" (6 px) over +-1 h.
+- **Top 200: 2 explained.** These are ranks 52 (464770254, Novosibirsk, V 16.4) and 92
+  (454191483, Sholokhov, V 15.5). Both are unlabelled PDC bumps that `cmv3` missed. 18 of the
+  200 have some body within 300".
+- **Triage artefacts: 5 of 29 explained.**
+  - Nemausa (V 10.9) explains 396863456 and 454149279, and also 402215073, which the triage
+    called scattered light.
+  - Asporina (V 13.2) explains 298849841.
+  - The fifth is 302345512.
+- **Asteroid cards SkyBoT cannot explain.** Three (436707310, 302675203, 47398410) have only
+  V 21-22 bodies within 126", far too faint for crossings at SNR 35-2800. Two (71026277,
+  37951066, camera 2) have no catalogued body within 5'.
+  - These may be comets (excluded by the asteroid filter), uncatalogued bodies, or the wrong
+    epoch (the strongest event need not be the crossing). This is not resolved.
+  - `cmv3` flags all five, from `track` or `flank`.
+- **EBs and variables:** 0 explained.
+- **Epoch:** BJD_TDB is sent as the epoch. Its offset from the spacecraft's UTC (barycentric
+  light time up to ~8 min, plus 69 s) is <= 7" (0.3 px) at 40"/h, well inside the 126" match.
+
+**Caveats and unverified.**
+- **The `n2` physics is a model.** K_BKG = 0.5, a 1-px Gaussian PSF and a 2.5-6 px background
+  annulus approximate SPOC's FFI apertures; real stamps vary. The step nulls assume one step
+  per dump with exponential recovery.
+- **The thresholds are VETTING priors.** Only the label set and the star flag were tuned.
+- **S32 is a southern-hemisphere sector, so only camera 1 is fairly close to the ecliptic.**
+  8 of the 10 eyeballed asteroids are on camera 1, two on camera 2. The asteroid labels need
+  checking on S43/S44 (ecliptic), where VETTING expects the most crossings.
+- **Asteroid nulls are few:** 55 on val and 53 on test, so an FPR of 0.04 is ~2 stars.

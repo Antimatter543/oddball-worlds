@@ -116,3 +116,32 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - **35 EBs have no VSX/Gaia/Prša entry.** They still need checking against the FFI EB catalogues before anything is called new. Notable: 77838934 (flat 4% box dips 16.4 d apart), 375150432 (flat 6% box dips, P≈12.2 d), 415401950 (very different eclipse widths).
 - **Leads outside S32:** 339670265 has a single ~15% dip in S38 near BTJD 2343.3. 350298319 is a blended EB whose source is unclear.
 - **Reading:** "big dip" ranks above "weird dip". Next: automated EB rejection and asteroid / scattered-light checks (docs/VETTING.md), then look deeper than the top 60.
+
+### 2026-11-10: per-event veto `cmv3` (asteroid, step, column and background labels) and `ens_v2` on S32 (test split): gate FAIL, artefact nulls mostly gone
+- Details are in ML_DESIGN §13. Reports:
+  - `outputs/veto/cmv3/s0032/report.md` (before / after per null type, ablation, known positives, triage)
+  - `outputs/eval/compare/s0032/classical__ens_v1__ens_v2__veto-cmv3/report.md` (the compare; `..._ens_v2/` is the same with the cmv2 veto)
+- **`cmv3` = `cmv2` + eight per-event labels:** `bkg`, `pdc`, `gap`, `qbits`, `dumpedge`, `track`, `flank` (dip-spike-dip asteroid crossing), `column`. These are VETTING §4 items 1 and 3.
+  - **New null set `n2`:** asteroid tracks across real stars, steps at momentum dumps, single-column events. Val 329 evaluated, test 331.
+  - **Rule chosen on val:** all labels, PDCSAP only, t_sys 15, t_res 10. It flags **2.4%** of real stars (`cmv2` 4.6%).
+- **Test null FPR in the top 1%** (none -> `cmv2` -> `cmv3`):
+  - `ens_v2`: asteroid 0.51 -> 0.51 -> **0.04**; step 0.75 -> 0.60 -> **0.20**; column 0.69 -> 0.68 -> **0.08**; CCD 0.67 -> 0.05 -> 0.02; dump 0.43 -> 0.02 -> 0.02.
+  - classical: asteroid 0.04 -> 0.06 -> 0.00; step 0.31 -> 0.32 -> 0.02; column 0.26 -> 0.31 -> 0.01.
+  - `ssl_v2_iforest`: asteroid 0.13 -> 0.13 -> 0.04; step 0.70 -> 0.54 -> 0.20; column 0.26 -> 0.29 -> 0.06.
+- **Recall is unchanged within noise.** `ens_v2` at ~0.3 / 1 / 3%: 0.303 / 0.590 / 0.788 with cmv2, 0.321 / 0.590 / 0.794 with cmv3. Astrophysical injections flagged: 0.04 (cmv2 0.03).
+  - **Classical alone loses a little** (~3%: 0.330 -> 0.291; v1 null FPR 0.007 -> 0.013; known positives in the top 1% 12 -> 11 of 18), because cmv3 removes half as many real stars.
+- **Known positives flagged:** 1 of 18 (β Pic), the same as `cmv2`.
+- **Eyeballed S32 triage** (evaluation only):
+  - 11 of 29 artefacts flagged (`cmv2`: 0): **9 of 10 asteroids**, but only 2 of 19 scattered-light cards. Those are quiet stars with no event above SNR ~5, picked by the ML for shape.
+  - EBs: 1 of 53 flagged (the same star as cmv2). Ordinary variables: 0 of 14.
+  - **Caveat:** the `flank` label and the half-maximum point width were added after a first pass flagged only 3 of the 10 asteroids, so the triage number is not independent. Val and test nulls are.
+- **`ens_v2`** = `ens_v1` re-selected on val with the cmv3 veto. It is a weighted max 1 : 2 : 2.
+  - Test, cmv3 veto: recall **0.321 / 0.590 / 0.794**, all depths 0.624, null FPR 0.020.
+  - Known positives in the top 1%: **3 of 18**. Still the §12 problem.
+- **SkyBoT (C57)** on the `ens_v2` top 200 that survive the veto, plus the triage stars (296 anonymous queries, ~20 min):
+  - **2 of the top 200** have a known asteroid with V ≤ 19 within 6 px during their strongest event (ranks 52 and 92). Both are PDC bumps that `cmv3` missed.
+  - **5 of 29 triage artefacts** are explained: Nemausa (V 10.9) accounts for 3 of them, including one card called scattered light.
+  - Five bright "asteroid" crossings have no V ≤ 19 body nearby. They may be comets, uncatalogued bodies or the wrong epoch; not resolved.
+- **Gate: fails** (recall at ~0.3% is 0.32, needs 0.5; 3 of 18 known positives).
+- **Reading:** camera artefacts no longer reach the top on S32 nulls. What's left is the shallow step tails, scattered-light shapes the ML likes, and the known-positive loss in the ensemble.
+- **Next:** run cmv3 on S43/S44 (ecliptic) to size the asteroid problem; label the eyeballed galleries per star from now on (`labels/`).

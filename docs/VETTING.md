@@ -194,6 +194,14 @@ and 4a are pure NumPy over the shards we already stream.
    `bkg` events finds known and unknown movers on every camera. SkyBoT (`C57`) confirms the top
    ~100–300 at ~10 s each, and the result is written as a gallery annotation. Run it first on
    S43/S44 (ecliptic) to size the problem.
+
+   **Status (2026-11-10):** items 1 and 3 are built as the `cmv3` veto (ML_DESIGN §13), so far
+   on S32 only. Item 1 also gained F5 (`dumpedge`) and F8 (`column`) from item 4a.
+   - The track test is a pair-plus-support line search per CCD, not RANSAC.
+   - A single-star dip-spike-dip label (`flank`) catches crossings that have too few
+     neighbours for a track.
+   - SkyBoT: `scripts/skybot_check.py`, run on the `ens_v2` top 200.
+   - S43/S44 are still to do.
 4. **Neighbour and blend pack without pixels, then keep centroids** (F10a/b/c, F8, F5c; ~1–2
    days).
    - (a) Neighbour event matching, the CROWDSAP / Δmag maximum-dilution test and the

@@ -28,3 +28,5 @@ Read `docs/PLAN.md` first (milestones, go/no-go gate, failure catalogue). Any tr
 - **VizieR:** use the catalogue id (e.g. `J/ApJS/263/14`), not `/table1`. The CDS Strasbourg servers sometimes time out; the CfA mirrors work.
 - **Splits:** always use `oddball.common.splits.split_of(tic)`. Never invent a new split.
 - **SAP is scattered-light heavy.** 22–26% of every CCD's S32 bins are common-mode in SAP (PDCSAP 2–6%). Any per-star "share of evidence in systematic bins" rule therefore flags most quiet stars (the v0 `sys_flag` flagged 77.5%). Veto per event and on PDCSAP instead (`cmv2`, ML_DESIGN §12).
+- **"Short event" tests need the half-maximum width.** A bright asteroid crossing's run above SNR 3 is many times longer than its core, so a run-length cut drops exactly the brightest movers (the first `cmv3` pass, ML_DESIGN §13).
+- **Store eyeballing labels per star** (`labels/`, with tic, label and source). The first S32 triage kept only counts, and the labels had to be rebuilt from the cards.

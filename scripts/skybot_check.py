@@ -183,7 +183,9 @@ def main() -> None:
                               if best is not None else np.nan)})  # fmt: skip
         if (i + 1) % 20 == 0:
             log(f"  {i + 1}/{len(q)} queried ({n_new} new)")
-    res = q.merge(pd.DataFrame(out), on="tic", how="left")
+    # one result per query row (a star can be in the top list and in --extra)
+    res = pd.concat([q.reset_index(drop=True),
+                     pd.DataFrame(out).drop(columns="tic").reset_index(drop=True)], axis=1)
     p = vd / f"skybot_{a.scorer}.csv"
     res.to_csv(p, index=False)
     prov = {"service": URL, "observer": "C57", "objFilter": 100, "radius_arcmin": a.radius,
