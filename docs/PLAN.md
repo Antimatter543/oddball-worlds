@@ -109,3 +109,10 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - **Next:**
   - A val target that represents real dippers without leaking the known positives. Options: injections into catalogued YSO hosts, or a held-out dipper set from another sector.
   - Better recall at SNR 10-30.
+
+### 2026-11-10: first look at the candidates (S32 galleries, model-assisted eyeballing)
+- 96 unique stars (the ens_v1 and ssl_v2_iforest galleries, 60 cards each): **53 EB, 29 artefact, 14 ordinary variable (incl. 6 flare stars), 0 weird**. The known positives are excluded from galleries by design.
+- **Artefacts:** asteroid crossings of the background annulus (8 in the top picks: the target dips while neighbours brighten in sequence), and orbit-start / scattered-light SAP ramps, which dominate the exploration picks.
+- **35 EBs have no VSX/Gaia/Prša entry.** They still need checking against the FFI EB catalogues before anything is called new. Notable: 77838934 (flat 4% box dips 16.4 d apart), 375150432 (flat 6% box dips, P≈12.2 d), 415401950 (very different eclipse widths).
+- **Leads outside S32:** 339670265 has a single ~15% dip in S38 near BTJD 2343.3. 350298319 is a blended EB whose source is unclear.
+- **Reading:** "big dip" ranks above "weird dip". Next: automated EB rejection and asteroid / scattered-light checks (docs/VETTING.md), then look deeper than the top 60.
