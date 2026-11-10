@@ -107,3 +107,38 @@ def time_clusters(cand: pd.DataFrame, bin_days: float = 0.5, min_n: int = 3) -> 
                                                  events=("cmv3_res_ev", lambda s: ", ".join(
                                                      sorted(set(map(str, s)))[:3])))  # fmt: skip
     return g[g.n >= min_n].sort_values("n", ascending=False).reset_index()
+
+
+def crowded_time_bins(cand: pd.DataFrame, bin_days: float = 0.5,
+                      alpha: float = 0.01) -> tuple[np.ndarray, pd.DataFrame]:
+    """Sector-wide time crowding (one sector): the candidates' strongest residual events
+    (``cmv3_res_t``) in ``bin_days`` bins over all cameras. The expectation per bin is the
+    median count over occupied bins; a bin is crowded when its Poisson upper-tail p-value is
+    below ``alpha`` / (number of occupied bins). This catches spacecraft-wide systematics
+    (sector and orbit edges, a mid-orbit dip seen on all four cameras in S55), which the
+    per-CCD ``time_clusters`` check misses. Added after looking at the six-sector list
+    (ML_DESIGN §17); it marks candidates only and never changes a score or rank.
+
+    Returns a boolean mask over ``cand`` rows (True = event in a crowded bin) and a table of
+    the crowded bins (``tbin, t0, n, expected, p, cameras``)."""
+    from scipy.stats import poisson
+
+    t = cand.cmv3_res_t.to_numpy(dtype=float)
+    ok = np.isfinite(t)
+    b = np.full(len(cand), np.iinfo(np.int64).min, dtype=np.int64)
+    b[ok] = np.floor(t[ok] / bin_days).astype(np.int64)
+    cols = ["tbin", "t0", "n", "expected", "p", "cameras"]
+    if not ok.any():
+        return np.zeros(len(cand), dtype=bool), pd.DataFrame(columns=cols)
+    vc = pd.Series(b[ok]).value_counts()
+    mu = float(np.median(vc.to_numpy()))
+    p = pd.Series(poisson.sf(vc.to_numpy() - 1, mu), index=vc.index)
+    bad = p.index[p < alpha / len(vc)]
+    mask = ok & np.isin(b, bad.to_numpy())
+    rows = []
+    for k in sorted(bad):
+        cams = cand.camera.to_numpy()[ok & (b == k)]
+        rows.append({"tbin": int(k), "t0": k * bin_days, "n": int(vc[k]), "expected": mu,
+                     "p": float(p[k]), "cameras": " ".join(
+                         f"{c}:{n}" for c, n in pd.Series(cams).value_counts().sort_index().items())})
+    return mask, pd.DataFrame(rows, columns=cols)

@@ -54,3 +54,20 @@ def test_ccd_excess_flags_a_hot_ccd():
     t = K.ccd_excess(cand, stars).set_index("camera")
     assert t.loc[1, "ratio"] == 1.8 and t.loc[1, "p_excess"] < 1e-3
     assert t.loc[2, "p_excess"] > 0.5
+
+
+def test_crowded_time_bins_flags_a_spacecraft_wide_spike():
+    rng = np.random.default_rng(0)
+    n = 500
+    t = rng.uniform(2000.0, 2025.0, n)  # ~10 events per 0.5-d bin
+    t[:30] = 2010.1 + rng.uniform(0, 0.3, 30)  # 30 extra events in one bin, all cameras
+    t[30] = np.nan  # no residual event
+    c = pd.DataFrame({"tic": np.arange(n), "cmv3_res_t": t, "camera": rng.integers(1, 5, n)})
+    mask, bins = K.crowded_time_bins(c)
+    assert list(bins.tbin) == [4020]
+    assert mask[:30].all() and not mask[30]
+    assert mask.sum() == bins.n.iloc[0]
+    # a uniform list has no crowded bin
+    c2 = c.assign(cmv3_res_t=rng.uniform(2000.0, 2025.0, n))
+    m2, b2 = K.crowded_time_bins(c2)
+    assert len(b2) == 0 and not m2.any()

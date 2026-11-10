@@ -150,6 +150,7 @@ def main() -> None:
         f"alpha is used for the classical EB down-weight")
 
     longs, stats, ccds, observed, per_sector_prov, allrank, tcs = [], [], [], {}, {}, [], []
+    crowds = []
     for sec in a.sectors:
         t, st = load_sector(sec, alpha)
         observed[sec] = set(t.tic.astype(int))
@@ -181,6 +182,12 @@ def main() -> None:
             sh.append(int(t2.n.max()) if len(t2) else 0)
         st["max_time_cluster_shuffled_p95"] = float(np.percentile(sh, 95))
         st["n_in_time_clusters"] = int(tc.n.sum()) if len(tc) else 0
+        crowd_mask, cb = K.crowded_time_bins(c)
+        c["time_crowded"] = crowd_mask
+        cb.insert(0, "sector", sec)
+        crowds.append(cb)
+        st["n_crowded_bins"] = len(cb)
+        st["n_time_crowded"] = int(crowd_mask.sum())
         st["camera_counts"] = " ".join(f"{k}:{v}" for k, v in
                                        c.camera.value_counts().sort_index().items())  # fmt: skip
         longs.append(c)
@@ -193,6 +200,11 @@ def main() -> None:
             f"ccd{int(cc.loc[cc.ratio.idxmax(), 'ccd'])})")
     long = pd.concat(longs, ignore_index=True)
     wide = K.merge_sectors(long, observed)
+    # a star is time-crowded when its event falls in a crowded bin in every sector it is a
+    # candidate in (a multi-sector star with one clean sector stays eligible)
+    tcw = long.groupby("tic").time_crowded.agg(["all", "sum"])
+    wide["time_crowded"] = wide.tic.map(tcw["all"]).fillna(False).astype(bool)
+    wide["n_sectors_time_crowded"] = wide.tic.map(tcw["sum"]).fillna(0).astype(int)
 
     # star-level context from the best sector, worst-case EB and veto across candidate sectors
     best = long.assign(best_rank=long[["cls_rank", "ens_rank"]].min(axis=1)).sort_values(
@@ -241,7 +253,8 @@ def main() -> None:
     # gallery priority: uncatalogued, not EB-like, not asteroid-explained, multi-sector first
     wide["eb_like_flag"] = wide.eb_like_max > K.EB_LIKE_FLAG
     wide["gallery_ok"] = (~wide.catalogued & ~wide.known_positive & ~wide.eb_like_flag
-                          & ~wide.skybot_explained & (wide.split != "known"))  # fmt: skip
+                          & ~wide.skybot_explained & ~wide.time_crowded
+                          & (wide.split != "known"))  # fmt: skip
     wide = wide.sort_values(["gallery_ok", "multi", "triage_s32", "best_rank", "tic"],
                             ascending=[False, False, True, True, True]).reset_index(drop=True)
     wide["priority"] = np.arange(1, len(wide) + 1)
@@ -255,6 +268,8 @@ def main() -> None:
     cc.to_csv(od / "ccd.csv", index=False)
     tca = pd.concat(tcs, ignore_index=True)
     tca.to_csv(od / "time_clusters.csv", index=False)
+    cba = pd.concat([x for x in crowds if len(x)] or crowds[:1], ignore_index=True)
+    cba.to_csv(od / "crowded_time_bins.csv", index=False)
 
     # SkyBoT targets: ecliptic-sector candidates, best rank first, within the query budget
     per = a.skybot_budget // len(ECLIPTIC)
@@ -270,6 +285,8 @@ def main() -> None:
 
     # summary
     n_multi = int(wide.multi.sum())
+    crowd_only = (wide.time_crowded & ~wide.catalogued & ~wide.known_positive
+                  & ~wide.eb_like_flag & ~wide.skybot_explained & (wide.split != "known"))  # fmt: skip
     lines = [f"# Candidate list {a.name} ({dt.date.today().isoformat()})", "",
              (f"Union per sector of the classical top {a.n} and the {ENS} top {a.n}, after the "
              f"cmv3 veto and the EB down-weight (alpha {alpha}, frozen from S32). Built by "
@@ -287,13 +304,26 @@ def main() -> None:
              f"flag (soft): {int(wide.kostov_nn.sum())}"),
              (f"- SkyBoT checked: {int(wide.skybot_checked.sum())}, explained by a known "
              f"asteroid (V <= 19 within 126\" +-1 h): {int(wide.skybot_explained.sum())}"),
-             (f"- gallery-eligible (uncatalogued, not EB-like, not asteroid, not known): "
+             (f"- event in a sector-wide crowded time bin in every candidate sector: "
+             f"{int(wide.time_crowded.sum())} stars, of which {int(crowd_only.sum())} would "
+             f"otherwise be gallery-eligible ({int((crowd_only & (wide.cmv3_res_snr >= 50)).sum())}"
+             " with residual SNR >= 50: sector/orbit-edge ramps and some clean-looking events; "
+             "filter `time_crowded` to look at them)"),
+             (f"- gallery-eligible (uncatalogued, not EB-like, not asteroid, not "
+             f"time-crowded, not known): "
              f"{int(wide.gallery_ok.sum())}, of which multi-sector "
              f"{int((wide.gallery_ok & wide.multi).sum())}"), "",
              "## Per sector", "", md_table(st.round(4)), "",
              "## Camera/CCD distribution (worst three cells per sector by ratio)", "",
              md_table(cc.sort_values(["sector", "ratio"], ascending=[True, False])
                       .groupby("sector").head(3).round(3)), "",
+             ("## Sector-wide crowded time bins (all cameras, 0.5 d; Poisson against the "
+             "median occupied bin, Bonferroni 0.01)"), "",
+             ("Spacecraft-wide systematics (sector/orbit edges, momentum dumps) put many "
+             "candidates' strongest event at the same time on every camera. Candidates whose "
+             "event falls in such a bin in every candidate sector are kept in the list but "
+             "left out of the gallery."), "",
+             md_table(cba.assign(p=cba.p.map("{:.1e}".format))) if len(cba) else "none", "",
              ("## Time-coincident candidates (same camera/CCD, residual event in the same "
              "0.5-d bin, >= 3 stars; largest 15)"), "",
              ("Stratum percentiles spread the list evenly over CCDs by construction, so a "
