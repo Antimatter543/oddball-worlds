@@ -26,6 +26,17 @@ KINDS = (
     "outburst",
 )
 NULL_KINDS = ("null_ccd", "null_dump")
+# Extra kinds for the EB check set (``eb1``; docs/ML_DESIGN.md §14). ``null_eb`` is a per-host
+# null (``is_null=True``): an eclipsing binary that should *not* rank high. ``dusty_tail`` is an
+# astrophysical target (a disintegrating planet) that must not be mistaken for one.
+EB_KINDS = ("null_eb", "dusty_tail")
+PER_HOST_NULL_KINDS = ("null_eb",)
+EB_DEPTH_RANGE = (0.003, 0.5)
+EB_PERIOD_RANGE = (0.4, 40.0)
+DUSTY_PERIOD_RANGE = (0.3, 3.0)
+DUSTY_DEPTH_RANGE = (0.002, 0.1)
+DUSTY_DURATION_RANGE = (1.0 / 24.0, 4.0 / 24.0)
+RSUN_AU = 1.0 / 215.032
 DEPTH_RANGE = (1e-3, 0.30)
 DURATION_RANGE = (2.0 / 24.0, 5.0)
 MIN_FWHM = 2.0 / 24.0
@@ -94,8 +105,16 @@ def _agauss(tc, fwhm, rng, spread=0.4):
             "fwhm_eg": fwhm * 2 * r / (1 + r)}  # fmt: skip
 
 
-def draw_params(kind: str, rng: np.random.Generator, t: np.ndarray, valid: np.ndarray) -> dict:
-    """Draw one injection of ``kind`` for a host with bin centres ``t`` and validity ``valid``."""
+def draw_params(kind: str, rng: np.random.Generator, t: np.ndarray, valid: np.ndarray,
+                host: dict | None = None) -> dict:  # fmt: skip
+    """Draw one injection of ``kind`` for a host with bin centres ``t`` and validity ``valid``.
+
+    ``host`` (``radius``, R_sun) is used by ``null_eb`` for physical eclipse durations.
+    """
+    if kind == "null_eb":
+        return draw_eb(rng, t, valid, (host or {}).get("radius", np.nan))
+    if kind == "dusty_tail":
+        return draw_dusty_tail(rng, t, valid)
     depth = loguniform(rng, *DEPTH_RANGE)
     dur = loguniform(rng, *DURATION_RANGE)
 
@@ -202,3 +221,73 @@ def draw_null_event(
         raise ValueError(kind)
     p["is_null"] = True
     return p
+
+
+def _epochs(rng, t, valid, period, lo_off, hi_off):
+    """Epoch times ``t_ref + k P`` covering the light curve (+- one period), with ``t_ref`` put
+    where the host has data so that at least one eclipse is visible."""
+    t_ref = pick_time(rng, t, valid, lo_off, hi_off)
+    k = np.arange(-int((t_ref - t[0]) / period) - 2, int((t[-1] - t_ref) / period) + 3)
+    return t_ref + k * period
+
+
+def draw_eb(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray, radius: float) -> dict:
+    """A detached or grazing eclipsing binary on the host (a per-host null, ``is_null=True``).
+
+    Period log-uniform 0.4-40 d (so some show a single eclipse per sector); primary depth
+    log-uniform 0.3-50%; total duration from the host radius (TIC; 1 R_sun if missing):
+    ``T14 = P/pi asin(k sqrt(1 - b^2))``, ``k = (R1 + R2)/a`` with R2/R1 ~ U(0.3, 1.2), a from
+    Kepler's law (M = 2 x clip(R, 0.3, 2) M_sun), impact parameter b ~ U(0, 0.95): flat-bottomed
+    (trapezoid) unless grazing (b > 0.8: V-shaped). Secondary depth ratio 0 (25%) or U(0.05, 1);
+    at phase 0.5 (70%) or U(0.3, 0.7) (eccentric, with its own width x U(0.6, 1.5)).
+    """
+    R = radius if np.isfinite(radius) and radius > 0 else 1.0
+    R = float(np.clip(R, 0.3, 10.0))
+    m = 2.0 * float(np.clip(R, 0.3, 2.0))
+    P = loguniform(rng, *EB_PERIOD_RANGE)
+    a_rs = (m * (P / 365.25) ** 2) ** (1.0 / 3.0) / RSUN_AU  # semi-major axis in R_sun
+    q = float(rng.uniform(0.3, 1.2))
+    k = min(0.95, R * (1.0 + q) / a_rs)
+    b = float(rng.uniform(0.0, 0.95))
+    T14 = max(P / np.pi * np.arcsin(k * np.sqrt(1.0 - b * b)), 1.0 / 24.0)
+    grazing = b > 0.8
+    edge = 0.5 * T14 if grazing else T14 * float(rng.uniform(0.1, 0.3))
+    flat = max(T14 - 2.0 * edge, 0.0)
+    depth = loguniform(rng, *EB_DEPTH_RANGE)
+    sec = 0.0 if rng.uniform() < 0.25 else float(rng.uniform(0.05, 1.0))
+    ecc = rng.uniform() >= 0.7
+    phase = float(rng.uniform(0.3, 0.7)) if ecc else 0.5
+    wsec = float(rng.uniform(0.6, 1.5)) if ecc else 1.0
+    comps = []
+    for tc in _epochs(rng, t, valid, P, -T14 / 2, T14 / 2):
+        comps.append({"shape": "box", "tc": float(tc), "width": flat, "edge": edge, "amp": 1.0})
+        if sec > 0:
+            comps.append({"shape": "box", "tc": float(tc + phase * P), "width": flat * wsec,
+                          "edge": edge * wsec, "amp": sec})  # fmt: skip
+    p = _finish("null_eb", depth, T14, comps, -1, t,
+                {"period_d": P, "sec_ratio": sec, "sec_phase": phase, "impact": b,
+                 "grazing": bool(grazing), "host_radius": R})  # fmt: skip
+    p["is_null"] = True
+    return p
+
+
+def draw_dusty_tail(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray) -> dict:
+    """A disintegrating planet: strictly periodic transits whose depth changes transit to transit.
+
+    Period log-uniform 0.3-3 d (KIC 12557548 0.65 d, K2-22 0.38 d, BD+05 4868 Ab 1.27 d); total
+    transit duration 1-4 h; a sharp ingress and an exponential egress from the trailing dust tail
+    (``fred``, rise 10%, tau 40% of the duration); each transit's amplitude U(0.05, 1) of the
+    maximum depth, which is log-uniform 0.2-10%.
+    """
+    P = loguniform(rng, *DUSTY_PERIOD_RANGE)
+    dur = loguniform(rng, *DUSTY_DURATION_RANGE)
+    depth = loguniform(rng, *DUSTY_DEPTH_RANGE)
+    comps = []
+    for tc in _epochs(rng, t, valid, P, -0.2 * dur, dur):
+        comps.append({"shape": "fred", "tc": float(tc), "rise": 0.1 * dur, "tau": 0.4 * dur,
+                      "rise_kind": "linear", "amp": float(rng.uniform(0.05, 1.0))})  # fmt: skip
+    # the deepest transit defines ``depth``: renormalise amplitudes so the max is 1
+    amax = max(c["amp"] for c in comps)
+    for c in comps:
+        c["amp"] = c["amp"] / amax
+    return _finish("dusty_tail", depth, dur, comps, -1, t, {"period_d": P})

@@ -117,6 +117,18 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - **Leads outside S32:** 339670265 has a single ~15% dip in S38 near BTJD 2343.3. 350298319 is a blended EB whose source is unclear.
 - **Reading:** "big dip" ranks above "weird dip". Next: automated EB rejection and asteroid / scattered-light checks (docs/VETTING.md), then look deeper than the top 60.
 
+### 2026-11-10: light-curve EB tests and `ens_v1_eb` on S32 (test split): gate FAIL, EBs halved in the top list
+- Details are in ML_DESIGN §14. Reports: `outputs/eval/compare/s0032/classical__ens_v1__ens_v1_eb/report.md` (v1) and `report_eb1.md` (the EB check set `eb1`).
+- **EB tests from the light curve** (`ebf_v1`, VETTING §3 E1-E4, E6, E7): strict period, constant depth (also odd/even), timing, width, symmetry, a secondary, no extra dips, physical duration, and agreement with the same star in S33/38/43/44/55. Dippers, Boyajian-like stars, exocomets and disintegrating planets fail by construction: 0.4-1.1% of each injected target kind scores `eb_like > 0.5` (test).
+- **New check set `eb1`:** 1,600 injected EBs (nulls: must not rank high) and 800 disintegrating planets (targets) per split.
+- **`ens_v1_eb`** = `ens_v1` down-weighted by `eb_like` (alpha 0.75, chosen on val). Test recall at ~0.3 / 1 / 3%: **0.348 / 0.649 / 0.817** (`ens_v1` 0.303 / 0.574 / 0.788). Null FPR 0.040 -> 0.053. Injected EBs in the top 1%: 0.664 -> 0.323. Disintegrating-planet recall 0.279 -> 0.347. No target kind loses recall, except aperiodic dippers at ~0.3% (0.42 -> 0.41).
+- **Known positives in the top 1%: still 2/18.** None looks EB-like (max `eb_like` 0.002), and none loses percentile. The block is `ens_v1`'s ML weights (§12). Diagnostic: the same rule on the equal-weight ensemble gives 6/18 -> 7/18.
+- **Real top list:** catalogued EBs in the S32 top 1% fall 377 -> 66. Eyeballed EBs in the top 60 fall 38 -> 17. But only 11 of the 35 uncatalogued eyeballed EBs are recognised: 24 of them show one eclipse in S32, which one sector cannot tell from a symmetric single dip. None of the 35 is in Kostov+2025 (vetted) or Gaia DR3 `veb`.
+- **Next:**
+  - Lone eclipses need more sectors (E7: ingest the stars' other sectors) or ephemerides.
+  - Look deeper than the top 60 of `ens_v1_eb`.
+  - Fix the ML-weight lock-out of the known dippers (§12).
+
 ### 2026-11-10: per-event veto `cmv3` (asteroid, step, column and background labels) and `ens_v2` on S32 (test split): gate FAIL, artefact nulls mostly gone
 - Details are in ML_DESIGN §13. Reports:
   - `outputs/veto/cmv3/s0032/report.md` (before / after per null type, ablation, known positives, triage)
