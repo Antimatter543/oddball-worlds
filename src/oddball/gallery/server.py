@@ -252,6 +252,33 @@ def _xmatch_html(c: dict, otypes: dict) -> str:
     return "".join(parts)
 
 
+def _candidate_html(cd: dict | None) -> str:
+    """Per-sector ranks of a cross-sector candidate card (``gallery_build.py --candidates``)."""
+    if not cd:
+        return ""
+    rows = []
+    for q in cd.get("per_sector", []):
+        tag = "<b>candidate</b>" if q.get("candidate") else "not a candidate"
+        flag = ", cmv3-flagged" if q.get("cmv3_flag") else ""
+        rows.append(f"S{int(q['sector'])}: {tag}, classical #{int(q['cls_rank'])} / ens_v3 "
+                    f"#{int(q['ens_rank'])} of {int(q['n_stars'])}, eb_like "
+                    f"{_fmt(q.get('eb_like'), 2)}{flag}, strongest residual event "
+                    f"{_e(q.get('res_event'))} at BTJD {_fmt(q.get('res_t'), 2)}")  # fmt: skip
+    extra = []
+    if cd.get("cat_class"):
+        extra.append(f"catalogue class {_e(cd['cat_class'])}")
+    if cd.get("kostov_nn"):
+        extra.append("in Kostov+2025's unvetted NN-flagged list (soft; also fires on dippers)")
+    if cd.get("triage_s32"):
+        extra.append(f"S32 triage label {_e(cd['triage_s32'])}")
+    extra.append("SkyBoT checked: no known asteroid" if cd.get("skybot_checked")
+                 else "SkyBoT not checked")  # fmt: skip
+    multi = "<b>multi-sector</b>" if cd.get("multi") else "single sector"
+    return (f"<div><b>candidate ({_e(cd.get('list'))}, {multi}, from {_e(cd.get('source'))}):"
+            "</b><br>" + "<br>".join(rows) + f"<br><span class=mut>{'; '.join(extra)}</span>"
+            "</div>")
+
+
 def _card_html(i: int, n: int, c: dict, m: dict) -> str:
     tic = int(c["tic"])
     subs = sorted(c.get("subscores", {}).items(), key=lambda kv: -(kv[1].get("pct") or 0))
@@ -277,6 +304,7 @@ def _card_html(i: int, n: int, c: dict, m: dict) -> str:
     buttons = "".join(f"<button data-label='{lab}'>{lab} <kbd>{KEYS[lab]}</kbd></button>"
                       for lab in LABELS)  # fmt: skip
     png = f"/g/{quote(m['gallery'])}/{quote(c['png'])}"
+    cand_html = _candidate_html(c.get("candidate"))
     return f"""
 <section class=card id=c{i} data-tic={tic}>
  <div class=head><b>{i + 1}/{n}</b><b>TIC {tic}</b>
@@ -290,6 +318,7 @@ def _card_html(i: int, n: int, c: dict, m: dict) -> str:
    other sectors: {', '.join('S' + str(s) for s in c.get('other_sectors', [])) or 'none'}</div>
   <div><b>score:</b> {_e(m['scorer'])} rank {c['rank']} (top {c['rank_pct']:.2f}%), score
    {c['score']:.5f}{cl_txt}<br><span class=mut>sub-score percentiles: {st or '–'}</span></div>
+  {cand_html}
   <div><b>systematics check:</b> {sys_txt}</div>
   <div><b>known-class model:</b> {kc_txt}</div>
   <div><b>neighbours shown:</b> <span class=mut>{nbs or 'none'}</span></div>

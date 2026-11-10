@@ -62,6 +62,8 @@ class OtherSector:
     camera: int
     ccd: int
     lc: dict
+    note: str = ""  # e.g. the star's rank in that sector (candidate galleries)
+    mark_t: float | None = None  # BTJD of an event to mark (dashed blue line)
 
 
 @dataclass
@@ -305,8 +307,10 @@ def render(card: CardData, path: Path, dpi: int = 80) -> None:
         a = fig.add_subplot(sg3[0, j])
         mark_systematics(a, o.lc["time"], o.lc["qflags"])
         _plot_lc(a, o.lc, ms=1.0)
-        a.set_title(f"other sector S{o.sector} (cam{o.camera}/ccd{o.ccd})", fontsize=8,
-                    loc="left")  # fmt: skip
+        if o.mark_t is not None and np.isfinite(o.mark_t):
+            a.axvline(o.mark_t, color="tab:blue", lw=0.8, ls="--", alpha=0.7, zorder=0)
+        a.set_title(f"other sector S{o.sector} (cam{o.camera}/ccd{o.ccd})"
+                    + (f"  {o.note}" if o.note else ""), fontsize=8, loc="left")  # fmt: skip
         a.tick_params(labelsize=6)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi)

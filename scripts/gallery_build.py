@@ -14,6 +14,12 @@ the known-class predictions (``outputs/knownclass/<kc>/``), the classical scorer
 its score and the ``sys_flag`` systematics columns). Catalogue answers are cached under
 ``data/gallery/xmatch/`` (``--offline`` uses only the cache).
 
+``--candidates v1`` instead builds one card per star of a cross-sector candidate list
+(``scripts/build_candidates.py``), in its priority order, skipping known positives and
+labelled stars: the star's best-ranked sector is the main panel (zoom on its strongest
+``cmv3`` residual event, CCD neighbours), and every other ingested sector of the star is shown
+below with its ranks there.
+
 TODO: TESScut pixel thumbnails (§7) are not drawn yet.
 """
 
@@ -119,7 +125,11 @@ def git_sha() -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--scorer", required=True)
+    ap.add_argument("--scorer", default=None, help="score file to draw from (one sector)")
+    ap.add_argument("--candidates", default=None,
+                    help="candidate list name (outputs/candidates/<name>/candidates.parquet, "
+                         "scripts/build_candidates.py): one card per star across sectors, in "
+                         "priority order; --n cards")
     ap.add_argument("--sector", type=int, default=32)
     ap.add_argument("--n", type=int, default=60)
     ap.add_argument("--explore", type=float, default=0.3, help="exploration share (§7: ~0.3)")
@@ -131,13 +141,18 @@ def main() -> None:
     ap.add_argument("--name", default=None, help="gallery id (default <scorer>_s<NNNN>_n<N>_seed<S>)")
     ap.add_argument("--labels", type=Path, default=DEFAULT_LABELS_CSV)
     ap.add_argument("--relabel", action="store_true", help="include already-labelled stars")
-    ap.add_argument("--order", choices=("shuffled", "rank"), default="shuffled",
-                    help="card order: shuffled (default, so the head does not anchor the "
-                         "labels) or by rank")  # fmt: skip
+    ap.add_argument("--order", choices=("shuffled", "rank"), default=None,
+                    help="card order: shuffled (default for --scorer, so the head does not "
+                         "anchor the labels) or by rank (default for --candidates: priority)")
     ap.add_argument("--offline", action="store_true", help="catalogue cache only, no network")
     ap.add_argument("--refresh-xmatch", action="store_true")
     ap.add_argument("--dpi", type=int, default=80)
     a = ap.parse_args()
+    a.order = a.order or ("rank" if a.candidates else "shuffled")
+    if a.candidates:
+        return build_candidate_gallery(a)
+    if not a.scorer:
+        ap.error("give --scorer or --candidates")
 
     scorer = validate_name(a.scorer, "scorer")
     sdir = f"s{a.sector:04d}"
@@ -294,6 +309,220 @@ def main() -> None:
             "knownclass": rel(kc_path) if kc is not None else None,
             "classical": rel(cls_path) if cls is not None else None, "sys_source": sys_src,
             "lightcurves": {"sector": a.sector, "product": "TESS-SPOC FFI (HLSP v1), 30-min bins",
+                            "data_root": rel(data_root())},
+            "xmatch": {"dir": rel(X.xmatch_dir()), "catalog_cache": cat.prov,
+                       "simbad_servers": list(X.SIMBAD_TAP), "offline": a.offline,
+                       "exofop": {"toi": X.TOI_URL, "ctoi": X.CTOI_URL}},
+        },
+        "otypes": {k: otypes[k] for k in sorted(used_otypes(card_list)) if k in otypes},
+        "cards": card_list,
+    }  # fmt: skip
+    gdir.mkdir(parents=True, exist_ok=True)
+    tmp = gdir / "manifest.json.tmp"
+    tmp.write_text(json.dumps(jsonable(manifest), indent=1))
+    tmp.replace(gdir / "manifest.json")
+    log(f"wrote {len(card_list)} cards -> {gdir} in {time.time() - t_start:.0f} s")
+    print(f"serve with: uv run python -I scripts/gallery_serve.py --gallery {name}")
+
+
+# --------------------------------------------------------------------------------------------
+# Cross-sector candidate galleries (--candidates)
+
+EV_HOURS = {"2h": 2.0, "8h": 8.0, "32h": 32.0}
+
+
+def event_window(t_ev: float, ev: str, snr: float) -> C.Window | None:
+    """Zoom window centred on a cmv3 residual event (``ev`` = ``pdc/dip/8h/none``)."""
+    if t_ev is None or not np.isfinite(t_ev):
+        return None
+    parts = str(ev).split("/")
+    ch = parts[0] if parts and parts[0] in ("pdc", "sap") else "pdc"
+    kind = parts[1] if len(parts) > 1 else "event"
+    w_h = EV_HOURS.get(parts[2], 8.0) if len(parts) > 2 else 8.0
+    hw = C._clip_halfwidth(1.5 * w_h / 24.0 + 0.5)
+    name = {"pdc": "PDCSAP", "sap": "SAP"}[ch]
+    return C.Window(t_ev - hw, t_ev + hw, ch, f"strongest cmv3 residual event: {name} {kind}, "
+                    f"{w_h:g} h box, SNR {snr:.0f}, at BTJD {t_ev:.2f}")  # fmt: skip
+
+
+def recon_traces(sector: int, tics) -> tuple[dict[int, np.ndarray], str | None]:
+    """Per-bin ssl_v2 reconstruction surprise for ``tics`` from the run's memmap (all real stars
+    of the sector, written by ``ml_score.py``), keyed by TIC; ({}, None) if absent."""
+    from oddball.common.paths import sector_dir
+    from oddball.ml.data import cache_dir_for
+
+    mp = outputs_root() / "ml" / "ssl_v2" / f"score_meta_s{sector:04d}.json"
+    if not mp.exists():
+        return {}, None
+    m = json.loads(mp.read_text())
+    sfx = "_pt" if m.get("mask_seeding") == "tic" else ""
+    f = Path(m["run"]) / "score" / f"surprise_real_s{sector:04d}_b{m['mask_block']}{sfx}.npy"
+    if not f.exists():
+        f = REPO_ROOT / "runs" / Path(m["run"]).name / "score" / f.name
+    if not f.exists():
+        return {}, None
+    idx = pd.read_parquet(cache_dir_for(sector_dir(sector)) / "index.parquet", columns=["tic"])
+    pos = pd.Series(np.arange(len(idx)), index=idx.tic.astype(int).to_numpy())
+    sur = np.load(f, mmap_mode="r")
+    if len(sur) != len(idx):
+        log(f"  {f}: {len(sur)} rows but the cache has {len(idx)}; no trace")
+        return {}, None
+    out = {int(t): np.asarray(sur[pos[int(t)]], np.float32) for t in tics if int(t) in pos.index}
+    return out, rel(f)
+
+
+def build_candidate_gallery(a) -> None:
+    lst = validate_name(a.candidates, "candidate list")
+    cdir = outputs_root() / "candidates" / lst
+    cand = pd.read_parquet(cdir / "candidates.parquet")
+    ranks = pd.read_parquet(cdir / "candidates_allsectors.parquet")
+    name = validate_name(a.name or f"cand_{lst}_n{a.n}", "gallery name")
+    gdir = outputs_root() / "gallery" / name
+    t_start = time.time()
+    store = LabelStore(a.labels)
+    labelled = set() if a.relabel else set(store.latest())
+    pool = cand[cand.gallery_ok & ~cand.tic.isin(labelled)].sort_values("priority")
+    chosen = pool.head(a.n).copy()
+    log(f"candidate list {lst}: {len(cand)} stars, {int(cand.gallery_ok.sum())} gallery-eligible, "
+        f"{len(labelled)} already labelled; chose {len(chosen)} "
+        f"(multi-sector {int(chosen.multi.sum())}; best sector "
+        f"{chosen.best_sector.value_counts().sort_index().to_dict()})")
+    by_sec = {s: g.set_index("tic") for s, g in ranks.groupby("sector")}
+    sectors = sorted(by_sec)
+
+    # light curves: each star in every ingested sector; neighbours in its best sector
+    metas = {s: metadata(s)[META_COLS] for s in sectors}
+    nbs = {}
+    for r in chosen.itertuples():
+        m = metas[int(r.best_sector)]
+        row = m[m.tic == r.tic].iloc[0]
+        nbs[int(r.tic)] = neighbours_for(row, m, a.neighbours)
+    lcs, dumps, traces, tr_files = {}, {}, {}, {}
+    for s in sectors:
+        want = {int(t) for t in chosen.tic if int(t) in by_sec[s].index}
+        want |= {int(t) for r in chosen.itertuples() if int(r.best_sector) == s
+                 for t in nbs[int(r.tic)].tic}  # fmt: skip
+        if not want:
+            continue
+        lcs[s] = load_lightcurves(s, want)
+        dumps[s] = C.sector_dump_times(lcs[s].values())
+        primary = [int(r.tic) for r in chosen.itertuples() if int(r.best_sector) == s]
+        traces[s], tr_files[s] = recon_traces(s, primary)
+        log(f"  S{s}: {len(lcs[s])} light curves, {len(dumps[s])} dump bins, recon trace for "
+            f"{len(traces[s])} of {len(primary)} primary stars")
+
+    cat = X.CatalogCache(chosen.tic)
+    tois = X.ToiLists(refresh=a.refresh_xmatch) if not a.offline else None
+    otypes = X.simbad_otypedef() if not a.offline else {}
+    sess = X._session()
+    if a.order == "shuffled":
+        chosen = chosen.sample(frac=1.0, random_state=a.seed).reset_index(drop=True)
+    card_list = []
+    for i, r in enumerate(chosen.itertuples()):
+        tic, s0 = int(r.tic), int(r.best_sector)
+        lc = lcs.get(s0, {}).get(tic)
+        if lc is None:
+            log(f"  TIC {tic}: no light curve in S{s0}, skipped")
+            continue
+        rk = by_sec[s0].loc[tic]
+        m0 = metas[s0].set_index("tic").loc[tic]
+        trace = None
+        if tic in traces.get(s0, {}):
+            v = traces[s0][tic]
+            trace = C.Trace(surprise_time(sector_origin(s0), len(v)), v,
+                            "ssl_v2 reconstruction surprise")  # fmt: skip
+        win = event_window(rk.cmv3_res_t, rk.cmv3_res_ev, rk.cmv3_res_snr)
+        if win is None:
+            win, tr2 = (C.window_from_trace(trace), trace) if trace is not None else \
+                C.classical_window(lc)
+            trace = trace or tr2
+        nb_list = [C.Neighbour(int(n.tic), float(n.tmag), float(n.sep_arcsec),
+                               lcs[s0].get(int(n.tic))) for n in nbs[tic].itertuples()]  # fmt: skip
+
+        def note(s, tic=tic):
+            q = by_sec[s].loc[tic]
+            tag = "CANDIDATE " if (q.in_cls or q.in_ens) else ""
+            fl = " cmv3-flagged" if q.cmv3_flag else ""
+            return (f"{tag}cls #{int(q.cls_rank)} / ens #{int(q.ens_rank)} of "
+                    f"{int(q.n_stars)}{fl}")  # fmt: skip
+
+        oth = []
+        for s in sectors:
+            if s == s0 or tic not in by_sec[s].index or tic not in lcs.get(s, {}):
+                continue
+            q = by_sec[s].loc[tic]
+            oth.append(C.OtherSector(s, int(q.camera), int(q.ccd), lcs[s][tic], note=note(s),
+                                     mark_t=float(q.cmv3_res_t)))  # fmt: skip
+        secs_txt = f"cand in S{r.sectors_cand.replace(' ', ',S')}; obs S{r.sectors_obs.replace(' ', ',S')}"
+        title = (f"TIC {tic}   S{s0} cam{int(rk.camera)}/ccd{int(rk.ccd)}   Tmag {m0.tmag:.2f}   "
+                 f"{note(s0)}   [{secs_txt}]")  # fmt: skip
+        png = f"cards/{tic}_s{s0:04d}.png"
+        C.render(C.CardData(tic, s0, title, lc, dumps[s0], win, trace, nb_list, oth),
+                 gdir / png, dpi=a.dpi)  # fmt: skip
+        xm = None
+        if not a.offline or (X.xmatch_dir() / "simbad" / f"{tic}.json").exists():
+            xm = X.star_xmatch(tic, float(r.ra), float(r.dec), cat, tois or _NoToi(),
+                               a.refresh_xmatch, sess)  # fmt: skip
+        best_src = "classical" if rk.cls_rank <= rk.ens_rank else "ens_v3"
+        per_sector = []
+        for s in sectors:
+            if tic in by_sec[s].index:
+                q = by_sec[s].loc[tic]
+                per_sector.append({"sector": s, "cls_rank": int(q.cls_rank),
+                                   "ens_rank": int(q.ens_rank), "n_stars": int(q.n_stars),
+                                   "candidate": bool(q.in_cls or q.in_ens),
+                                   "cmv3_flag": bool(q.cmv3_flag), "eb_like": float(q.eb_like),
+                                   "res_event": str(q.cmv3_res_ev),
+                                   "res_t": float(q.cmv3_res_t)})  # fmt: skip
+        card = {
+            "tic": tic, "sector": s0, "png": png, "rank": int(r.best_rank),
+            "rank_pct": 100.0 * float(r.best_rank) / float(rk.n_stars),
+            "score": float(rk.cls_score if best_src == "classical" else rk.ens_score),
+            "pick": "multi-sector" if r.multi else "single-sector",
+            "reason": f"candidates {lst}: best {best_src} rank {int(r.best_rank)} in S{s0}; "
+                      f"candidate in S{r.sectors_cand}",
+            "split": r.split, "disagreement": 0.0, "priority": int(r.priority),
+            "tmag": float(m0.tmag), "camera": int(rk.camera), "ccd": int(rk.ccd),
+            "ra": float(r.ra), "dec": float(r.dec), "crowdsap": float(m0.crowdsap),
+            "rms_ppt": float(m0.rms_bin) * 1e3, "teff": float(m0.teff),
+            "radius": float(m0.radius),
+            "subscores": {f"score_{k}": {"value": float(getattr(r, f"pct_{k}")),
+                                         "pct": float(getattr(r, f"pct_{k}"))}
+                          for k in ("classical", "iforest", "recon")},
+            "window": {"t0": win.t0, "t1": win.t1, "source": win.source},
+            "timeresolved": trace.label if trace is not None else None,
+            "neighbours": [{"tic": n.tic, "tmag": n.tmag, "sep_arcsec": round(n.sep_arcsec, 1),
+                            "has_lc": n.lc is not None} for n in nb_list],
+            "other_sectors": [o.sector for o in oth],
+            "candidate": {"list": lst, "multi": bool(r.multi), "sectors_cand": r.sectors_cand,
+                          "sectors_obs": r.sectors_obs, "source": r.source,
+                          "per_sector": per_sector, "cat_class": r.cat_class,
+                          "kostov_nn": bool(r.kostov_nn), "eb_like_max": float(r.eb_like_max),
+                          "skybot_checked": bool(r.skybot_checked),
+                          "triage_s32": r.triage_s32},
+            "xmatch": xm,
+        }  # fmt: skip
+        card_list.append(card)
+        if (i + 1) % 10 == 0:
+            log(f"  rendered {i + 1}/{len(chosen)}")
+
+    manifest = {
+        "gallery": name, "scorer": f"candidates_{lst}",
+        "sector": "/".join(str(s) for s in sectors), "n": len(card_list),
+        "built_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "git": git_sha(),
+        "selection": {"n_requested": a.n, "order": a.order, "seed": a.seed,
+                      "excluded_labelled": len(labelled),
+                      "counts": chosen.multi.map({True: "multi-sector",
+                                                  False: "single-sector"}).value_counts().to_dict(),
+                      "rule": "gallery_ok (uncatalogued, not EB-like, not SkyBoT-explained, not a "
+                              "known positive) in candidates.parquet priority order: multi-sector "
+                              "first, S32-triaged stars last, then best per-sector rank"},
+        "inputs": {
+            "candidates": {"path": rel(cdir / "candidates.parquet"),
+                           "provenance": json.loads((cdir / "provenance.json").read_text())},
+            "timeresolved": {str(s): f for s, f in tr_files.items()},
+            "lightcurves": {"sectors": sectors,
+                            "product": "TESS-SPOC FFI (HLSP v1), 30-min bins",
                             "data_root": rel(data_root())},
             "xmatch": {"dir": rel(X.xmatch_dir()), "catalog_cache": cat.prov,
                        "simbad_servers": list(X.SIMBAD_TAP), "offline": a.offline,

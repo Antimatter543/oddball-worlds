@@ -2,6 +2,8 @@
 
     uv run python -I scripts/skybot_check.py --scorer ens_v2 --top 200 \
         --extra labels/triage_s0032_v1.csv
+    uv run python -I scripts/skybot_check.py --sector 43 --scorer ens_v3 --top 0 \
+        --candidates outputs/candidates/v1/skybot_targets_s0043.csv --tag cand_v1
 
 docs/VETTING.md F3. For each of the top ``--top`` real light curves of ``--scorer`` that survive
 its veto (score >= 0; known positives excluded), and for the TICs in ``--extra`` (evaluation
@@ -125,6 +127,10 @@ def main() -> None:
     ap.add_argument("--veto", default="cmv3")
     ap.add_argument("--top", type=int, default=200)
     ap.add_argument("--extra", type=Path, default=None)
+    ap.add_argument("--candidates", type=Path, default=None,
+                    help="CSV with a tic column: queried like the top list (strongest residual "
+                         "event), group 'cand' (e.g. outputs/candidates/v1/skybot_targets_*.csv)")
+    ap.add_argument("--tag", default=None, help="output name skybot_<tag>.csv (default: scorer)")
     ap.add_argument("--radius", type=float, default=5.0, help="arcmin")
     ap.add_argument("--match", type=float, default=126.0, help="arcsec")
     ap.add_argument("--vmax", type=float, default=19.0)
@@ -142,6 +148,10 @@ def main() -> None:
     top = s.sort_values("score", ascending=False).head(a.top).assign(group="top")
     top["rank"] = np.arange(1, len(top) + 1)
     rows = [top]
+    if a.candidates:
+        cd = pd.read_csv(a.candidates)
+        rows.append(pd.DataFrame({"tic": cd.tic.astype("int64"), "group": "cand",
+                                  "rank": np.arange(1, len(cd) + 1)}))  # fmt: skip
     if a.extra:
         ex = pd.read_csv(a.extra)
         rows.append(pd.DataFrame({"tic": ex.tic, "group": "extra:" + ex.label.astype(str)}))
@@ -149,7 +159,7 @@ def main() -> None:
     vc = f"{a.veto}_"
     q = q.merge(v[["tic", f"{vc}res_t", f"{vc}res_snr", f"{vc}sys_t", f"{vc}sys_snr",
                    f"{vc}res_ev", f"{vc}sys_ev", f"{vc}flag"]], on="tic", how="left")  # fmt: skip
-    use_sys = (q.group != "top") & (q[f"{vc}sys_snr"] > q[f"{vc}res_snr"])
+    use_sys = (~q.group.isin(["top", "cand"])) & (q[f"{vc}sys_snr"] > q[f"{vc}res_snr"])
     q["epoch_btjd"] = np.where(use_sys, q[f"{vc}sys_t"], q[f"{vc}res_t"])
     q["epoch_event"] = np.where(use_sys, q[f"{vc}sys_ev"], q[f"{vc}res_ev"])
     out = []
@@ -186,13 +196,15 @@ def main() -> None:
     # one result per query row (a star can be in the top list and in --extra)
     res = pd.concat([q.reset_index(drop=True),
                      pd.DataFrame(out).drop(columns="tic").reset_index(drop=True)], axis=1)
-    p = vd / f"skybot_{a.scorer}.csv"
+    tag = a.tag or a.scorer
+    p = vd / f"skybot_{tag}.csv"
     res.to_csv(p, index=False)
     prov = {"service": URL, "observer": "C57", "objFilter": 100, "radius_arcmin": a.radius,
             "match_arcsec": a.match, "vmax": a.vmax, "sleep_s": a.sleep, "cache": str(cache),
             "n_queries": len(q), "n_new": n_new, "scorer": a.scorer, "veto": a.veto,
-            "top": a.top, "run_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}  # fmt: skip
-    (cache / f"provenance_{a.scorer}.json").write_text(json.dumps(prov, indent=1))
+            "top": a.top, "candidates": str(a.candidates) if a.candidates else None,
+            "tag": tag, "run_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}  # fmt: skip
+    (cache / f"provenance_{tag}.json").write_text(json.dumps(prov, indent=1))
     g = res.groupby("group").agg(n=("tic", "size"), explained=("explained_pm1h", "mean"))
     log(f"wrote {p}\n{g}")
 

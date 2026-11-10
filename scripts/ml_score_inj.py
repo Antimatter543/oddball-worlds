@@ -30,7 +30,14 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from ml_score import VARIANT_COLS, attach_sys, load_model, score_cache, write_scores
+from ml_score import (
+    VARIANT_COLS,
+    attach_sys,
+    load_model,
+    ref_state_path,
+    score_cache,
+    write_scores,
+)
 
 from oddball.common.paths import REPO_ROOT, outputs_root, sector_dir
 from oddball.ml.data import Cache, build_cache, cache_dir_for
@@ -53,6 +60,7 @@ def main() -> None:
     ap.add_argument("--n-masks", type=int, default=5)
     ap.add_argument("--mask-block", type=int, default=8)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--mask-seeding", choices=("tic", "stream"), default="tic")
     ap.add_argument("--out-root", type=Path, default=None,
                     help="write score files under this directory instead of outputs/scores")
     a = ap.parse_args()
@@ -69,7 +77,7 @@ def main() -> None:
     real_cache = Cache(build_cache(sector_dir(a.sector), cache_dir_for(sector_dir(a.sector)),
                                    log=log))  # fmt: skip
     obs_mask = obs_mask_for(ck, a.sector, real_cache, work, log)
-    with open(work / "ref_state.pkl", "rb") as fh:
+    with open(ref_state_path(work, a.sector), "rb") as fh:
         st = pickle.load(fh)
     meta = dir_metadata(sector_dir(a.sector))[["tic", "camera", "ccd", "tmag"]]
     real_sub = pd.read_parquet(outputs_root() / "scores" / a.ref_scorer / sdir / "real.parquet")
@@ -87,7 +95,7 @@ def main() -> None:
         if a.out_root:
             tag += "_check"
         sub, pooled, ctx = score_cache(model, ck, cache, work, tag, a.n_masks, a.seed, obs_mask,
-                                       a.mask_block)  # fmt: skip
+                                       a.mask_block, a.mask_seeding)  # fmt: skip
         emb = embedding_matrix(pooled, ctx, st["stats"])
         sub["score_iforest"] = -st["iforest"].score_samples(emb)
         frames.append(sub)
