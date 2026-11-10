@@ -21,6 +21,7 @@ import pandas as pd
 
 from oddball.common.paths import REPO_ROOT, outputs_root
 from oddball.common.splits import KNOWN_POSITIVES_CSV
+from oddball.tess.plots import overlay_surprise, surprise_time
 from oddball.tess.store import load_lightcurves
 
 
@@ -60,11 +61,7 @@ def plot_gallery(top: pd.DataFrame, tr: pd.DataFrame, origin: int, sector: int, 
                 ax.set_ylim(lo - pad, hi + pad)
         s = trd.get(int(r.tic))
         if s is not None:
-            t = (origin + np.arange(len(s)) + 0.5) * 30 / 1440
-            ax2 = ax.twinx()
-            ax2.fill_between(t, 0, np.nan_to_num(np.clip(s, 0, None)), color="tab:red", alpha=0.25,
-                             lw=0)  # fmt: skip
-            ax2.set_yticks([])
+            overlay_surprise(ax, surprise_time(origin, len(s)), s)
         ax.set_title(f"#{r.rank} TIC {int(r.tic)}  Tmag {r.tmag:.1f} cam{int(r.camera)}/ccd"
                      f"{int(r.ccd)}  score {r.score:.4f}  knn {r.score_knn:.3f} recon "
                      f"{r.score_recon:.1f} iforest {r.score_iforest:.3f}", fontsize=8, loc="left")

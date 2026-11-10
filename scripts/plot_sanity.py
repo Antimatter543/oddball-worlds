@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from oddball.common.paths import REPO_ROOT, outputs_root
+from oddball.tess.plots import mark_systematics
 from oddball.tess.store import load_lightcurves, metadata
 
 KNOWN = REPO_ROOT / "docs" / "known_positives.csv"
@@ -33,12 +34,7 @@ def _panel(ax, lc, meta_row, label):
     q = lc["qflags"]
     rms = meta_row.rms_bin
     sap_off = 1 - max(6 * rms, 0.01) if np.isfinite(rms) else 0.98
-    for tt in t[(q & 32) != 0]:
-        ax.axvline(tt, color="tab:red", lw=0.6, alpha=0.6)
-    sl = (q & (2048 | 4096)) != 0
-    if sl.any():
-        ax.fill_between(t, 0, 1, where=sl, transform=ax.get_xaxis_transform(),
-                        color="tab:orange", alpha=0.15, lw=0)  # fmt: skip
+    mark_systematics(ax, t, q)
     sap = lc["sap_flux"]
     ax.plot(t, sap - np.nanmedian(sap) + sap_off, ".", ms=1.5, color="0.6", label="SAP (offset)")
     ax.plot(t, f, ".", ms=2, color="k", label="PDCSAP 30-min")
