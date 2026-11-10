@@ -73,6 +73,52 @@ then moves it to `data/tess-spoc/sNNNN/`. It never overwrites an existing sector
 `provenance.json` gains a `kaggle` block (git SHA, kernel, timings, bytes downloaded) and a
 `kaggle_download` block; each run is also logged to `data/kaggle/runs.jsonl`.
 
+### Labelling gallery (human in the loop)
+
+A local gallery for looking at a scorer's top-ranked stars and labelling them
+(`docs/ML_DESIGN.md` §7). It works with any score file `outputs/scores/<scorer>/sNNNN/real.parquet`.
+
+```bash
+uv run python -I scripts/gallery_build.py --scorer ssl_v2_iforest --sector 32 --n 60   # ~5 min
+uv run python -I scripts/gallery_serve.py          # then open http://127.0.0.1:8765/
+```
+
+- **Choosing stars:** 70% are the top-ranked stars and 30% are exploration. The exploration half
+  is random picks from the rest of the top 5% plus "uncertain" picks from ranks 5–25%, weighted
+  toward stars whose sub-scores disagree. Each card records why it was chosen. Known positives
+  are never shown. Stars that are already labelled are skipped, so a rebuild shows new ones;
+  `--relabel` brings them back. Cards are shuffled by default (`--order rank` keeps rank order).
+- **Each card** (pre-rendered PNG in `outputs/gallery/<name>/cards/`) has these panels:
+  - The whole sector in PDCSAP and SAP, with momentum dumps, orbit edges, scattered-light and
+    other quality-flagged bins marked.
+  - The scorer's time-resolved anomaly. This is the ML reconstruction surprise when the
+    scorer's model wrote one for this star (`outputs/ml/*/timeresolved_*`, top 500 of the
+    combined score only). Otherwise it is the classical 2-h dip SNR.
+  - A zoom on the most anomalous window.
+  - The 5 nearest Tmag ≤ 14 stars on the same camera/CCD, shown over the same window.
+  - The star in the other ingested sectors.
+
+  The page beside each card shows the scores and the percentile of each sub-score, the
+  `sys_flag` systematics columns, and the known-class model's guess. It also shows catalogue
+  matches: SIMBAD (TAP, CfA mirror first), VSX and Gaia DR3 variability from the known-class
+  cache, and the ExoFOP TOI/CTOI lists. A one-line verdict flags TOIs, catalogued young stars
+  and dimmers, and known common variables.
+- **Catalogue cache:** results are cached under `data/gallery/xmatch/` with their provenance
+  (service, query, UTC). Use `--offline` to build from the cache only and `--refresh-xmatch` to
+  re-query.
+- **Labels:** `interesting`, `systematic`, `known-boring-variable` and `unsure`, plus a note.
+  Keys: `i`/`s`/`b`/`u` (or `1`–`4`), `j`/`k` to move, `n` to add a note, `h` to hide labelled
+  cards. Labels are appended to [`labels/labels_v1.csv`](labels/labels_v1.csv) with the
+  columns `tic, sector, scorer, rank, split, reason, label, note, utc, gallery`. Commit this
+  file. It is append-only and the latest row per (tic, sector) wins. Every write is locked and
+  fsynced, so a crash or restart loses nothing; a half-written last line is skipped.
+- **Safety:** the server binds to 127.0.0.1 only and checks the Host header. Writing a label
+  needs a JSON POST that carries a per-run token. Every field is validated: the label must be
+  from the fixed set, the TIC must be one of this gallery's cards, and the note is capped at
+  500 characters and made safe for CSV and spreadsheets. Catalogue text is HTML-escaped. The
+  server uses no external JS or CDN.
+- **TODO:** TESScut pixel thumbnails.
+
 ## Parked: Gaia DR4
 
 Gaia DR4 lands on 2 Dec 2026. A neural orbit-fitter for stars with hidden companions may join later. See `docs/PLAN.md`.
