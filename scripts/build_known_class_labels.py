@@ -58,8 +58,12 @@ def injection_hosts() -> dict[int, str]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--sectors", type=int, nargs="+", default=list(SECTORS))
-    ap.add_argument("--fetch", nargs="*", default=[], choices=["vsx", "prsa", "gaia", "gaia_vclass"])
+    ap.add_argument("--fetch", nargs="*", default=[], choices=["vsx", "prsa", "gaia", "gaia_vclass", "gaia_veb", "kostov"])
     ap.add_argument("--build", action="store_true")
+    ap.add_argument("--out", default="labels",
+                    help="label table name under <data>/knownclass/ (labels = the kc_v1 table)")
+    ap.add_argument("--eb-sources", nargs="*", default=[], choices=["kostov", "gaia_veb"],
+                    help="extra EB catalogues to label from (kc_v1 used none)")
     ap.add_argument("--vsx-chunk", type=int, default=5000)
     ap.add_argument("--gaia-chunk", type=int, default=20000)
     a = ap.parse_args()
@@ -76,6 +80,10 @@ def main() -> None:
             K.fetch_gaia(tg, chunk=a.gaia_chunk, log=log)
         elif src == "gaia_vclass":
             K.fetch_gaia_vclass(tg, chunk=a.vsx_chunk, log=log)
+        elif src == "gaia_veb":
+            K.fetch_gaia_veb(tg, chunk=a.vsx_chunk, log=log)
+        elif src == "kostov":
+            K.fetch_kostov(log=log)
     if not a.build:
         return
 
@@ -92,7 +100,10 @@ def main() -> None:
         gaia = K.gaia_from_vclass(vc) if vc is not None and len(vc) else None
     excl = injection_hosts()
     excl.update({t: "known_positive" for t in known_positive_tics()})
-    lab = L.build_labels(tg.tic.to_numpy(), tg.tmag.to_numpy(), vsx, prsa, gaia, excl)
+    kostov = K.load_kostov() if "kostov" in a.eb_sources else None
+    veb = maybe("gaia_veb") if "gaia_veb" in a.eb_sources else None
+    lab = L.build_labels(tg.tic.to_numpy(), tg.tmag.to_numpy(), vsx, prsa, gaia, excl,
+                         kostov=kostov, gaia_veb=veb)  # fmt: skip
     lab["split"] = split_array(lab.tic.to_numpy())
     # Which TICs every cone-search source actually answered for (cached chunk files): a TIC
     # outside them has unknown catalogue status, so it can be neither quiet nor a label.
@@ -106,7 +117,7 @@ def main() -> None:
         covered &= cov
     lab["covered"] = covered
     log(f"catalogue coverage: {covered.mean():.1%} of TICs answered by every cone source")
-    out = data_root() / "knownclass" / "labels.parquet"
+    out = data_root() / "knownclass" / f"{a.out}.parquet"
     lab.to_parquet(out, index=False)
 
     counts = (lab[lab.label != ""].groupby(["label", "label_source"]).size()
@@ -116,11 +127,13 @@ def main() -> None:
         "sectors": a.sectors,
         "n_tics": len(lab),
         "sources": {s: json.loads((K.raw_dir(s) / "provenance.json").read_text())
-                    for s in ("vsx", "prsa", "gaia", "gaia_vclass")
+                    for s in ("vsx", "prsa", "gaia", "gaia_vclass", *a.eb_sources)
                     if (K.raw_dir(s) / "provenance.json").exists()},
         "label_counts": {c: {k: int(v) for k, v in r.items()} for c, r in counts.iterrows()},
         "excluded": lab[lab.excluded].exclude_reason.value_counts().to_dict(),
         "flagged_any": int(lab.flagged_any.sum()),
+        "eb_sources": a.eb_sources,
+        "kostov_nn": int(lab.kostov_nn.sum()),
         "covered_frac": float(lab.covered.mean()),
         "exclusion_rules": {"vsx_exact": sorted(L.VSX_EXCLUDE_EXACT),
                             "vsx_prefix": list(L.VSX_EXCLUDE_PREFIX),
@@ -128,7 +141,7 @@ def main() -> None:
         "radii_arcsec": {"vsx_label": L.VSX_LABEL_RADIUS, "vsx_exclude": K.VSX_RADIUS,
                          "gaia_label": L.GAIA_LABEL_RADIUS, "gaia_exclude": K.GAIA_RADIUS},
     }  # fmt: skip
-    (data_root() / "knownclass" / "labels_provenance.json").write_text(json.dumps(prov, indent=1))
+    (data_root() / "knownclass" / f"{a.out}_provenance.json").write_text(json.dumps(prov, indent=1))
     log(f"labels -> {out}")
     print(counts.assign(total=counts.sum(1)).to_string())
     print("excluded:", prov["excluded"])

@@ -205,6 +205,60 @@ def gaia_from_vclass(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+GAIA_VEB_CAT = "I/358/veb"
+KOSTOV_CAT = "J/ApJS/279/50"
+KOSTOV_TABLES = {  # VizieR table -> (columns, role)
+    "table3": (["TIC", "Per", "Depth-pri", "Depth-sec", "Dur-pri"], "new EBs (vetted)"),
+    "table4": (["TIC", "Per-TESS"], "known EBs (vetted, TESS period)"),
+    "table2": (["TIC"], "unvetted NN-flagged targets (soft feature only, never a label)"),
+}
+
+
+def fetch_gaia_veb(targets: pd.DataFrame, chunk: int = 5000, log=print) -> Path:
+    """Gaia DR3 eclipsing-binary candidates (VizieR I/358/veb, Mowlavi+2023) within GAIA_RADIUS.
+
+    Same multi-position cone machinery (and mirror fallback via ``ODDBALL_VIZIER_SERVER``) as
+    ``fetch_gaia_vclass``. Positions are DR3 epoch 2016, as for vclassre.
+    """
+    return fetch_cone("gaia_veb", GAIA_VEB_CAT,
+                      ["Source", "Freq", "DepthE1", "DepthE2", "Rank", "ModelType",
+                       "RA_ICRS", "DE_ICRS"],
+                      GAIA_RADIUS, targets, chunk, log)  # fmt: skip
+
+
+def fetch_kostov(log=print) -> Path:
+    """Kostov+2025 TESS FFI EB catalogue (VizieR J/ApJS/279/50), whole tables, matched by TIC.
+
+    ``table3`` (7,936 new EBs) and ``table4`` (2,065 known EBs) are vetted and become EB labels;
+    ``table2`` (~873k targets flagged by their neural network, unvetted) is kept only as a soft
+    per-TIC flag: an eclipse-like network flags dippers too, so it is never a label or a veto.
+    """
+    from astroquery.vizier import Vizier
+
+    out = raw_dir("kostov")
+    out.mkdir(parents=True, exist_ok=True)
+    for tab, (cols, role) in KOSTOV_TABLES.items():
+        f = out / f"{tab}.parquet"
+        if f.exists():
+            continue
+        v = Vizier(columns=cols, row_limit=-1, vizier_server=VIZIER_SERVER, timeout=1800)
+        t = _retry(lambda v=v, tab=tab: v.get_catalogs(f"{KOSTOV_CAT}/{tab}"), log=log)[0]
+        df = t.to_pandas()
+        df.columns = [c.replace("-", "_") for c in df.columns]
+        df.to_parquet(f, index=False)
+        _write_prov("kostov", {"service": f"VizieR ({VIZIER_SERVER})", "catalog": KOSTOV_CAT,
+                               "reference": "Kostov et al. 2025, ApJS 279, 50",
+                               f"{tab}_rows": len(df), f"{tab}_role": role})  # fmt: skip
+        log(f"  kostov {tab}: {len(df)} rows")
+    return out
+
+
+def load_kostov() -> dict[str, pd.DataFrame]:
+    d = raw_dir("kostov")
+    return {t: pd.read_parquet(d / f"{t}.parquet") for t in KOSTOV_TABLES
+            if (d / f"{t}.parquet").exists()}  # fmt: skip
+
+
 def fetch_prsa(log=print) -> Path:
     from astroquery.vizier import Vizier
 

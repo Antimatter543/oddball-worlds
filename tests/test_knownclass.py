@@ -100,6 +100,26 @@ def test_build_labels_priority_and_exclusions():
     assert lab.loc[7, "excluded"] and lab.loc[7, "exclude_reason"] == "gaia_class"
     assert lab.loc[8, "label"] == "LPV"  # no photometry: position match only
     assert lab.loc[9, "excluded"] and not lab.loc[9, "flagged_any"]
+    assert not lab.kostov_nn.any()
+
+
+def test_build_labels_kostov_and_gaia_veb():
+    vsx, prsa, gaia = _cats()
+    kostov = {"table3": pd.DataFrame({"TIC": [4, 6], "Per": [2.0, 3.0]}),
+              "table4": pd.DataFrame({"TIC": [3], "Per_TESS": [1.1]}),
+              "table2": pd.DataFrame({"TIC": [1, 8, 9]})}  # fmt: skip
+    veb = pd.DataFrame({"tic": [7, 8, 1], "Source": [1, 2, 3], "Freq": [0.5, 0.2, 1.0],
+                        "ModelType": ["TWOGAUSSIANS"] * 3, "sep_arcsec": [0.5, 2.5, 0.1]})  # fmt: skip
+    lab = L.build_labels(np.arange(1, 10), np.full(9, 10.0), vsx, prsa, gaia, {},
+                         kostov=kostov, gaia_veb=veb).set_index("tic")  # fmt: skip
+    assert lab.loc[4, "label_source"] == "kostov2025_table3"  # beats the Gaia classifier
+    assert lab.loc[6, "label"] == "EB"  # vetted TESS EB beats a blended VSX SR
+    assert lab.loc[3, "label"] == "" and lab.loc[3, "excluded"]  # exclusions still win
+    assert lab.loc[7, "excluded"]  # Gaia YSO excludes even with a veb match
+    assert lab.loc[8, "label"] == "LPV"  # veb match 2.5" away: not a label
+    assert lab.loc[1, "label_source"] == "vsx"  # VSX outranks gaia_veb
+    assert lab.loc[[1, 8, 9], "kostov_nn"].all() and not lab.loc[[2, 4], "kostov_nn"].any()
+    assert lab.loc[9, "label"] == ""  # the NN flag alone never labels
 
 
 # ---------------------------------------------------------------------------------------------

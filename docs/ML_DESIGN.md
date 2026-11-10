@@ -350,3 +350,111 @@ Test results, with the cmv2 veto applied:
 
   20% of the ~0.3% bin is below SNR 10 and essentially unrecoverable. Reaching 50% overall
   would need ~0.64 in the SNR 10-30 bin.
+
+## 14. Implementation record: light-curve EB tests and `ens_v1_eb` (S32, 2026-11-10)
+
+Code: `src/oddball/knownclass/ebtests.py`, `scripts/{eb_features,eb_explain,veto_inj_set}.py`,
+the `null_eb` / `dusty_tail` kinds in `oddball.inject.sampling` (`make_injections.py --kinds
+--exclude-sets`), Kostov+2025 and Gaia DR3 `veb` in `oddball.knownclass.{catalogs,labels}`.
+Why: the eyeballed S32 top list was 53 EBs out of 96 stars, 35 of them in no catalogue we use
+(PLAN, 2026-11-10 triage). `kc_v1` cannot separate EBs from dippers (§11: it called 15 of 18
+known dippers "typical EB or rotator"), so EBs need tests that dippers fail by construction.
+
+**Tests (`ebf_v1`, per light curve, PDCSAP, 30-min bins; docs/VETTING.md §3 E1-E4, E6, E7).**
+The module docstring has the full recipe. In short: a 1.5-d running-median residual; events =
+2-h box SNR > 5; an anchored period search on the two deepest events (window depths, so an
+unresolved eclipse is not lost inside a bin); at the best period, the hit fraction, excess depth
+scatter (also odd/even separately), timing residuals, width scatter, stacked-profile asymmetry,
+a secondary at any phase, unexplained extra events and the physical-duration ratio for the TIC
+radius. `eb_periodic` is the product of soft factors in [0, 1], so a single strong violation
+(a dipper's varying depths, an exocomet's tail, extra dips) is enough to reject.
+`eb_single_raw` (lone event: informative SNR x symmetric shape x no extra events) is kept as a
+diagnostic. **E7 (`eb_xsec`):** the same star in S33/38/43/44/55 supports an EB when an event
+there matches this sector's depth and width (within 1.5x) and, if both sectors are periodic,
+the period (2%, also at 1/2 and 2x). Two lone events count fully when depth and width agree
+within 1.15x and 1.25x (89% of catalogued-EB lone-event pairs in the train split, 25% for other
+catalogued classes), else at half weight. Absence elsewhere never counts against an EB.
+~150-310 s per sector with 5 workers.
+
+**Check set `eb1`** (`--kinds null_eb null_eb dusty_tail --exclude-sets v1`, seed 20261110;
+1,600 `null_eb` + 800 `dusty_tail` per split, hosts disjoint from v1). `null_eb` is a per-host
+*null* that must not rank high: P log-uniform 0.4-40 d, primary depth 0.3-50%, physical
+duration from the host radius, trapezoid or (grazing) V, secondary 0 or 5-100% at phase 0.5 or
+eccentric. `dusty_tail` is a *target* (disintegrating planet): strictly periodic, P 0.3-3 d,
+1-4 h, sharp ingress and exponential egress, each transit's depth U(0.05, 1) of the maximum. It
+is the hardest case for an EB test (strict period, constant width), so it guards against the
+test eating periodic oddballs. `eb1` was scored by classical, `ssl_v2` (seed 0) and the `cmv2`
+veto (`veto_inj_set.py`: the real maps reused, flag rule unchanged; 1.4% flagged).
+
+**Combiner (`eb_explain.py`).** The base statistic is recomputed from `ens_v1`'s rule (asserted
+equal to its `score_raw` on real, v1 and eb1), then the §11 down-weight with `E = eb_like`:
+
+    eb_like = max(eb_periodic, w_single * eb_single_raw, eb_xsec * c_shape * c_extra)
+    score   = pct_stratum(1 - (1 - s)^(1 - alpha * eb_like)),  cmv2-flagged -> -1
+
+`alpha` in {0, .25, .5, .75, .9, 1} and `w_single` in {0, .25, .5, .75, 1} are chosen on **val**:
+J = mean v1 recall in the top 1% at ~0.3 / 1 / 3% - v1 null FPR - eb1 EB-null FPR, with the
+dusty-tail recall not allowed to fall more than 0.02; ties within 0.01 go to the smallest
+intervention. The cross-sector weight is fixed at 1 a priori: val cannot see it (the injected
+EBs have no other sectors, and injected targets get support only when the host's own eclipses
+match them).
+
+**Val sweep** (`outputs/scores/ens_v1_eb/s0032/provenance.json`): alpha 0.75, w_single 0
+(J 0.213; best 0.221 at alpha 0.9, inside the tie band). Every w_single > 0 lowers J: a lone
+symmetric eclipse and the `single_dip` target are the same thing in one sector, and lone events
+are where most real EBs in our top list sit (below).
+
+| val | ~0.3% | ~1% | ~3% | null FPR | EB-null FPR | dusty-tail recall |
+|---|---|---|---|---|---|---|
+| alpha 0 (= `ens_v1`) | 0.256 | 0.521 | 0.798 | 0.020 | 0.696 | 0.279 |
+| chosen | 0.307 | 0.606 | 0.828 | 0.027 | 0.341 | 0.365 |
+
+**Test (S32, `cmv2` veto):** `outputs/eval/compare/s0032/classical__ens_v1__ens_v1_eb/report.md`
+(v1) and `report_eb1.md` (eb1).
+
+| test | ~0.3% | ~1% | ~3% | all | null FPR | known top 1% | EB-null FPR | dusty-tail recall |
+|---|---|---|---|---|---|---|---|---|
+| classical | 0.032 | 0.112 | 0.330 | 0.284 | 0.007 | 12/18 | 0.191 | 0.039 |
+| `ens_v1` | 0.303 | 0.574 | 0.788 | 0.614 | 0.040 | 2/18 | 0.664 | 0.279 |
+| `ens_v1_eb` | 0.348 | 0.649 | 0.817 | 0.655 | 0.053 | 2/18 | 0.323 | 0.347 |
+
+- **No target kind loses recall** at any depth bin except aperiodic dippers at ~0.3% (0.42 ->
+  0.41). Targets with `eb_like > 0.5` on test: 0.4-1.1% per kind (dusty tails 1.1%). The
+  gain is the mechanism working: real EBs leave the top 1%, so its threshold drops.
+- **Cost:** null FPR 0.040 -> 0.053 (val 0.020 -> 0.027). Some freed slots go to systematics.
+- **Known positives:** none has `eb_like` above 0.002, and all 17 unvetoed ones keep or raise
+  their percentile (e.g. TIC 43488669 0.996 -> 0.998), but still only 2/18 are in the top 1%.
+  The limit is still `ens_v1`'s ML weights (§12), not EBs. Diagnostic, not selected: the same
+  rule on the equal-weight `ens_v1_max` (`--fixed ens_v1_eb`) gives 6/18 -> 7/18 and ~0.3% recall
+  0.259 -> 0.309. Two known positives drop 0.002 there (TIC 50745441, 4350574): `combine` clips
+  percentiles at 1 - 1e-7, so the top of a stratum is tied, and a near-zero `eb_like` (< 0.001)
+  breaks the tie downwards.
+- **EB nulls still in the top 1%** (test, approx.): 60% of P > 13 d (lone eclipses), 34% of
+  P < 2 d, 7% of P 2-6 d. The short-period survivors have `eb_like` above 0.5 but base
+  percentiles so extreme that alpha 0.75 does not bring them below the cut.
+
+**Real stars (evaluation only, nothing tuned on them).** Of the 53 eyeballed EBs, 48 can be
+identified from the record: the 35 uncatalogued TICs in the triage plus the 13 gallery stars
+with a catalogue EB label (the other 5 were not recorded per TIC).
+- `eb_like > 0.5`: **11 of 35 uncatalogued** (8 periodic in S32, 3 more from other sectors) and
+  **10 of 13 catalogued**. 24 of the 35 show a single eclipse in S32, which no single-sector test
+  can tell from a symmetric single dip.
+- Top 1% (stratum percentile, veto applied, all splits): catalogued EBs 377 -> 66, `eb_like >
+  0.5` 538 -> 3, identifiable eyeballed EBs 46 -> 28 of 48. Top 60 overall: eyeballed EBs 38 -> 17.
+- **Catalogues do not rescue them:** none of the 35 is in Kostov+2025 (tables 3/4) or in Gaia
+  DR3 `veb` within 2″; 26 of 35 are in Kostov's unvetted NN list (a soft flag that also fires
+  on dippers). 8 of the 13 catalogued ones are in `veb`.
+
+**Rejected: a flat-bottom test for lone eclipses (E4 "U shape").** The width ratio W90/W50 of
+real lone EB eclipses in the train split (median 0.39 for 18 eyeballed, 0.40 for 26
+catalogued) equals a Gaussian single dip's (0.38). The trapezoid `null_eb` injections sit at
+0.71. Limb darkening, partial eclipses and 30-min bins round real eclipse bottoms. The test would
+have looked good on val and done nothing on real stars. It also means `null_eb` is flatter
+than real EBs, so val's EB-null numbers are somewhat optimistic for shape.
+
+**Open:** a single-sector lone eclipse remains unexplained without another sector (E7) or an
+ephemeris (TESS EBs in later sectors, ground surveys). A lone eclipse plus a shallower,
+width-matched second event in the same sector (an eccentric secondary) is now counted as an
+"extra" event (c_extra 0.6), which costs 7 of the 24 lone-eclipse EBs. `kc_v2` with the EB
+features and the Kostov/`veb` labels (`build_known_class_labels.py --eb-sources kostov
+gaia_veb --out labels_eb`) is not trained yet.

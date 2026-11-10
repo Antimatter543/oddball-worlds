@@ -42,7 +42,13 @@ from oddball.common.paths import REPO_ROOT, data_root, sector_dir
 from oddball.common.splits import known_positive_tics, split_array
 from oddball.common.strata import ccd_index, stratum_id
 from oddball.inject.apply import apply_model, sap_dilution
-from oddball.inject.sampling import DEPTH_RANGE, KINDS, draw_null_event, draw_params
+from oddball.inject.sampling import (
+    DEPTH_RANGE,
+    KINDS,
+    PER_HOST_NULL_KINDS,
+    draw_null_event,
+    draw_params,
+)
 from oddball.tess.arrays import dir_metadata
 from oddball.tess.ingest import LC_SCHEMA
 
@@ -86,11 +92,17 @@ def select_hosts(
     n_events: int,
     hosts_per_event: int,
     rng: np.random.Generator,
+    exclude_tics=None,
 ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
-    """Return ``(astro_hosts, [null_hosts_event_0, ...])`` from ``split`` only."""
+    """Return ``(astro_hosts, [null_hosts_event_0, ...])`` from ``split`` only.
+
+    ``exclude_tics``: hosts already used by another injection set (kept disjoint).
+    """
     m = meta.copy()
     m["split"] = split_array(m.tic.to_numpy())
     cand = m[m.split == split].copy()
+    if exclude_tics is not None:
+        cand = cand[~cand.tic.isin({int(x) for x in exclude_tics})]
     known = known_positive_tics()
     assert not cand.tic.isin(known).any(), "known positives leaked into the host pool"
     cand["stratum"] = stratum_id(cand.tmag, cand.camera, cand.ccd)
@@ -160,6 +172,8 @@ def build_injection_set(
     n_dump_events: int = 3,
     out_dir: Path | None = None,
     log=print,
+    kinds: tuple[str, ...] = KINDS,
+    exclude_tics=None,
 ) -> dict:
     if split not in ("val", "test"):
         raise ValueError("injection sets are built for val or test only")
@@ -175,10 +189,11 @@ def build_injection_set(
     # per-injection streams are keyed by the injection's index, not processing order
     inj_key = [seed, sector, SPLIT_CODE[split], 7]
 
-    astro, null_groups = select_hosts(meta, split, n_astro, n_events, hosts_per_event, rng_sel)
+    astro, null_groups = select_hosts(meta, split, n_astro, n_events, hosts_per_event, rng_sel,
+                                      exclude_tics)  # fmt: skip
 
     # ---- plan: one row per injection
-    kinds = np.resize(np.array(KINDS), len(astro))
+    kinds = np.resize(np.array(kinds), len(astro))
     rng_kind.shuffle(kinds)
     plan = astro.assign(kind=kinds, event_id=-1, params=None)
     n_ev = len(null_groups)
@@ -216,8 +231,9 @@ def build_injection_set(
             valid = np.isfinite(flux)
             if r.params is None:
                 rng = np.random.default_rng([*inj_key, int(r.inj_index)])
-                p = draw_params(r.kind, rng, t, valid)
-                p["is_null"] = False
+                rad = float(r.radius) if r.radius is not None else np.nan
+                p = draw_params(r.kind, rng, t, valid, host={"radius": rad})
+                p["is_null"] = r.kind in PER_HOST_NULL_KINDS
             else:
                 p = dict(r.params)
             f_inj, s_inj, m = apply_model(flux, sap, t, p, bin_days, crowdsap=r.crowdsap)
