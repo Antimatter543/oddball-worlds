@@ -215,8 +215,23 @@ def build_injection_set(
     plan["inj_id"] = [f"{name}-s{sector:04d}-{split}-{i:05d}" for i in range(len(plan))]
     plan["inj_index"] = np.arange(len(plan))
     assert plan.tic.is_unique
+    inj, n_written = _write_shards(sector, split, plan, meta, out, bin_days, inj_key, log)
+    _write_tables(inj, out)
+    prov = _provenance(sector, split, name, seed, inj, n_ev)
+    (out / "provenance.json").write_text(json.dumps(prov, indent=2, default=str))
+    log(f"wrote {n_written} injections to {out}")
+    return prov
 
-    # ---- shard-by-shard injection
+
+def _write_shards(sector, split, plan, meta, out, bin_days, inj_key, log, depth_range=None,
+                  extra_cols=()):  # fmt: skip
+    """Inject every row of ``plan`` into its host, shard by shard (one source shard in memory).
+
+    ``plan`` rows: the host's metadata plus ``kind``, ``event_id``, ``params`` (None: draw per
+    injection from the stream ``[*inj_key, inj_index]``), ``inj_id``, ``inj_index``. A host may
+    appear in several rows (replicas). ``extra_cols``: plan columns copied into the truth table
+    and the shard metadata. Returns ``(truth table, n written)``.
+    """
     inj_records = []
     n_written = 0
     meta_cols = [c for c in meta.columns if c != "shard"]
@@ -232,7 +247,8 @@ def build_injection_set(
             if r.params is None:
                 rng = np.random.default_rng([*inj_key, int(r.inj_index)])
                 rad = float(r.radius) if r.radius is not None else np.nan
-                p = draw_params(r.kind, rng, t, valid, host={"radius": rad})
+                p = draw_params(r.kind, rng, t, valid, host={"radius": rad},
+                                depth_range=depth_range)  # fmt: skip
                 p["is_null"] = r.kind in PER_HOST_NULL_KINDS
             else:
                 p = dict(r.params)
@@ -250,6 +266,7 @@ def build_injection_set(
             mrow = {c: getattr(r, c) for c in meta_cols}
             mrow.update(inj_id=r.inj_id, host_tic=int(r.tic), kind=r.kind,
                         is_null=bool(p["is_null"]), shard=out_idx)  # fmt: skip
+            mrow.update({c: getattr(r, c) for c in extra_cols})
             meta_rows.append(mrow)
             inj_records.append({
                 "inj_id": r.inj_id, "host_tic": int(r.tic), "sector": int(sector),
@@ -262,6 +279,7 @@ def build_injection_set(
                 "sap_depth": float(p["depth"]) * sap_dilution(r.crowdsap),
                 "binned_depth": float(np.max(dev[valid])) if valid.any() else 0.0,
                 "peak_bin_valid": bool(valid[k]),
+                **{c: getattr(r, c) for c in extra_cols},
             })  # fmt: skip
         lc_tbl = pa.Table.from_pylist(lc_rows, schema=INJ_SCHEMA)
         _atomic(lc_tbl, out / "shards" / f"lc_{out_idx:05d}.parquet", row_group_size=1000)
@@ -269,11 +287,16 @@ def build_injection_set(
         n_written += len(lc_rows)
         log(f"  shard {int(shard):3d} -> lc_{out_idx:05d}: {len(lc_rows)} injections")
 
-    inj = pd.DataFrame(inj_records, columns=INJ_COLUMNS)
+    return pd.DataFrame(inj_records, columns=[*INJ_COLUMNS, *extra_cols]), n_written
+
+
+def _write_tables(inj: pd.DataFrame, out: Path) -> None:
     _atomic(pa.Table.from_pandas(inj, preserve_index=False), out / "injections.parquet")
     metas = [pq.read_table(f) for f in sorted((out / "shards").glob("meta_*.parquet"))]
     _atomic(pa.concat_tables(metas, promote_options="default"), out / "metadata.parquet")
 
+
+def _provenance(sector, split, name, seed, inj, n_ev) -> dict:
     src_prov = sector_dir(sector) / "provenance.json"
     src = json.loads(src_prov.read_text()) if src_prov.exists() else {}
     prov = {
@@ -291,8 +314,6 @@ def build_injection_set(
                                            "download_dates_utc", "spoc_data_release",
                                            "bin_minutes", "quality_bitmask", "n_converted")},
     }  # fmt: skip
-    (out / "provenance.json").write_text(json.dumps(prov, indent=2, default=str))
-    log(f"wrote {n_written} injections to {out}")
     return prov
 
 

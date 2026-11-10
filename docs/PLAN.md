@@ -157,3 +157,20 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - **Gate: fails** (recall at ~0.3% is 0.32, needs 0.5; 3 of 18 known positives).
 - **Reading:** camera artefacts no longer reach the top on S32 nulls. What's left is the shallow step tails, scattered-light shapes the ML likes, and the known-positive loss in the ensemble.
 - **Next:** run cmv3 on S43/S44 (ecliptic) to size the asteroid problem; label the eyeballed galleries per star from now on (`labels/`).
+
+### 2026-11-10: young-host val target `yso1` and ensemble `ens_v3` on S32 (test split): gate FAIL, known positives 3 -> 5 of 18, EB nulls a third
+- Details are in ML_DESIGN §15. Reports: `outputs/eval/compare/s0032/classical__ens_v1_eb__ens_v2__ens_v3__veto-cmv3[__inj-eb1|n2|yso1]/report.md` and `outputs/eval/yso1/s0032/`.
+- **New val/test set `yso1`:** dips injected into catalogued young stars (VSX young types or Gaia DR3 YSO), depths 0.17-17%. 25 val and 36 test hosts, 20 injections each plus one unchanged copy (a matched null). Hosts near known positives and earlier hosts are excluded. No published dipper list gives an independent S32 val set (the S32 dippers in Capistrant+2022 are already known positives).
+- **`ens_v3`** = weighted max of stratum percentiles, classical : iforest : recon = 1 : 2 : 0.75, EB down-weight alpha 0.9. Chosen on val by a pre-registered J = generic recall + young-host recall − instrument-null FPR − EB-null FPR.
+- **Test, cmv3 veto, top 1%** (`ens_v2` -> `ens_v3`):
+  - known positives **3 -> 5 of 18** (seeds 0/1/2: 3/4/3 -> 5/8/5); all 17 unvetoed sit higher.
+  - EB-null FPR **0.70 -> 0.25**; dusty tails 0.31 -> 0.36; ~0.3% recall 0.32 -> 0.33.
+  - costs: ~1% recall **0.59 -> 0.52**, ~3% 0.79 -> 0.76, v1 null FPR 0.020 -> 0.033 (10/300).
+  - classical alone still has 11/18 known positives.
+- **The young-host term did not drive the choice:** dropping it picks the same rule. The EB term did. yso1 recall is noisy and host-dominated (val and test order the scorers differently; test `ens_v3` 0.16 [0.11, 0.21], `ens_v1_eb` 0.21), and does not track the known positives (classical has the lowest yso1 recall).
+- **Found:** `ssl_v2_recon` scores the same light curve differently at a different row (masks come from one RNG stream in row order); the matched nulls exposed it (percentile median |Δ| 0.02, max 0.50).
+- **Gate: fails** (~0.3% recall 0.33, needs 0.5; 5 of 18 known positives; ~1% recall lost).
+- **Next:**
+  - `yso2`, pre-registered: conditional recall (hosts not already in the top 1%), deeper events (10-50%, like real dippers), more hosts from S33/38/43/44/55 val splits.
+  - Seed `ssl_v2_recon` masks per TIC.
+  - Step nulls (~0.20 FPR) remain the weakest instrument type.

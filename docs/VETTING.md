@@ -190,6 +190,10 @@ and 4a are pure NumPy over the shards we already stream.
    §9) and add the Kostov+2025 and Gaia `veb` labels. These are the properties dippers
    physically lack, so they should separate EBs from dippers better than the typicality in the
    current features. Measure that on val injections into catalogued EB and YSO hosts only.
+
+   **Status (2026-11-10):** built as `ebf_v1` / `ens_v1_eb` (ML_DESIGN §14). Measured on young
+   hosts with the `yso1` set (§15): `eb_like > 0.5` for 1 of 1,220 injections into catalogued
+   YSO hosts and 0 of their 61 unchanged copies, so the EB down-weight does not hit young-host dippers.
 3. **Asteroid track test + SkyBoT confirmation** (F2, F3; 1–2 days). An internal RANSAC over
    `bkg` events finds known and unknown movers on every camera. SkyBoT (`C57`) confirms the top
    ~100–300 at ~10 s each, and the result is written as a gallery annotation. Run it first on

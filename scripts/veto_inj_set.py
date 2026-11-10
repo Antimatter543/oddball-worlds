@@ -2,6 +2,7 @@
 real-star files.
 
     uv run python -I scripts/veto_inj_set.py --sector 32 --inj eb1
+    uv run python -I scripts/veto_inj_set.py --sector 32 --inj yso1 --real-masks-only
 
 ``build_veto.py`` re-runs its pass over the real sector and rewrites ``real.parquet`` (dropping
 ``cmv2_flag``, which ``tune_veto.py`` adds). This script instead reuses the cached real maps
@@ -9,6 +10,10 @@ real-star files.
 ``build_veto.py`` does (``oddball.score.veto.set_masks``), classifies its events, and applies the
 flag thresholds already chosen on val (``provenance.json["flag"]``). It writes only
 ``outputs/veto/<name>/sNNNN/inj_<set>.parquet`` and records the set in ``provenance.json``.
+
+``--real-masks-only`` skips the set's own binomial CCD map (as ``build_veto3.py`` does for
+``n2``). Use it for sets with replicas (``yso1``, ML_DESIGN §15): copies of one host share its
+real events at the same bins and would otherwise look like a CCD-wide event.
 """
 
 from __future__ import annotations
@@ -40,6 +45,8 @@ def main() -> None:
     ap.add_argument("--inj", required=True)
     ap.add_argument("--name", default="cmv2")
     ap.add_argument("--batch-rows", type=int, default=2000)
+    ap.add_argument("--real-masks-only", action="store_true",
+                    help="judge the set with the real sector's masks only")
     a = ap.parse_args()
     sec = a.sector
     vd = outputs_root() / "veto" / a.name / f"s{sec:04d}"
@@ -57,18 +64,23 @@ def main() -> None:
         if not (d / "injections.parquet").exists():
             continue
         mi = dir_metadata(d)
-        own = V.scan_maps(d, grid, mi, cells, a.batch_rows)
-        sm = V.set_masks(masks, own)
-        extra[f"{a.inj}/{split}"] = sm.info["set_extra_cells"]
+        if a.real_masks_only:
+            sm = masks
+            extra[f"{a.inj}/{split}"] = 0
+        else:
+            own = V.scan_maps(d, grid, mi, cells, a.batch_rows)
+            sm = V.set_masks(masks, own)
+            extra[f"{a.inj}/{split}"] = sm.info["set_extra_cells"]
         f, _ = V.classify_dir(d, grid, mi, cells, sm, a.batch_rows)
         f.insert(2, "sector", sec)
         parts.append(f)
-        log(f"{a.inj}/{split}: {len(f)} light curves, {sm.info['set_extra_cells']} extra cells")
+        log(f"{a.inj}/{split}: {len(f)} light curves, {extra[f'{a.inj}/{split}']} extra cells")
     out = pd.concat(parts, ignore_index=True)
     out["cmv2_flag"] = V.veto_flag(out, flag["t_sys"], flag["t_res"], flag["pdc_only"])
     out.to_parquet(vd / f"inj_{a.inj}.parquet", index=False)
     prov.setdefault("extra_sets", {})[a.inj] = {
         "set_extra_cells": extra,
+        "real_masks_only": bool(a.real_masks_only),
         "flag_frac": float(out.cmv2_flag.mean()),
         "built_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "script": "scripts/veto_inj_set.py (real maps reused; flag thresholds from 'flag')",

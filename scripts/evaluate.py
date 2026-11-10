@@ -4,7 +4,8 @@
     ODDBALL_DATA=... uv run python -I scripts/evaluate.py --compare classical classical_cm my_encoder
 
 Single mode writes ``outputs/eval/<scorer>/sNNNN/report.md`` + CSVs + plots + summary.json.
-Compare mode writes ``outputs/eval/compare/sNNNN/<a>__<b>.../report.md`` and a plot.
+Compare mode writes ``outputs/eval/compare/sNNNN/<a>__<b>...[__veto-X][__inj-Y]/report.md`` and a
+plot (``__inj-Y`` for any injection set other than ``v1``).
 """
 
 from __future__ import annotations
@@ -46,7 +47,8 @@ def main() -> None:
         print(f"report: {out / 'report.md'}")
     else:
         eds = [load(n, a.sector, a.inj, a.veto) for n in a.compare]
-        tag = "" if a.veto == "cmv2" else f"__veto-{a.veto}"
+        tag = ("" if a.veto == "cmv2" else f"__veto-{a.veto}") + (
+            "" if a.inj == "v1" else f"__inj-{a.inj}")  # other sets do not overwrite v1's report
         out = (outputs_root() / "eval" / "compare" / f"s{a.sector:04d}"
                / ("__".join(a.compare) + tag))  # fmt: skip
         write_compare(eds, out, cmd, split=a.split)

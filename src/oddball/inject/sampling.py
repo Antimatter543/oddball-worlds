@@ -106,16 +106,20 @@ def _agauss(tc, fwhm, rng, spread=0.4):
 
 
 def draw_params(kind: str, rng: np.random.Generator, t: np.ndarray, valid: np.ndarray,
-                host: dict | None = None) -> dict:  # fmt: skip
+                host: dict | None = None,
+                depth_range: tuple[float, float] | None = None) -> dict:  # fmt: skip
     """Draw one injection of ``kind`` for a host with bin centres ``t`` and validity ``valid``.
 
     ``host`` (``radius``, R_sun) is used by ``null_eb`` for physical eclipse durations.
+    ``depth_range`` overrides the kind's depth range (log-uniform; ``None`` keeps
+    ``DEPTH_RANGE`` / ``DUSTY_DEPTH_RANGE``). The draws are otherwise identical, so the
+    default reproduces the existing sets exactly.
     """
     if kind == "null_eb":
         return draw_eb(rng, t, valid, (host or {}).get("radius", np.nan))
     if kind == "dusty_tail":
-        return draw_dusty_tail(rng, t, valid)
-    depth = loguniform(rng, *DEPTH_RANGE)
+        return draw_dusty_tail(rng, t, valid, depth_range=depth_range)
+    depth = loguniform(rng, *(depth_range or DEPTH_RANGE))
     dur = loguniform(rng, *DURATION_RANGE)
 
     if kind == "single_dip":
@@ -271,7 +275,8 @@ def draw_eb(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray, radius: 
     return p
 
 
-def draw_dusty_tail(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray) -> dict:
+def draw_dusty_tail(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray,
+                    depth_range: tuple[float, float] | None = None) -> dict:  # fmt: skip
     """A disintegrating planet: strictly periodic transits whose depth changes transit to transit.
 
     Period log-uniform 0.3-3 d (KIC 12557548 0.65 d, K2-22 0.38 d, BD+05 4868 Ab 1.27 d); total
@@ -281,7 +286,7 @@ def draw_dusty_tail(rng: np.random.Generator, t: np.ndarray, valid: np.ndarray) 
     """
     P = loguniform(rng, *DUSTY_PERIOD_RANGE)
     dur = loguniform(rng, *DUSTY_DURATION_RANGE)
-    depth = loguniform(rng, *DUSTY_DEPTH_RANGE)
+    depth = loguniform(rng, *(depth_range or DUSTY_DEPTH_RANGE))
     comps = []
     for tc in _epochs(rng, t, valid, P, -0.2 * dur, dur):
         comps.append({"shape": "fred", "tc": float(tc), "rise": 0.1 * dur, "tau": 0.4 * dur,

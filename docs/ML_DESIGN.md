@@ -100,7 +100,7 @@ Combine scores by **rank-averaging**. **Conditional calibration:** convert each 
 ## 9. Interfaces (shared contract between stages)
 - **Splits:** `oddball.common.splits.split_of(tic)` → `train` / `val` / `test` / `known`. Hash-based by TIC, 80/10/10. Every known positive is `known`.
 - **Light-curve shards:** the ingest format (`src/oddball/tess/ingest.py`, read with `oddball.tess.store`).
-- **Injection sets:** `data/injections/<name>/s<NNNN>/{val,test}/`. Same shard schema as ingest, plus columns `inj_id` (str, unique) and `host_tic` (int), plus an `injections.parquet` table with one row per `inj_id`: `host_tic, sector, split, kind, depth, duration_d, t0_btjd, params_json, is_null`. `is_null=True` marks instrument-like null injections. Hosts are drawn **only** from the split named by the directory.
+- **Injection sets:** `data/injections/<name>/s<NNNN>/{val,test}/`. Same shard schema as ingest, plus columns `inj_id` (str, unique) and `host_tic` (int), plus an `injections.parquet` table with one row per `inj_id`: `host_tic, sector, split, kind, depth, duration_d, t0_btjd, params_json, is_null`. `is_null=True` marks instrument-like null injections. Hosts are drawn **only** from the split named by the directory. A set may repeat a host in several rows (`yso1`, §15): it then carries a `replica` column (each host once per replica; `-1` = the matched null, an unchanged copy) and a `hosts.parquet` with each host's catalogue match. Cross-star vetoes must then run per replica and with the real sector's masks only (`scripts/veto3_inj_set.py`, `veto_inj_set.py --real-masks-only`).
 - **Score files:** `outputs/scores/<scorer>/s<NNNN>/{real,inj_<name>}.parquet`, with columns `tic, sector, inj_id (null for real), score` (higher = weirder), plus any `score_*` sub-scores. A scorer must be runnable on any shard directory, real or injected.
 - **Evaluation** reads score files only, so any scorer (classical, EncoTESS, our encoder) plugs in identically.
 - **Known-class feature tables** (§4.5): `outputs/knownclass/features/<table>/s<NNNN>/{real,inj_<name>}.parquet`, keys `tic, sector, inj_id`, any numeric feature columns. Tables join on the keys, so ML embeddings plug in next to `kcf_v1`.
@@ -651,3 +651,189 @@ width-matched second event in the same sector (an eccentric secondary) is now co
 "extra" event (c_extra 0.6), which costs 7 of the 24 lone-eclipse EBs. `kc_v2` with the EB
 features and the Kostov/`veb` labels (`build_known_class_labels.py --eb-sources kostov
 gaia_veb --out labels_eb`) is not trained yet.
+
+## 15. Implementation record: young-host val target `yso1` and ensemble `ens_v3` (S32, 2026-11-10)
+
+Code: `src/oddball/inject/yso.py` (host pool, replicas, matched nulls), `src/oddball/score/ens3.py`
+(objective, tie rule, bootstraps), `scripts/{make_yso_set,veto3_inj_set,ensemble_v3,yso_report}.py`,
+`--real-masks-only` in `scripts/veto_inj_set.py`, an optional `depth_range` in
+`oddball.inject.sampling.draw_params` / `draw_dusty_tail`, `tests/test_{yso,ens3}.py`.
+`build_injection_set` was split into helpers (`_write_shards`, `_write_tables`, `_provenance`);
+a v1 val rebuild with the refactored code is identical to the stored set (all columns and flux).
+
+**Why.** Every ensemble so far was tuned on val injections into generic hosts, and the tuning
+let the ML scores dominate: `ens_v1`, `ens_v1_eb` and `ens_v2` put 2-3 of the 18 S32 known
+positives in the top 1%, classical alone 11-12 (§12-§14). The known positives are evaluation
+only, so the fix has to come from a val target that looks like them. 16 of the 18 are young
+dippers, mostly faint Orion OB1 members on camera 1 CCD 2. Their light curves are dominated by the
+star's own large, irregular variability, which generic hosts almost never have.
+
+**The set `yso1`** (`data/injections/yso1/s0032/{val,test}`, ~1 min to build).
+- Host pool: S32 stars that are catalogued young. VSX within 21″ with a young-star type
+  (`vsx_young`: YSO / T Tauri / Orion-type / UXOR / DIP / FU Ori etc.; RCB, BOY, ZZO excluded) or
+  Gaia DR3 within 3″ flagged YSO. 473 stars: train 373, val 31, test 59, known 10.
+- Exclusions: every star within 120″ of a known positive (0 in val/test after the split), and the
+  29 hosts already used by v1 / eb1 / n2. Final hosts: **val 25, test 36** (val sources vsx 10 /
+  gaia 3 / both 12; test 13 / 3 / 20). Camera 1 CCD 2: val 12, test 22.
+- Each host gets **20 replicas** (each a fresh injection from `YSO_KINDS`: aperiodic and
+  quasi-periodic dippers, Boyajian, exocomet, dusty tail) plus **one matched null** (`null_yso`,
+  the unchanged light curve, `replica = -1`). val 500 + 25, test 720 + 36 light curves.
+- Depths: log-uniform in `YSO_DEPTH_RANGE` = 0.17-17%, i.e. the v1 range shifted up one decade,
+  because young hosts' own variability hides v1's 0.3% events.
+- Hosts are noisy like the known positives: median rms percentile in their stratum val 0.97,
+  test 0.92 (known positives 0.976).
+- RNG stream key [seed, sector, split, 11, inj_index]; `hosts.parquet` records each host's match.
+
+**Pipeline on a replicated set.** A set that repeats each host 21 times breaks two stages that
+assume one row per star, and both had to be fixed:
+- Cross-star masks (cmv2, cmv3) are built from the set's own light curves by default. Twenty
+  copies of a host make every event in it look "common", so `--real-masks-only` builds the
+  masks from the real sector only.
+- cmv3's cross labels compare an event with other stars at the same time. On yso1 they are
+  computed **per replica** (each replica against the real sector), else the 20 replicas of a
+  host vouch for each other.
+- Checks: the matched nulls veto exactly like their real hosts (cmv2 and cmv3: 0 mismatches);
+  `veto3_inj_set.py --check` on v1 and n2 reproduces the stored cmv3 flags (0 mismatches, max
+  diff 0). cmv3 flags 1.9% of yso1, 1.4% of eb1.
+- Not usable on yso1: the v0 `sys_flag` and `classical_cm`, which build their map from the set.
+- Matched nulls are a pipeline check: `score(null copy)` should equal `score(host)`. classical and
+  iforest reproduce exactly. **`ssl_v2_recon` does not** (see the caveat below).
+
+**Pre-registered objective** (`ens3.py`, fixed before the sweep):
+J = R_gen + R_yso − N_inst − N_eb, all on val, top 1% of stratum after cmv3.
+- R_gen: v1 recall averaged over the ~0.3 / 1 / 3% depth bins.
+- R_yso: yso1 recall averaged over the ~0.3 / 1 / 3 / 10% bins.
+- N_inst: mean FPR of the 5 instrument null types (v1 CCD / dump nulls, n2 asteroid / step /
+  column). N_eb: eb1 EB-null FPR. N_yso (matched-null rate) is reported, not scored.
+- Guard: dusty-tail recall may not fall more than 0.02 below the same rule at alpha 0.
+- Ties within 0.01 of the best J go to the simplest rule (`simplicity`: fewer free weights, then
+  lower alpha).
+
+**Grid** (`ensemble_v3.py`, ~2.5 min): rules mean, max, fisher, stouffer, and a weighted max
+`wmax` of the stratum percentiles with weights (classical 1, iforest w2, recon w3), w in
+{0.25, 0.5, 0.75, 1, 1.25, 1.5, 2}; × EB down-weight alpha in {0, .25, .5, .75, .9, 1}.
+The single-transit weight stays 0. The script reproduces `ens_v2` and `ens_v1_eb` from their
+own files (max diff 0) and writes their missing yso1 / n2 / eb1 scores.
+
+**Pick: `ens_v3` = wmax 1 : 2 : 0.75 (classical : iforest : recon), alpha 0.9.** Val J 0.402
+(best 0.404 at alpha 1.0, within the tie). R_gen 0.522, R_yso 0.145, N_inst 0.031, N_eb 0.234,
+N_yso 0.12 (3 of 25 hosts), dusty 0.369.
+
+| family best (val) | rule | J | R_gen | R_yso | N_eb |
+|---|---|---|---|---|---|
+| mean | alpha 1 | .365 | .361 | .181 | .156 |
+| max | alpha 1 | .356 | .556 | .157 | .329 |
+| classical-heavy wmax | 1 : 1 : .25, alpha 1 | .394 | .443 | .174 | .194 |
+| fisher | best | .326 | | | |
+| stouffer | best | .330 | | | |
+| `ens_v2` rule | alpha 0 | −.097 | .541 | .098 | .715 |
+| `ens_v1_eb` rule | alpha .75 | .355 | .596 | .131 | .342 |
+
+- The highest R_yso on the grid is 0.214 (wmax 1 : .25 : .5), at R_gen 0.259.
+- **The yso term did not decide the pick.** Maximising J − R_yso picks the same rule. What moved
+  the pick away from `ens_v2` is the EB term (`ens_v2`'s alpha 0 and EB-null FPR 0.72). Under the
+  old ens_v2 objective the same grid picks wmax 1 : 1.5 : 1.5, alpha 0.5.
+- Paired cluster bootstrap of J(pick) − J(other), host-clustered and stratum-wise, 90%:
+  `ens_v2` rule +0.499 [0.423, 0.579]; `ens_v1_eb` rule +0.047 [−0.008, 0.105]; max alpha .75
+  +0.051 [−0.015, 0.122]. So on val `ens_v3` is clearly better than `ens_v2` and not clearly
+  better than `ens_v1_eb`.
+- Val yso1 recall of the pick: 0.148 [0.078, 0.228] (host bootstrap).
+
+**Published dipper lists (step 1b): not used.** The Capistrant+2022 dippers (VarF D, 293 rows) that
+fall in S32 are already known positives; Cody & Hillenbrand and Ansdell+2016 cover K2 Upper Sco / ρ Oph, and
+S32 has no star within 1° of Upper Sco, Taurus or NGC 2264. val has no VSX DIP / UXOR star (test
+has 2 UXOR: TIC 284996069, 287840183). So there is no independent real-dipper val set in S32.
+
+**Test (cmv3, top 1%; nothing tuned on it).**
+
+| scorer | ~0.3% | ~1% | ~3% | all | v1 null | step | asteroid | column | EB null | dusty | known top 1% |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| classical | .027 | .097 | .291 | .261 | .013 (4/300) | 4/200 | 0/53 | 1/78 | .164 | .029 | 11/18 |
+| ens_v1_eb | .361 | .649 | .828 | .663 | .040 (12/300) | 26/200 | 2/53 | 5/78 | .324 | .379 | 2/18 |
+| ens_v2 | .321 | .590 | .794 | .624 | .020 (6/300) | 40/200 | 2/53 | 6/78 | .697 | .310 | 3/18 |
+| ens_v3 | .333 | .517 | .762 | .613 | .033 (10/300) | 41/200 | 3/53 | 4/78 | .245 | .362 | 5/18 |
+
+- Known positives: `ens_v3` 5/18 in the top 1% (TIC 50745441, 34397579, 43488669, 248992945,
+  38090218). All 17 unvetoed ones sit higher than in `ens_v2` (e.g. PDS 110 0.884 -> 0.936);
+  β Pic is vetoed. Classical with cmv3 still gets 11/18 (12/18 with cmv2).
+- Costs against `ens_v2`: ~1% recall 0.590 -> 0.517, ~3% 0.794 -> 0.762, v1 null FPR
+  0.020 -> 0.033. Gain: EB-null FPR 0.697 -> 0.245, ~0.3% 0.321 -> 0.333, dusty 0.310 -> 0.362.
+- Step nulls stay the weakest instrument type (~0.20 FPR for every ensemble).
+
+**Seeds** (`--fixed`, components from `runs/ssl_v2_s{1,2}`), test:
+
+| metric | ens_v3 seeds 0 / 1 / 2 | ens_v2 seeds 0 / 1 / 2 |
+|---|---|---|
+| known in top 1% | 5 / 8 / 5 | 3 / 4 / 3 |
+| ~0.3% recall | .333 / .375 / .286 | .321 / .318 / .261 |
+| ~1% recall | .517 / .633 / .498 | .590 / .640 / .588 |
+| EB-null FPR | .245 / .256 / .215 | .697 / .736 / .714 |
+| v1 null FPR | .033 / .040 / .023 | .020 / .047 / .020 |
+| top-100 overlap (pairwise mean) | 0.75 | 0.71 |
+
+The known-positive gain and the EB gain hold for every seed; the ~1% cost is seed-dependent.
+
+**yso1 test** (36 hosts, 720 injections; `yso_report.py`, host-bootstrap 90% CI):
+
+| scorer | recall | matched nulls top 1% | recall ~10% depth |
+|---|---|---|---|
+| classical | .142 [.099, .188] | 1/36 | .330 |
+| ens_v1_eb | .210 [.154, .274] | 0/36 | .462 |
+| ens_v2 | .183 | 1/36 | .412 |
+| ens_v3 | .158 [.110, .213] | 0/36 | .390 |
+
+- `ens_v3` recall by injected SNR: <3: 0, 3-10: 0, 10-30: 0.073, 30-100: 0.443, >100: 0.836.
+- Seeds of `ens_v3` on yso1 test: .158 / .233 / .190 (`ens_v2` .183 / .212 / .182).
+- val yso1: classical .206 (3/25 nulls; conditional .139), ens_v1_eb .136, ens_v2 .102,
+  ens_v3 .148 (3/25 nulls; conditional .070). **The scorer ordering differs between val and test**,
+  so yso1 with 25-36 hosts is host-dominated noise at the level of these differences.
+- yso1 recall does not track the known positives: classical has the lowest yso1 test recall and
+  the most known positives. The set does not yet measure what makes the known positives score.
+- EB tests on young hosts: `eb_like > 0.5` for 1 of 1,220 yso1 injections and 0 of 61 hosts.
+  The EB down-weight does not hit young-host dippers.
+
+**Gate (known positives up without losing recall or null FPR elsewhere): FAIL.** Known positives
+improve (5/18 vs 3/18, every seed), and EB nulls drop by a factor of ~3, but ~1% recall falls by
+0.07 and v1 null FPR rises to 0.033, and the yso term did not cause the change. `ens_v3` is a
+better default than `ens_v2` on the EB and known-positive axes; it is not the young-dipper fix.
+
+**Caveats found.**
+- **`ssl_v2_recon` is noisy per row.** Scoring masks come from one RNG stream in row order
+  (`oddball/ml/scoring.py`, `rng = default_rng(seed)` per run), so the same light curve at a
+  different row gets a different `score_recon`. Null copies vs hosts: raw diff mean −0.105, SD
+  0.707 (n 61), against a real-star IQR of 0.219; final percentile median |Δ| 0.022, max 0.495
+  (TIC 24297713). It looks unbiased but limits stability. Fix: seed masks per TIC or average more
+  masks.
+- **R_yso as defined is dominated by hosts already in the top 1%**: all 20 replicas of such a host
+  count as recovered. Conditional recall (hosts whose null is below the cut) should be the
+  pre-registered term next time.
+- **Too few hosts.** 25 val hosts give a recall CI ±0.075. More need other sectors (young hosts in
+  S33/38/43/44/55).
+- **Too shallow.** ≤17% is shallower than real dippers (literature 10-50%).
+- A `yso2` (conditional term, deeper, more hosts) was **not** built here: it would be motivated by
+  these test results. Build it as the next pre-registered step, on new sectors' val splits.
+
+**Costs:** yso1 build ~1 min; classical seconds; ML scoring ~1 min per seed; EB features 20 s;
+cmv3 on yso1 16 min (per-replica cross labels); `ensemble_v3.py` ~2.5 min.
+
+**Commands.**
+```
+uv run --group ml python -I scripts/make_yso_set.py --sector 32 --name yso1 --exclude-sets v1 eb1 n2 --replicas 20
+uv run --group ml python -I scripts/score_classical.py --sector 32 --reuse-real --inj eb1 n2 v1 yso1
+uv run --group ml python -I scripts/ml_score_inj.py --run runs/ssl_v2_s0 --shards data/injections/yso1/s0032 \
+    --variant iforest=ssl_v2_iforest --variant recon=ssl_v2_recon
+#   seeds 1, 2 on n2 / eb1 / yso1: --run runs/ssl_v2_s{s} --ref-scorer ssl_v2_seed{s}_iforest
+uv run --group ml python -I scripts/eb_features.py --sector 32 --skip-real --inj yso1 n2 --workers 4
+uv run --group ml python -I scripts/eb_features.py --xsec 32
+uv run --group ml python -I scripts/veto_inj_set.py --sector 32 --inj yso1 --real-masks-only   # also --inj n2
+uv run --group ml python -I scripts/veto3_inj_set.py --sector 32 --inj eb1 yso1 --real-masks-only yso1
+uv run --group ml python -I scripts/veto3_inj_set.py --sector 32 --inj v1 n2 --real-masks-only n2 --check
+uv run --group ml python -I scripts/ensemble_v3.py --sector 32 --name ens_v3
+uv run --group ml python -I scripts/ensemble_v3.py --sector 32 --name ens_v3_seed1 --fixed ens_v3 \
+    --components classical ssl_v2_seed1_iforest ssl_v2_seed1_recon   # same for ens_v2, seed 2
+uv run --group ml python -I scripts/evaluate.py --compare classical ens_v1_eb ens_v2 ens_v3 --split test --veto cmv3 --inj v1   # and eb1, n2, yso1
+uv run --group ml python -I scripts/yso_report.py --scorers classical ens_v1_eb ens_v2 ens_v3 --split test --veto cmv3   # and --split val
+```
+Reports: `outputs/eval/compare/s0032/classical__ens_v1_eb__ens_v2__ens_v3__veto-cmv3[__inj-<set>]/report.md`,
+`outputs/eval/yso1/s0032/<scorers>__<split>__veto-cmv3/`. `evaluate.py --compare` now suffixes
+`__inj-<name>` for non-v1 sets (before, every set overwrote the v1 report).
