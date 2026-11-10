@@ -20,8 +20,10 @@ their stratum. They are never used for tuning; this is the blind check.
 Systematics veto (``veto``): flagged light curves, real and injected, drop to the bottom and
 everything is re-ranked (``pct_veto``, ``top1%_veto``). ``cmv2`` (default) is the per-event
 common-mode veto ``outputs/veto/cmv2/sNNNN/{real,inj_<name>}.parquet`` (``cmv2_flag``, joined by
-TIC / ``inj_id``, so it is identical for every scorer); ``sys_flag`` is the v0 per-star flag
-carried in the score files; ``none`` disables it.
+TIC / ``inj_id``, so it is identical for every scorer); ``cmv3`` is its extension with
+background, PDC/SAP, gap-edge, QUALITY, dump-edge, asteroid-track and same-column labels
+(``outputs/veto/cmv3``, ML_DESIGN §13); ``sys_flag`` is the v0 per-star flag carried in the score
+files; ``none`` disables it.
 
 Injected SNR (PLAN gate clarification 2): ``snr_inj = depth / rms_bin(host) * sqrt(duration /
 bin)``, the host's robust scatter of its binned, normalised PDCSAP flux from the sector metadata.
@@ -51,7 +53,8 @@ GATE_DEPTH = "~0.3%"
 GATE_RECALL = 0.5
 SNR_EDGES = (0.0, 3.0, 10.0, 30.0, 100.0, np.inf)
 SNR_LABELS = ("<3", "3-10", "10-30", "30-100", ">100")
-VETOES = ("cmv2", "sys_flag", "none")
+VETOES = ("cmv2", "cmv3", "sys_flag", "none")
+PER_EVENT_VETOES = ("cmv2", "cmv3")
 
 
 @dataclass
@@ -157,8 +160,8 @@ def load(scorer: str, sector: int, inj_name: str, veto: str = "cmv2") -> EvalDat
                           * np.sqrt(inj.duration_d / (inj.bin_minutes / 1440.0)))  # fmt: skip
     inj["snr_bin"] = pd.cut(inj.snr_inj, SNR_EDGES, labels=SNR_LABELS, right=False)
 
-    if veto == "cmv2":
-        vr, vi = load_veto("cmv2", sector, inj_name)
+    if veto in PER_EVENT_VETOES:
+        vr, vi = load_veto(veto, sector, inj_name)
         real = real.merge(vr, on="tic", how="left", validate="one_to_one")
         inj = inj.merge(vi, on="inj_id", how="left", validate="one_to_one")
         n_miss = int(inj.veto_flag.isna().sum()) + int(real.veto_flag.isna().sum())

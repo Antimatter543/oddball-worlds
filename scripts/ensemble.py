@@ -17,7 +17,8 @@ real stars, ``p_k``, and a surprise ``s_k = -log(1 - p_k)``. Combiners (chosen o
 
 The statistic is re-percentiled within stratum against the real stars. With ``--ka`` the
 known-class explain-away (``oddball.knownclass.explain.downweight``, alpha and tau swept on val)
-is applied to it and the result re-percentiled again. Then the ``cmv2`` veto: flagged light
+is applied to it and the result re-percentiled again. Then the ``--veto`` (``cmv2``; ``cmv3`` for
+``ens_v2``, ML_DESIGN §13): flagged light
 curves get ``score = -1`` (below every unflagged one); ``score_raw`` keeps the pre-veto value.
 
 Selection objective on val (same as ``tune_veto.py``): mean recall in the top 1% at ~0.3 / 1 / 3%
@@ -61,7 +62,11 @@ ALPHAS = (0.0, 0.25, 0.5, 0.75, 0.9)
 TAUS = (0.05, 0.1, 0.25, 0.5, 1.0)
 DEPTHS = ("~0.3%", "~1%", "~3%")
 PASSTHROUGH = ("sys_flag", "sys_frac", "cm_frac", "dump_frac", "n_anom")
-VETO_COLS = ("cmv2_flag", "cmv2_res_snr", "cmv2_sys_snr", "cmv2_res_snr_pdc", "cmv2_sys_snr_pdc")
+VETO_SUFFIXES = ("flag", "res_snr", "sys_snr", "res_snr_pdc", "sys_snr_pdc")
+
+
+def veto_cols(veto: str) -> tuple[str, ...]:
+    return tuple(f"{veto}_{s}" for s in VETO_SUFFIXES)
 
 
 def log(msg: str) -> None:
@@ -152,12 +157,13 @@ def main() -> None:
     real["stratum"] = stratum_id(real.tmag, real.camera, real.ccd)
     inj["stratum"] = stratum_id(inj.tmag, inj.camera, inj.ccd)
     vd = veto_dir(a.veto, sec)
-    vr = pd.read_parquet(vd / "real.parquet", columns=["tic", *VETO_COLS])
-    vi = pd.read_parquet(vd / f"inj_{a.inj}.parquet", columns=["inj_id", *VETO_COLS])
+    vcols = veto_cols(a.veto)
+    vr = pd.read_parquet(vd / "real.parquet", columns=["tic", *vcols])
+    vi = pd.read_parquet(vd / f"inj_{a.inj}.parquet", columns=["inj_id", *vcols])
     real = real.merge(vr, on="tic", how="left", validate="one_to_one")
     inj = inj.merge(vi, on="inj_id", how="left", validate="one_to_one")
-    fr = real.cmv2_flag.fillna(False).to_numpy(bool)
-    fi = inj.cmv2_flag.fillna(False).to_numpy(bool)
+    fr = real[f"{a.veto}_flag"].fillna(False).to_numpy(bool)
+    fi = inj[f"{a.veto}_flag"].fillna(False).to_numpy(bool)
     log(f"{len(real)} real, {len(inj)} injected; veto {a.veto} flags {fr.mean():.3f} real, "
         f"{fi.mean():.3f} injected")
 
@@ -238,7 +244,7 @@ def main() -> None:
                           "score": np.where(f, -1.0, e), "score_raw": e})  # fmt: skip
         for k, c in enumerate(comps):
             o[f"score_{c}"] = P[:, k]
-        for c in (*PASSTHROUGH, *VETO_COLS, "kc_explained"):
+        for c in (*PASSTHROUGH, *vcols, "kc_explained"):
             if c in df:
                 o[c] = df[c].to_numpy()
         o.to_parquet(od / f"{part}.parquet", index=False)

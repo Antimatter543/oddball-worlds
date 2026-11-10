@@ -1,0 +1,97 @@
+tic,label,subtype,source
+396863456,artefact,asteroid,triage-1
+71026277,artefact,asteroid,triage-1
+298849841,artefact,asteroid,triage-1
+47398410,artefact,asteroid,triage-1
+412059784,artefact,asteroid,triage-1
+436707310,artefact,asteroid,triage-1
+454149279,artefact,asteroid,triage-1
+37951066,artefact,asteroid,triage-1
+302675203,artefact,asteroid,triage-1
+302345512,artefact,asteroid (marginal; or glint),triage-2
+402215073,artefact,scattered_light (orbit start 2187.3),triage-1
+339670265,artefact,scattered_light (S32 quiet; S38 dip lead),triage-1
+452809358,artefact,scattered_light,triage-2
+138769608,artefact,scattered_light,triage-2
+11082377,artefact,scattered_light,triage-2
+356788879,artefact,scattered_light,triage-2
+389009670,artefact,scattered_light,triage-2
+67774844,artefact,scattered_light,triage-2
+350954912,artefact,scattered_light,triage-2
+55758201,artefact,scattered_light,triage-2
+179049070,artefact,scattered_light,triage-2
+450104323,artefact,scattered_light,triage-2
+138825380,artefact,scattered_light,triage-2
+34511341,artefact,scattered_light,triage-2
+177286600,artefact,scattered_light,triage-2
+70962216,artefact,scattered_light,triage-2
+200255974,artefact,scattered_light,triage-2
+178831849,artefact,scattered_light,triage-2
+149989158,artefact,scattered_light,triage-2
+7688915,eb,,triage-1
+178945992,eb,,triage-1
+139575985,eb,,triage-1
+675243,eb,,triage-1
+219252548,eb,,triage-1
+238202532,eb,,triage-1
+294785844,eb,,triage-1
+34340015,eb,,triage-1
+149503323,eb,,triage-1
+350298319,eb,,triage-1
+176874062,eb,,triage-1
+300328191,eb,,triage-1
+43485172,eb,,triage-1
+160149234,eb,,triage-1
+139396901,eb,,triage-1
+21725427,eb,,triage-1
+77838934,eb,,triage-1
+46311396,eb,,triage-1
+375150432,eb,,triage-1
+7491762,eb,,triage-1
+354570017,eb,,triage-1
+192828459,eb,,triage-1
+279695143,eb,,triage-1
+237941053,eb,,triage-1
+149987870,eb,,triage-1
+167713851,eb,,triage-1
+38467924,eb,,triage-1
+220437557,eb,,triage-1
+14221036,eb,,triage-1
+415401950,eb,,triage-1
+121713927,eb,,triage-1
+307033218,eb,,triage-1
+259541437,eb,,triage-1
+200323039,eb,,triage-1
+220410034,eb,,triage-1
+141708345,eb,,triage-1
+348842168,eb,,triage-1
+141428309,eb,,triage-1
+213045964,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+260502102,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+24697560,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+13325340,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+34469476,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+167168482,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+11102229,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+167486191,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+213072526,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+449361346,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+200434004,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+345583219,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+442918617,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+117761119,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+393227652,eb,catalogued EB (VSX/Prsa) or 'VSX VAR' card,triage-1 (by catalogue)
+259376845,variable,flare star,triage-1
+350744438,variable,flare star,triage-1
+246929723,variable,flare star,triage-1
+31281820,variable,flare star,triage-1
+158030515,variable,flare star,triage-1
+408114334,variable,flare star,triage-1
+272322827,variable,,triage-1
+242944633,variable,,triage-1
+299832931,variable,,triage-1
+455034251,variable,,triage-1
+238228495,variable,,triage-2
+255554670,variable,,triage-2
+200395490,variable,,triage-2
+33004127,variable,,triage-2

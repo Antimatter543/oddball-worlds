@@ -82,16 +82,23 @@ CAUSES = ("none", "cm_ccd", "cm_cell", "scattered", "dump", "set", "overlap")
 # Per-batch signal
 
 
-def channel_snr(f: np.ndarray) -> dict[tuple[int, int], np.ndarray]:
+def channel_snr(f: np.ndarray, resid: dict | None = None) -> dict[tuple[int, int], np.ndarray]:
     """{(sign, width index): (n, L) float32 box SNR} of one channel's detrended residual.
 
     Sign 0 = dips (positive SNR for a dimming), 1 = bumps. NaN where the box lacks data.
+    ``resid``: if a dict is given, it receives ``r`` (the detrended residual of the
+    median-normalised flux) and ``sigma`` (its white-noise scatter, NaN where undefined).
     """
     f = f.astype(np.float64)
     med = nanquantile_last(f, 0.5)[0]
     with np.errstate(invalid="ignore", divide="ignore"):
         x = f / med[:, None] - 1.0
     x[~np.isfinite(x)] = np.nan
+    return series_snr(x, resid)
+
+
+def series_snr(x: np.ndarray, resid: dict | None = None) -> dict[tuple[int, int], np.ndarray]:
+    """:func:`channel_snr` on an already normalised series ``x`` (NaN = no data)."""
     d = np.diff(x, axis=1)
     dmed = nanquantile_last(d, 0.5)[0]
     sigma = 1.4826 * nanquantile_last(np.abs(d - dmed[:, None]), 0.5)[0] / np.sqrt(2.0)
@@ -109,6 +116,9 @@ def channel_snr(f: np.ndarray) -> dict[tuple[int, int], np.ndarray]:
         s = s / np.maximum(np.nan_to_num(rs, nan=1.0), 1.0)[:, None]
         out[(0, wi)] = s.astype(np.float32)
         out[(1, wi)] = (-s).astype(np.float32)
+    if resid is not None:
+        resid["r"] = r
+        resid["sigma"] = np.where(bad, np.nan, sigma)
     return out
 
 
@@ -326,8 +336,22 @@ def events_batch(snr: dict, ci: np.ndarray, cell: np.ndarray, masks: SysMasks) -
     A long real dip that merely contains a weaker systematic blip is kept, and so is a short
     real dip whose wide-box view runs into a nearby systematic window.
     """
+    parts, members = events_stage1(snr, ci, cell, masks)
+    return events_stage2(parts, members, len(ci))
+
+
+EVENT_COLS = ["row", "ch", "sign", "w", "start", "end", "peak_col", "peak", "chi2", "share",
+              "sys", "cause"]  # fmt: skip
+
+
+def events_stage1(snr: dict, ci: np.ndarray, cell: np.ndarray, masks: SysMasks):
+    """Stage 1 of :func:`events_batch`: per series, the events and their own classification.
+
+    Returns ``(parts, members)``: one DataFrame per series with events (``EVENT_COLS``) and, per
+    series, the per-bin members ``(channel, rows, cols, snr^2, run starts, chi2, L)`` that stage 2
+    needs. Callers may add their own stage-1 labels to ``parts`` before :func:`events_stage2`.
+    """
     parts, members = [], []
-    n = len(ci)
     big = np.iinfo(np.int64).max
     for si, (c, s, w) in enumerate(SERIES):
         v = snr[(c, s, w)]
@@ -367,10 +391,14 @@ def events_batch(snr: dict, ci: np.ndarray, cell: np.ndarray, masks: SysMasks) -
             "share": share.astype(np.float32), "sys": sys_ev, "cause": cause.astype(np.int8),
         }))  # fmt: skip
         members.append((c, rr, colx, w2, starts, tot, L))
-    cols = ["row", "ch", "sign", "w", "start", "end", "peak_col", "peak", "chi2", "share",
-            "sys", "cause"]  # fmt: skip
+    return parts, members
+
+
+def events_stage2(parts: list, members: list, n: int) -> pd.DataFrame:
+    """Stage 2 of :func:`events_batch` (relabel by overlap with stage-1 systematic events);
+    modifies ``parts`` in place and returns all events concatenated."""
     if not parts:
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=EVENT_COLS)
     # stage 2: per-channel time spans of the stage-1 systematic events
     L = members[0][6]
     span = np.zeros((2, len(WIDTHS), n, L + 1), np.int32)

@@ -30,8 +30,9 @@ def main() -> None:
     g.add_argument("--scorer")
     g.add_argument("--compare", nargs="+")
     ap.add_argument("--split", default="test", help="split for compare mode headline")
-    ap.add_argument("--veto", default="cmv2", choices=["cmv2", "sys_flag", "none"],
-                    help="systematics veto for the *_veto columns (default: per-event cmv2)")
+    ap.add_argument("--veto", default="cmv2", choices=["cmv2", "cmv3", "sys_flag", "none"],
+                    help="systematics veto for the *_veto columns (default: per-event cmv2; "
+                         "cmv3 adds the background / track / column labels, ML_DESIGN §13)")
     a = ap.parse_args()
     cmd = "python scripts/evaluate.py " + " ".join(shlex.quote(x) for x in sys.argv[1:])
 
