@@ -16,6 +16,16 @@ random real star of its own split and stratum (ties count one half).
 
 Known positives (``known`` split) are ranked against all real non-known stars of the sector in
 their stratum. They are never used for tuning; this is the blind check.
+
+Systematics veto (``veto``): flagged light curves, real and injected, drop to the bottom and
+everything is re-ranked (``pct_veto``, ``top1%_veto``). ``cmv2`` (default) is the per-event
+common-mode veto ``outputs/veto/cmv2/sNNNN/{real,inj_<name>}.parquet`` (``cmv2_flag``, joined by
+TIC / ``inj_id``, so it is identical for every scorer); ``sys_flag`` is the v0 per-star flag
+carried in the score files; ``none`` disables it.
+
+Injected SNR (PLAN gate clarification 2): ``snr_inj = depth / rms_bin(host) * sqrt(duration /
+bin)``, the host's robust scatter of its binned, normalised PDCSAP flux from the sector metadata.
+Diagnostic only: the gate is unchanged.
 """
 
 from __future__ import annotations
@@ -39,6 +49,9 @@ DUR_LABELS = ("2-6 h", "6 h-1 d", "1-2.5 d", "2.5-5 d")
 TOPS = {"top1%": 0.99, "top0.1%": 0.999}
 GATE_DEPTH = "~0.3%"
 GATE_RECALL = 0.5
+SNR_EDGES = (0.0, 3.0, 10.0, 30.0, 100.0, np.inf)
+SNR_LABELS = ("<3", "3-10", "10-30", "30-100", ">100")
+VETOES = ("cmv2", "sys_flag", "none")
 
 
 @dataclass
@@ -48,6 +61,7 @@ class EvalData:
     inj_name: str
     real: pd.DataFrame  # tic, score, split, stratum, tmag, ...
     inj: pd.DataFrame  # injection truth + score + pct
+    veto: str = "cmv2"
 
 
 def score_dir(scorer: str, sector: int) -> Path:
@@ -92,11 +106,27 @@ def _clean(s: pd.Series) -> pd.Series:
     return s.astype(np.float64).fillna(-np.inf)
 
 
-def load(scorer: str, sector: int, inj_name: str) -> EvalData:
+def veto_dir(name: str, sector: int) -> Path:
+    return outputs_root() / "veto" / name / f"s{sector:04d}"
+
+
+def load_veto(name: str, sector: int, inj_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(real: tic -> veto_flag, inj: inj_id -> veto_flag) for a veto table such as ``cmv2``."""
+    d = veto_dir(name, sector)
+    col = f"{name}_flag"
+    r = pd.read_parquet(d / "real.parquet", columns=["tic", col])
+    i = pd.read_parquet(d / f"inj_{inj_name}.parquet", columns=["inj_id", col])
+    return (r.rename(columns={col: "veto_flag"}), i.rename(columns={col: "veto_flag"}))
+
+
+def load(scorer: str, sector: int, inj_name: str, veto: str = "cmv2") -> EvalData:
+    if veto not in VETOES:
+        raise ValueError(f"veto must be one of {VETOES}")
     sd = score_dir(scorer, sector)
     real = pd.read_parquet(sd / "real.parquet")
     inj_scores = pd.read_parquet(sd / f"inj_{inj_name}.parquet")
-    meta = dir_metadata(sector_dir(sector))[["tic", "tmag", "camera", "ccd"]]
+    meta_full = dir_metadata(sector_dir(sector))
+    meta = meta_full[["tic", "tmag", "camera", "ccd"]]
 
     real = real.drop(columns=[c for c in ("tmag", "camera", "ccd", "stratum") if c in real])
     real = real.merge(meta, on="tic", how="left", validate="one_to_one")
@@ -120,14 +150,36 @@ def load(scorer: str, sector: int, inj_name: str) -> EvalData:
     inj["tmag_bin"] = np.asarray(TMAG_LABELS, dtype=object)[tmag_bin(inj.tmag)]
     for name, cut in TOPS.items():
         inj[name] = inj.pct >= cut
-    if "sys_flag" in inj and "sys_flag" in real:
+    host = meta_full[["tic", "rms_bin", "bin_minutes"]].rename(columns={"tic": "host_tic"})
+    inj = inj.merge(host, on="host_tic", how="left", validate="many_to_one")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        inj["snr_inj"] = (inj.depth / inj.rms_bin
+                          * np.sqrt(inj.duration_d / (inj.bin_minutes / 1440.0)))  # fmt: skip
+    inj["snr_bin"] = pd.cut(inj.snr_inj, SNR_EDGES, labels=SNR_LABELS, right=False)
+
+    if veto == "cmv2":
+        vr, vi = load_veto("cmv2", sector, inj_name)
+        real = real.merge(vr, on="tic", how="left", validate="one_to_one")
+        inj = inj.merge(vi, on="inj_id", how="left", validate="one_to_one")
+        n_miss = int(inj.veto_flag.isna().sum()) + int(real.veto_flag.isna().sum())
+        if n_miss:
+            print(f"warning: {n_miss} light curves have no {veto} entry (not vetoed)")
+        real["veto_flag"] = real.veto_flag.fillna(False).astype(bool)
+        inj["veto_flag"] = inj.veto_flag.fillna(False).astype(bool)
+    elif veto == "sys_flag" and "sys_flag" in inj and "sys_flag" in real:
+        real["veto_flag"] = real.sys_flag.astype(bool)
+        inj["veto_flag"] = inj.sys_flag.astype(bool)
+    if "veto_flag" in inj:
         # Symmetric veto: flagged light curves (real and injected) drop to the bottom, then
         # everything is re-ranked, so the top-1% cut is recomputed without flagged real stars.
-        rv = ref.assign(score=np.where(ref.sys_flag.astype(bool), -np.inf, ref.score))
-        iv = inj.assign(score=np.where(inj.sys_flag.astype(bool), -np.inf, inj.score))
+        ref = real[real.split.isin(["val", "test"])]
+        rv = ref.assign(score=np.where(ref.veto_flag, -np.inf, ref.score))
+        iv = inj.assign(score=np.where(inj.veto_flag, -np.inf, inj.score))
         inj["pct_veto"] = rank_within(rv, iv, ["split", "stratum"])
-        inj["top1%_veto"] = (inj.pct_veto >= TOPS["top1%"]) & ~inj.sys_flag.astype(bool)
-    return EvalData(scorer, sector, inj_name, real, inj)
+        inj["top1%_veto"] = (inj.pct_veto >= TOPS["top1%"]) & ~inj.veto_flag
+    else:
+        veto = "none"
+    return EvalData(scorer, sector, inj_name, real, inj, veto)
 
 
 def recall_table(inj: pd.DataFrame, by: list[str]) -> pd.DataFrame:
@@ -180,4 +232,30 @@ def null_table(inj: pd.DataFrame) -> pd.DataFrame:
                 **{k: (k, "mean") for k in TOPS}, median_pct=("pct", "median"))  # fmt: skip
     if "sys_flag" in nul:
         out["sys_flag_rate"] = g.sys_flag.mean()
+    if "veto_flag" in nul:
+        out["veto_flag_rate"] = g.veto_flag.mean()
     return out.reset_index()
+
+
+def known_veto(ed: EvalData) -> pd.DataFrame:
+    """Known positives: veto flag and percentile after the veto (blind check, never tuned on)."""
+    if "veto_flag" not in ed.real:
+        return pd.DataFrame()
+    real = ed.real.assign(score=np.where(ed.real.veto_flag, -np.inf, ed.real.score))
+    known = real[real.split == "known"].copy()
+    ref = real[real.split != "known"]
+    known["pct_veto"] = rank_within(ref, known, ["stratum"])
+    kp = pd.read_csv(Path(__file__).resolve().parents[3] / "docs" / "known_positives.csv")
+    known = known.merge(kp[["tic", "name"]], on="tic", how="left")
+    known["top1%_veto"] = (known.pct_veto >= 0.99) & ~known.veto_flag
+    return known[["name", "tic", "veto_flag", "pct_veto", "top1%_veto"]]
+
+
+def snr_table(inj: pd.DataFrame, split: str = "test", depth_bin: str | None = None,
+              col: str = "top1%") -> pd.DataFrame:
+    """Recall vs injected SNR (non-null injections of one split, optionally one depth bin)."""
+    a = inj[(~inj.is_null) & (inj.split == split)]
+    if depth_bin is not None:
+        a = a[a.depth_bin == depth_bin]
+    g = a.groupby("snr_bin", observed=False)
+    return pd.DataFrame({"n": g.size(), "recall": g[col].mean()}).reindex(list(SNR_LABELS))

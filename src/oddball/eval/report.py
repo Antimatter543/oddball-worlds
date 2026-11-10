@@ -17,11 +17,14 @@ from oddball.eval.harness import (
     DEPTH_LABELS,
     DUR_LABELS,
     GATE_DEPTH,
+    SNR_LABELS,
     EvalData,
     gate,
     known_table,
+    known_veto,
     null_table,
     recall_table,
+    snr_table,
 )
 from oddball.inject.sampling import KINDS
 
@@ -69,6 +72,19 @@ def scorecard(ed: EvalData, split: str = "test") -> pd.DataFrame:
     astro = ed.inj[(~ed.inj.is_null) & (ed.inj.split == split)]
     p, _ = pivot(astro, "depth_bin", DEPTH_LABELS, "top1%")
     return p[list(SCORECARD_DEPTHS)]
+
+
+def snr_md(ed: EvalData, split: str) -> str:
+    cols = {}
+    for lab, db in (("all depths", None), (GATE_DEPTH, GATE_DEPTH)):
+        t = snr_table(ed.inj, split, db)
+        cols[f"n ({lab})"] = t.n
+        cols[f"recall ({lab})"] = t.recall
+        if "top1%_veto" in ed.inj:
+            cols[f"recall veto ({lab})"] = snr_table(ed.inj, split, db, "top1%_veto").recall
+    df = pd.DataFrame(cols).reindex(list(SNR_LABELS))
+    df.insert(0, "snr_inj", df.index)
+    return md_table(df.reset_index(drop=True))
 
 
 def null_fpr(ed: EvalData, split: str) -> dict:
@@ -249,11 +265,20 @@ def write_report(ed: EvalData, out: Path, command: str = "") -> dict:
     if len(nt):
         L += ["Per event:", "", md_table(nt, "{:.3g}"), ""]
 
+    L += ["## Recall in top 1% vs injected SNR (diagnostic)", "",
+          ("`snr_inj = depth / rms_bin(host) * sqrt(duration / 30 min)`. Non-null injections; "
+           "the gate is unchanged."), ""]
+    L += [snr_md(ed, "test"), ""]
+
     if "top1%_veto" in ed.inj:
-        L += ["## Systematics flag (common-mode v0): with and without the veto", "",
-              ("`veto` = light curves with `sys_flag` (real and injected) are sent to the bottom and "
-               "everything is re-ranked; a flagged injection counts as not recovered. Shows what "
-               "the flag buys on nulls and what it costs on astrophysical injections."), ""]
+        L += [f"## Systematics veto `{ed.veto}`: with and without the veto", "",
+              (f"`veto` = light curves flagged by `{ed.veto}` (real and injected) are sent to the "
+               "bottom and everything is re-ranked; a flagged injection counts as not recovered. "
+               "Shows what the flag buys on nulls and what it costs on astrophysical "
+               "injections."), ""]
+        fr = ed.real.groupby("split").veto_flag.mean()
+        L += ["Flagged fraction of real stars: " + ", ".join(f"{k} {v:.3f}" for k, v in
+                                                            fr.items()), ""]  # fmt: skip
         rows = []
         for split in ("test", "val"):
             s = ed.inj[ed.inj.split == split]
@@ -265,12 +290,15 @@ def write_report(ed: EvalData, out: Path, command: str = "") -> dict:
                 if gg.empty:
                     continue
                 rows.append({"split": split, "set": lab, "n": len(gg),
-                             "flag_rate": gg.sys_flag.mean(),
+                             "flag_rate": gg.veto_flag.mean(),
                              "top1%_without": gg["top1%"].mean(),
                              "top1%_with_veto": gg["top1%_veto"].mean()})
         L += [md_table(pd.DataFrame(rows), "{:.3f}"), ""]
 
     L += ["## Known positives in S32 (blind)", "", md_table(known, "{:.4g}"), ""]
+    kv = known_veto(ed)
+    if len(kv):
+        L += [f"Known positives under the `{ed.veto}` veto:", "", md_table(kv, "{:.4g}"), ""]
     L += ["## Plots", ""] + [f"![{f}]({f})" for f in figs] + [""]
     (out / "report.md").write_text("\n".join(L))
     summary = {
@@ -316,7 +344,42 @@ def write_compare(eds: list[EvalData], out: Path, command: str = "", split: str 
             rows[-1].update({"null FPR (veto)": nul["top1%_veto"].mean(),
                              "recall@1% all (veto)": astro["top1%_veto"].mean(),
                              "recall@1% ~0.3% (veto)": at["top1%_veto"].mean()})
+            for d in SCORECARD_DEPTHS[1:]:
+                rows[-1][f"recall@1% {d} (veto)"] = astro[astro.depth_bin == d][
+                    "top1%_veto"].mean()
+            kv = known_veto(e)
+            rows[-1]["known top1% (veto)"] = f"{int(kv['top1%_veto'].sum())}/{len(kv)}"
+    vetoes = sorted({e.veto for e in eds})
+    L += [(f"Veto: `{', '.join(vetoes)}` (flagged real + injected light curves sent to the "
+           "bottom, then re-ranked).")]
+    for e in eds[:1]:
+        if "veto_flag" in e.real:
+            fr = e.real.groupby("split").veto_flag.mean()
+            L += ["Flagged fraction of real stars: " + ", ".join(
+                f"{k} {v:.3f}" for k, v in fr.items())]  # fmt: skip
+    L += [""]
     L += ["## Headline", "", md_table(pd.DataFrame(rows), "{:.3f}"), ""]
+    tab = {}
+    for e in eds:
+        tab[e.scorer] = snr_table(e.inj, split).recall
+        if "top1%_veto" in e.inj:
+            tab[f"{e.scorer} (veto)"] = snr_table(e.inj, split, None, "top1%_veto").recall
+    tab = pd.DataFrame(tab).reindex(list(SNR_LABELS))
+    tab.insert(0, "n", snr_table(eds[0].inj, split).n)
+    tab.insert(0, "snr_inj", tab.index)
+    L += ["## Recall in top 1% vs injected SNR (all depths)", "",
+          "`snr_inj = depth / rms_bin(host) * sqrt(duration / 30 min)`.", "",
+          md_table(tab.reset_index(drop=True)), ""]
+    tab = {}
+    for e in eds:
+        tab[e.scorer] = snr_table(e.inj, split, GATE_DEPTH).recall
+        if "top1%_veto" in e.inj:
+            tab[f"{e.scorer} (veto)"] = snr_table(e.inj, split, GATE_DEPTH, "top1%_veto").recall
+    tab = pd.DataFrame(tab).reindex(list(SNR_LABELS))
+    tab.insert(0, "n", snr_table(eds[0].inj, split, GATE_DEPTH).n)
+    tab.insert(0, "snr_inj", tab.index)
+    L += [f"## Recall in top 1% vs injected SNR at {GATE_DEPTH} depth", "",
+          md_table(tab.reset_index(drop=True)), ""]
 
     for d in SCORECARD_DEPTHS:
         tab = pd.DataFrame({e.scorer: scorecard(e, split)[d] for e in eds})
@@ -331,6 +394,12 @@ def write_compare(eds: list[EvalData], out: Path, command: str = "", split: str 
         k = known_table(e.real, e.sector)[["name", "pct_stratum"]].rename(
             columns={"pct_stratum": e.scorer})
         kt = k if kt is None else kt.merge(k, on="name")
+    for e in eds:
+        kv = known_veto(e)
+        if len(kv):
+            kt = kt.merge(kv[["name", "veto_flag"]].rename(
+                columns={"veto_flag": f"{e.veto} flag"}), on="name", how="left")
+            break
     L += ["## Known positives (percentile within stratum)", "", md_table(kt, "{:.3f}"), ""]
 
     fig, axs = plt.subplots(2, 4, figsize=(18, 8), sharey=True)
