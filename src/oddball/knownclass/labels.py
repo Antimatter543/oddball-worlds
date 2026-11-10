@@ -5,9 +5,12 @@ The anomaly targets (dippers and other young-star dimmers, Boyajian-like stars, 
 disintegrating planets) must stay out-of-distribution: a star that any source puts in one of
 those classes is **excluded**, i.e. it is neither a training label nor a "quiet" star.
 
-Per TIC, label priority is Prsa+2022 TESS EB > VSX (nearest entry within ``VSX_LABEL_RADIUS``)
-> Gaia DR3 SOS tables (``vari_summary.in_vari_*``) > Gaia DR3 classifier best class (score >=
-``GAIA_MIN_SCORE``). Exclusions use wider nets: any VSX entry within ``VSX_RADIUS`` (one TESS
+Per TIC, label priority is Prsa+2022 TESS EB = Kostov+2025 vetted TESS FFI EBs (tables 3, 4) >
+VSX (nearest entry within ``VSX_LABEL_RADIUS``) > Gaia DR3 SOS tables (``vari_summary.in_vari_*``)
+= Gaia DR3 eclipsing-binary candidates (``I/358/veb``, within ``GAIA_LABEL_RADIUS``) > Gaia DR3
+classifier best class (score >= ``GAIA_MIN_SCORE``). Kostov's unvetted neural-network flag
+(table 2) is only a soft per-TIC column ``kostov_nn``: an eclipse-trained network also fires on
+dippers, so it is never a label, a veto or an exclusion. Exclusions use wider nets: any VSX entry within ``VSX_RADIUS`` (one TESS
 pixel) or any Gaia source within ``GAIA_RADIUS`` with an excluded type excludes the TIC, since
 its variability would be blended into our light curve.
 
@@ -162,10 +165,12 @@ def _num(v) -> float:
 
 def build_labels(tics: np.ndarray, tmag: np.ndarray, vsx: pd.DataFrame | None,
                  prsa: pd.DataFrame | None, gaia: pd.DataFrame | None,
-                 always_exclude: dict[int, str]) -> pd.DataFrame:  # fmt: skip
+                 always_exclude: dict[int, str], kostov: dict[str, pd.DataFrame] | None = None,
+                 gaia_veb: pd.DataFrame | None = None) -> pd.DataFrame:  # fmt: skip
     """One row per TIC: catalogue label (or empty), source, exclusion flag and reason.
 
-    ``always_exclude``: TIC -> reason (known positives, injection hosts).
+    ``always_exclude``: TIC -> reason (known positives, injection hosts). ``kostov``: the
+    ``catalogs.load_kostov`` tables; ``gaia_veb``: the ``fetch_gaia_veb`` cone results.
     """
     df = pd.DataFrame({"tic": np.asarray(tics, np.int64), "tmag": np.asarray(tmag, float)})
     df["label"] = ""
@@ -175,6 +180,7 @@ def build_labels(tics: np.ndarray, tmag: np.ndarray, vsx: pd.DataFrame | None,
     df["exclude_reason"] = ""
     df["flagged_any"] = False  # any catalogue says "variable" (so the star can't be quiet)
     df["n_sources_disagree"] = 0
+    df["kostov_nn"] = False  # soft flag only (Kostov+2025 table 2, unvetted)
     idx = pd.Series(np.arange(len(df)), index=df.tic)
     cand = {}  # tic -> list of (priority, cls, source, detail)
 
@@ -195,6 +201,26 @@ def build_labels(tics: np.ndarray, tmag: np.ndarray, vsx: pd.DataFrame | None,
         for r in prsa.itertuples():
             add(r.TIC, 0, "EB", "prsa2022", f"P={_num(r.Per):.4g} morph={_num(r.Morph):.2f}")
         df.loc[df.tic.isin(prsa.TIC.astype(np.int64)), "flagged_any"] = True
+
+    if kostov:
+        for tab, col in (("table3", "Per"), ("table4", "Per_TESS")):
+            k = kostov.get(tab)
+            if k is None or not len(k):
+                continue
+            for r in k.itertuples():
+                add(r.TIC, 0, "EB", f"kostov2025_{tab}", f"P={_num(getattr(r, col)):.4g}")
+            df.loc[df.tic.isin(k.TIC.astype(np.int64)), "flagged_any"] = True
+        if kostov.get("table2") is not None:
+            df["kostov_nn"] = df.tic.isin(kostov["table2"].TIC.astype(np.int64))
+
+    if gaia_veb is not None and len(gaia_veb):
+        vb = gaia_veb[gaia_veb.sep_arcsec <= GAIA_LABEL_RADIUS].sort_values("sep_arcsec")
+        vb = vb.drop_duplicates("tic", keep="first")
+        for r in vb.itertuples():
+            f = _num(r.Freq)
+            add(r.tic, 2, "EB", "gaia_veb",
+                f"DR3 {r.Source} P={1 / f if f > 0 else np.nan:.4g} {r.ModelType}")
+        df.loc[df.tic.isin(vb.tic), "flagged_any"] = True
 
     if vsx is not None and len(vsx) and "Type" in vsx:
         v = vsx.copy()

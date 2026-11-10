@@ -80,13 +80,19 @@ def _pad_list(col: pa.Array, bin0: np.ndarray, grid: Grid, dtype, fill) -> np.nd
 
 
 def iter_batches(
-    d: Path, grid: Grid, batch_rows: int = 2000, columns: tuple[str, ...] = LIST_COLUMNS
+    d: Path,
+    grid: Grid,
+    batch_rows: int = 2000,
+    columns: tuple[str, ...] = LIST_COLUMNS,
+    files: list[Path] | None = None,
 ) -> Iterator[dict]:
     """Yield ``{tic, inj_id (or None), host_tic, bin0, <col>: (n, L) array}`` per batch.
 
     Float columns are float32 with NaN padding; ``qflags`` int32 / ``npts`` uint16 with 0.
+    ``files`` restricts the pass to some of the directory's ``lc_*.parquet`` files (parallel
+    workers).
     """
-    for f in lc_files(d):
+    for f in files if files is not None else lc_files(d):
         pf = pq.ParquetFile(f)
         names = set(pf.schema_arrow.names)
         want = ["tic", "bin0", *columns] + [c for c in ("inj_id", "host_tic") if c in names]
