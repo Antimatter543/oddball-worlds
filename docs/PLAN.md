@@ -174,3 +174,14 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
   - `yso2`, pre-registered: conditional recall (hosts not already in the top 1%), deeper events (10-50%, like real dippers), more hosts from S33/38/43/44/55 val splits.
   - Seed `ssl_v2_recon` masks per TIC.
   - Step nulls (~0.20 FPR) remain the weakest instrument type.
+
+### Resume point (2026-11-10 17:00, PC shut down mid-run)
+- main = 8b77e8d: cmv3 veto (§13), EB tests (§14), yso1 + ens_v3 (§15) all merged and pushed. Gate still FAIL; ens_v3 is 5/18 known on S32 test, classical 11/18.
+- Unfinished: the 6-sector run + candidate gallery. Its work-in-progress is committed on local branch `worktree-agent-a21637f5beec2885c` (5807f87, worktree `.claude/worktrees/agent-a21637f5beec2885c`, 316 tests pass). That branch holds the recon per-TIC mask-seed fix, `scripts/build_candidates.py`, `src/oddball/score/candidates.py`, `scripts/apply_veto_rule.py` and cross-sector gallery changes. None of it is verified end to end yet.
+- Outputs so far: S32 has everything. S33 `classical` and `cmv2` were killed mid-run, so treat them as partial and rerun. S38/43/44/55 haven't started.
+- Next steps, in order:
+  1. Finish the recon fix and rerun S32 ens_v3 with `--fixed`.
+  2. Score all six sectors (classical, ssl_v2 iforest+recon, EB, cmv3, ens_v3 `--fixed`), one sector at a time.
+  3. Build the candidates: classical top 300 ∪ ens_v3 top 300 per sector, plus SkyBoT on S43/S44.
+  4. Build a ~150-card gallery.
+  Later: pre-register yso2 (only count hosts not already in the top 1%, use deeper dips, take hosts from the other sectors' val).
