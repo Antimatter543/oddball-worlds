@@ -7,7 +7,7 @@
 (``<run>/score/real_sub_*.parquet``, ``emb_real_*.npy``) is missing, which rewrites every real
 score file. This entry point reuses what the published score files and the run already hold:
 
-* the fitted reference state ``<run>/score/ref_state.pkl`` (embedding statistics, IsolationForest)
+* the fitted reference state ``<run>/score/ref_state_sNNNN.pkl`` (S32 before 2026-11-10: ``ref_state.pkl``) (embedding statistics, IsolationForest)
   and the cached common-gap mask ``<run>/score/obs_mask_sNNNN.npy``;
 * the real reference sub-scores from ``outputs/scores/<ref-scorer>/sNNNN/real.parquet`` (every
   ``score_*`` column), with Tmag / camera / CCD from the sector metadata, for calibration.

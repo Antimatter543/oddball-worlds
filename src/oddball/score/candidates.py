@@ -93,3 +93,17 @@ def ccd_excess(cand: pd.DataFrame, stars: pd.DataFrame) -> pd.DataFrame:
     t["ratio"] = np.where(t.expected > 0, t.n_cand / t.expected.clip(lower=1e-9), np.nan)
     t["p_excess"] = poisson.sf(t.n_cand - 1, t.expected)
     return t
+
+
+def time_clusters(cand: pd.DataFrame, bin_days: float = 0.5, min_n: int = 3) -> pd.DataFrame:
+    """Candidates whose strongest residual event (``cmv3_res_t``) falls in the same
+    ``bin_days`` bin on the same camera/CCD. Stratified percentiles spread the list evenly over
+    CCDs by construction, so a CCD-wide artefact shows up as a cluster in time, not as a CCD
+    excess. Returns clusters with at least ``min_n`` stars, largest first."""
+    c = cand[np.isfinite(cand.cmv3_res_t)].copy()
+    c["tbin"] = np.floor(c.cmv3_res_t / bin_days).astype(int)
+    g = c.groupby(["camera", "ccd", "tbin"]).agg(n=("tic", "size"),
+                                                 t_mid=("cmv3_res_t", "median"),
+                                                 events=("cmv3_res_ev", lambda s: ", ".join(
+                                                     sorted(set(map(str, s)))[:3])))  # fmt: skip
+    return g[g.n >= min_n].sort_values("n", ascending=False).reset_index()

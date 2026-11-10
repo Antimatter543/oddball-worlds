@@ -149,7 +149,7 @@ def main() -> None:
     log(f"{ENS} rule from S32: {prov_e['rule']} {prov_e['weights']} alpha {alpha}; the same "
         f"alpha is used for the classical EB down-weight")
 
-    longs, stats, ccds, observed, per_sector_prov, allrank = [], [], [], {}, {}, []
+    longs, stats, ccds, observed, per_sector_prov, allrank, tcs = [], [], [], {}, {}, [], []
     for sec in a.sectors:
         t, st = load_sector(sec, alpha)
         observed[sec] = set(t.tic.astype(int))
@@ -166,6 +166,23 @@ def main() -> None:
         cc = K.ccd_excess(c, t)
         cc.insert(0, "sector", sec)
         ccds.append(cc)
+        tc = K.time_clusters(c)
+        tc.insert(0, "sector", sec)
+        tcs.append(tc)
+        st["max_time_cluster"] = int(tc.n.max()) if len(tc) else 0
+        # chance level: the same count with camera/CCD labels shuffled among the candidates
+        rng = np.random.default_rng(sec)
+        sh = []
+        for _ in range(50):
+            cs = c.copy()
+            perm = rng.permutation(len(cs))
+            cs["camera"], cs["ccd"] = cs.camera.to_numpy()[perm], cs.ccd.to_numpy()[perm]
+            t2 = K.time_clusters(cs)
+            sh.append(int(t2.n.max()) if len(t2) else 0)
+        st["max_time_cluster_shuffled_p95"] = float(np.percentile(sh, 95))
+        st["n_in_time_clusters"] = int(tc.n.sum()) if len(tc) else 0
+        st["camera_counts"] = " ".join(f"{k}:{v}" for k, v in
+                                       c.camera.value_counts().sort_index().items())  # fmt: skip
         longs.append(c)
         ep = outputs_root() / "scores" / ENS / f"s{sec:04d}" / "provenance.json"
         per_sector_prov[sec] = json.loads(ep.read_text()).get("built_utc") if ep.exists() else None
@@ -236,6 +253,8 @@ def main() -> None:
     st.to_csv(od / "sector_stats.csv", index=False)
     cc = pd.concat(ccds, ignore_index=True)
     cc.to_csv(od / "ccd.csv", index=False)
+    tca = pd.concat(tcs, ignore_index=True)
+    tca.to_csv(od / "time_clusters.csv", index=False)
 
     # SkyBoT targets: ecliptic-sector candidates, best rank first, within the query budget
     per = a.skybot_budget // len(ECLIPTIC)
@@ -275,6 +294,11 @@ def main() -> None:
              "## Camera/CCD distribution (worst three cells per sector by ratio)", "",
              md_table(cc.sort_values(["sector", "ratio"], ascending=[True, False])
                       .groupby("sector").head(3).round(3)), "",
+             ("## Time-coincident candidates (same camera/CCD, residual event in the same "
+             "0.5-d bin, >= 3 stars; largest 15)"), "",
+             ("Stratum percentiles spread the list evenly over CCDs by construction, so a "
+             "CCD-wide artefact would show here rather than as a CCD excess."), "",
+             md_table(tca.head(15)) if len(tca) else "none", "",
              "## Multi-sector candidates (first 40 by priority)", "",
              md_table(wide[wide.multi].head(40)[["tic", "sectors_cand", "sectors_obs",
                                                  "best_rank", "source", "cat_class", "tmag",

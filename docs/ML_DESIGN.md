@@ -393,7 +393,7 @@ evaluated). This is the VETTING §2 list.
   CCD-wide event, which the real sky would not.
 - **Cross-star tests.** These run on the set's events together with the real sector's
   (minus the hosts' own real copies).
-- The ML scorers score `n2` through `ml_score_inj.py` from `runs/ssl_v2_s0/ref_state.pkl`
+- The ML scorers score `n2` through `ml_score_inj.py` from `runs/ssl_v2_s0/ref_state.pkl` (now `ref_state_s0032.pkl`, §16)
   (reproduces `inj_v1` exactly).
 
 **Tuning** (`tune_veto3.py`, val only).
@@ -798,7 +798,7 @@ improve (5/18 vs 3/18, every seed), and EB nulls drop by a factor of ~3, but ~1%
 better default than `ens_v2` on the EB and known-positive axes; it is not the young-dipper fix.
 
 **Caveats found.**
-- **`ssl_v2_recon` is noisy per row.** Scoring masks come from one RNG stream in row order
+- **`ssl_v2_recon` is noisy per row (fixed in §16).** Scoring masks came from one RNG stream in row order
   (`oddball/ml/scoring.py`, `rng = default_rng(seed)` per run), so the same light curve at a
   different row gets a different `score_recon`. Null copies vs hosts: raw diff mean −0.105, SD
   0.707 (n 61), against a real-star IQR of 0.219; final percentile median |Δ| 0.022, max 0.495
@@ -837,3 +837,59 @@ uv run --group ml python -I scripts/yso_report.py --scorers classical ens_v1_eb 
 Reports: `outputs/eval/compare/s0032/classical__ens_v1_eb__ens_v2__ens_v3__veto-cmv3[__inj-<set>]/report.md`,
 `outputs/eval/yso1/s0032/<scorers>__<split>__veto-cmv3/`. `evaluate.py --compare` now suffixes
 `__inj-<name>` for non-v1 sets (before, every set overwrote the v1 report).
+
+## 16. Implementation record: `ssl_v2_recon` masks seeded per TIC (S32, 2026-11-10)
+
+Code: `oddball.ml.scoring.encode_and_surprise(..., mask_seeding="tic")` and `mask_rng`,
+`scripts/ml_score.py` / `ml_score_inj.py --mask-seeding`, `tests/test_ml_scoring_order.py`.
+
+**Bug (§15 caveat).** The reconstruction surprise hides each light curve's patches in 5 block
+masks (every patch hidden in 2). The masks came from one `default_rng(seed)` consumed in row
+order, so a light curve's score depended on its row and on the rows scored before it. The yso1
+matched nulls (unchanged host copies) exposed it: percentile median |Δ| 0.022, max 0.495.
+
+**Fix.** Each light curve draws its masks from `default_rng([seed, host_tic])` (`SeedSequence`
+hashes the pair, so consecutive TICs get unrelated streams). For real stars `host_tic = tic`; an
+injected light curve gets exactly its host's masks, so host and injection differ only by the
+injected signal (a paired design). `encode_and_surprise` now also returns rows in the order
+given: before, it relied on `iter_batches` returning sorted rows, which only held for
+`rows = arange(n)`. The old behaviour stays available as `mask_seeding="stream"` for
+reproduction. Encodings and surprise files made with the new masks carry a `_pt` suffix, so a
+cached old encoding is never reused. The IsolationForest state is now per sector
+(`ref_state_sNNNN.pkl`), so scoring another sector no longer overwrites S32's.
+
+**Checks.**
+- Unit test: scores are equal (1e-5) under a row permutation with a different batch
+  composition; a duplicated light curve with the same host scores like the original; the old
+  stream mode does not (documents the bug).
+- yso1 matched nulls (61 hosts): raw recon |Δ| max 4.8e-7 (stream: 2.6), percentile |Δ| max
+  3.5e-4 (stream: 0.495). iforest and kNN are bit-identical to the stored files (the pooled
+  embedding uses no masks).
+- **Mask sensitivity remains.** New vs old masks move real S32 recon percentiles by median 0.022
+  (p90 0.11; 12% of stars by more than 0.1, 2% by more than 0.3); the recon top-1% overlap is 0.79.
+  The fix makes the score deterministic, not mask-independent. Averaging more masks would reduce
+  this; not done.
+
+**Rebuilt on S32** (`ml_score.py --rescore-real` with v1, eb1, n2, yso1; 6 min, peak RSS 2.8 GB;
+then `ensemble_v3.py --name ens_v3 --fixed ens_v3_rowrng`, where `ens_v3_rowrng` is the copy of
+the old files). `ens_v2` and `ens_v1_eb` were not rebuilt (they keep the old recon), so
+`ensemble_v3.py` skips their reproduction check under `--fixed` / `--no-ref-check`.
+
+Test, cmv3 veto, top 1% (`evaluate.py --compare classical ens_v3_rowrng ens_v3 --split test
+--veto cmv3 --inj <set>`):
+
+| ens_v3 | ~0.3% | ~1% | ~3% | all | v1 null FPR | known top 1% | EB-null FPR | n2 null FPR | yso1 recall |
+|---|---|---|---|---|---|---|---|---|---|
+| old masks | 0.333 | 0.517 | 0.762 | 0.613 | 0.033 | 5/18 | 0.245 | 0.145 | 0.158 |
+| per-TIC masks | 0.334 | 0.510 | 0.728 | 0.604 | 0.033 | 5/18 | 0.243 | 0.145 | 0.157 |
+
+- The ~3% bin loses 0.034 (about 2 SE at ~600 injections): mostly exocomet, single-dip and
+  outburst injections where recon is the deciding component. This is mask-draw variance, not a
+  bias we can name; it is reported, not tuned away. Known-positive percentiles are unchanged to
+  0.002, and the real `ens_v3` top 100 / 300 / 1600 are the same stars as before.
+- Val J of the frozen rule: 0.3997 (was 0.402).
+- **Diagnostic only, not adopted:** a fresh val sweep with the fixed recon
+  (`ensemble_v3.py --name ens_v3_resweep_diag --no-ref-check`) has its best J at the same
+  weights (1 : 2 : 0.75, alpha 1.0, J 0.4016), but the tie rule (simplest within 0.01) now picks
+  wmax 1 : 1 : 0.5, alpha 0.9 (J 0.394). The pick is unstable inside the tie band. `ens_v3`
+  stays frozen, since the search on the other sectors uses it.
