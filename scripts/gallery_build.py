@@ -514,8 +514,9 @@ def build_candidate_gallery(a) -> None:
                       "excluded_labelled": len(labelled),
                       "counts": chosen.multi.map({True: "multi-sector",
                                                   False: "single-sector"}).value_counts().to_dict(),
-                      "rule": "gallery_ok (uncatalogued, not EB-like, not SkyBoT-explained, not a "
-                              "known positive) in candidates.parquet priority order: multi-sector "
+                      "rule": "gallery_ok (uncatalogued, not EB-like, not SkyBoT-explained, not "
+                              "time-crowded, not a known positive) in candidates.parquet priority "
+                              "order: multi-sector "
                               "first, S32-triaged stars last, then best per-sector rank"},
         "inputs": {
             "candidates": {"path": rel(cdir / "candidates.parquet"),
