@@ -230,6 +230,41 @@ Deferred: Earth/Moon angle masks (F4c; `bkg` already shows it), DRN firefly and 
 parsing (F7, F8 lists; low counts), TRICERATOPS (built for periodic planets), Gaia binarity (E10;
 annotation only).
 
+## 5. Card triage protocol (cross-sector gallery, 2026-11-11)
+
+Fixed before any card of `cand_v1_n150` was labelled. Every card is labelled per star in
+`labels/triage_allsectors_v1.csv` through `scripts/triage_append.py`, which refuses a row
+without a reason, catalogue evidence, an "already known?" answer and a confirm/kill test, and
+refuses `unexplained` unless the row says why EB, systematic and blend each fail.
+
+**Inputs per star.** The card (`cards/<tic>_s<NNNN>.png`: best sector, zoom on the strongest
+`cmv3` residual event, the nearest CCD stars in the same window, every other ingested sector),
+the pixel card (`cards/<tic>_s<NNNN>_pix.png`, `scripts/pixel_check.py`: TESScut difference
+image, signal-locus map, 7x7 per-pixel light curves, Gaia neighbours) and the dossier block
+(`dossier.md`, `scripts/vet_dossier.py`: ranks and events per sector, EB-test features,
+Lomb-Scargle period, SkyBoT, Gaia DR3 incl. RUWE and CMD height, AllWISE colours, VSX within
+120", Gaia variability, Kostov+2025, young-star lists, SIMBAD, TOI/CTOI).
+`scripts/fold_quicklook.py` folds a star at a trial period across all its sectors.
+
+**Order of explanations (sceptical; the first that fits wins).**
+1. *Systematic*: the event sits on an orbit edge or scattered-light band, at a momentum dump,
+   is SAP-only or PDC-only without the other, is shared by the CCD neighbours, or is a
+   crowding blow-up (CROWDSAP < ~0.5 and a PDCSAP amplitude SAP does not show).
+2. *Asteroid*: SkyBoT explained it; or a 2-8 h dip/bump in an ecliptic sector with an
+   opposite-sign blob in the difference image (a mover in the background pixels).
+3. *Blend*: the difference-image or signal-locus centroid is > 1 px from the target, toward a
+   Gaia neighbour; or a VSX variable within 2 px has the same period; or the neighbours within
+   2 px outshine the target (LMC/SMC fields) and the pixel check cannot place the signal.
+4. *Known class by morphology*: EB (strict period, constant depths, secondary or ellipsoidal
+   equal minima), rotation (quasi-sinusoidal and evolving, cool star), pulsator (stable,
+   multi-periodic), stochastic (luminous or giant star: M_G < ~1 or > 2 mag above the MS,
+   irregular), Be outburst (hot star, bumps), flare (fast rise, slow decay, M dwarf), known YSO.
+5. *Unexplained*: only when 1-4 each fail, with the reason for each written down.
+
+**Research depth.** `full` = card + pixel card + dossier, plus targeted lookups where they
+decide the class; `visual` = card only. Infrared excess and a young-star CMD position up-weight
+a dipper reading but never prove it (E9); a known variable within ~1 px makes a blend likely.
+
 ## References
 
 Every arXiv id below was resolved via the arXiv API or opened during this research.

@@ -35,6 +35,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
 
+from oddball.common.http import ANON_USER_AGENT
 from oddball.common.paths import sector_dir
 from oddball.tess.lightcurve import (
     DEFAULT_BIN_MINUTES,
@@ -243,7 +244,7 @@ def _session() -> requests.Session:
     if s is None:
         s = requests.Session()
         s.mount("https://", requests.adapters.HTTPAdapter(pool_connections=2, pool_maxsize=2))
-        s.headers["User-Agent"] = "oddball-worlds/0.0 (+https://github.com/Antimatter543/oddball-worlds)"
+        s.headers["User-Agent"] = ANON_USER_AGENT
         _tls.session = s
     return s
 

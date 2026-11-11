@@ -37,12 +37,13 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from oddball.common.http import ANON_USER_AGENT
 from oddball.common.paths import data_root, outputs_root, sector_dir
 from oddball.common.splits import split_array
 from oddball.tess.arrays import dir_metadata
 
 URL = "https://ssp.imcce.fr/webservices/skybot/api/conesearch.php"
-UA = "oddball-worlds research script (anonymous; contact via github antimatter543)"
+UA = ANON_USER_AGENT
 COLS = ["num", "name", "ra_h", "dec_deg", "cls", "vmag", "err_arcsec", "d_arcsec",
         "dra_arcsec_h", "ddec_arcsec_h", "dg_au", "dh_au"]  # fmt: skip
 

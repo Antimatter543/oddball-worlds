@@ -117,7 +117,7 @@ uv run python -I scripts/gallery_serve.py          # then open http://127.0.0.1:
   from the fixed set, the TIC must be one of this gallery's cards, and the note is capped at
   500 characters and made safe for CSV and spreadsheets. Catalogue text is HTML-escaped. The
   server uses no external JS or CDN.
-- **TODO:** TESScut pixel thumbnails.
+- **Pixel check:** `scripts/pixel_check.py` draws a TESScut difference image, signal-locus map and per-pixel light curves per card (`cards/*_pix.png`); `scripts/vet_dossier.py` adds the catalogue research.
 
 ## Parked: Gaia DR4
 

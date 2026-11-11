@@ -20,7 +20,7 @@ labelled stars: the star's best-ranked sector is the main panel (zoom on its str
 ``cmv3`` residual event, CCD neighbours), and every other ingested sector of the star is shown
 below with its ranks there.
 
-TODO: TESScut pixel thumbnails (§7) are not drawn yet.
+TESScut pixel checks are drawn separately by ``scripts/pixel_check.py`` (``cards/*_pix.png``).
 """
 
 from __future__ import annotations
