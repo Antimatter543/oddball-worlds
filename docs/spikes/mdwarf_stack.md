@@ -342,21 +342,39 @@ entry). It is 0 if fewer than 2 transits are in the data. **Predicted detectable
 - **pred_eff = 0.741** (median MES / SNR_white, 47 matched of 53 DEV harm injections with SNR_white >= 12;
   16-84%: 0.636-0.816).
 
+## Gate 2 frozen method (2026-11-11 15:53 AEST; committed before any TEST-star or host search)
+Written by `gate2/freeze.py` from DEV results only; the script refuses to run once any TEST or host output file
+exists. A copy is in `outputs/planets_spike/gate2/frozen.json`. Nothing below changes after a TEST or host result.
+- **Engine:** gate-1 CPU engine, unchanged code (`search.search_star` with `prange`), 3 niced workers.
+- **Rotation arm: harm** (pre-registered rule; numbers in the DEV notes above).
+- **Fast/slow:** fast = LS peak power (0.1-5 d, `search2.rot_sector`) >= 0.1 in >= 50% of a star's sectors, on its
+  real uninjected light curve (`gate2/census.py`). DEV: 18 of 60 fast.
+- **tau_long = 8.054**, the 3rd highest of 420 DEV long nulls (harm), rank floor(0.005 N) + 1 as pre-registered.
+  Top nulls: 8.27 / 8.08 / 8.05 / 7.81 / 7.63 / 7.56. The top three are all roll nulls of one 5-sector star
+  (TIC 454682563) at 50-54 d with 2 epochs. 0 of 60 DEV real controls (harm, long) reach it; their maximum is 7.54.
+- **tau_short:** pending. The 300 DEV short nulls run after the long-range TEST stages (criteria (a)-(d) use
+  tau_long only). It is then computed by the same rule from the unchanged job file `dev_nulls_short_harm.jsonl`
+  (`freeze.py tau_late`, which can only fill a value still marked pending).
+- **pred_eff = 0.741** for the hold-out MES prediction (pre-registered definition).
+- **Long nulls and the orbit period:** 155 of 420 nulls had a top signal (MES >= 6); 19% lie within 3% of a
+  13.7/27.4 d multiple or fraction, against 13% expected for log-uniform periods in 10-60 d (about 2 sigma high).
+  The top null (53.70 d) is one of them (2 x 27.4 = 54.8 d, -2%).
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
-**State at 2026-11-11 15:35 AEST.** CPU only, at most 3 workers under `nice -n 19 ionice -c3`. Pre-registration:
-8798f55. **No TEST star and no host has been searched.** `outputs/planets_spike/gate2/frozen.json` holds the fast
-rule, rot = harm and pred_eff, but is **not yet frozen**: tau_long needs the DEV long nulls.
+**State at 2026-11-11 15:54 AEST.** CPU only, at most 3 workers under `nice -n 19 ionice -c3`. Pre-registration:
+8798f55. The frozen method above is committed (see `git log` for the commit after 2cf9049). Output files are under
+`/home/antiraedus/Projects/oddball-worlds/outputs/planets_spike/gate2/` (abbreviated `G2`).
 
-Done: `dev_paired` 360/360. `rot_census_DEV.csv`. Running: `dev_nulls_long_harm` (420).
+Done: `dev_paired` 360/360, `dev_nulls_long_harm` 420/420, `rot_census_DEV.csv`, `frozen.json`.
 
-Next commands, from the worktree, `PY` as below, every heavy one niced:
-1. `spikes/mdwarf_stack/gate2/run_stage.sh dev_nulls_long_harm >> outputs/planets_spike/gate2/run_dev.log 2>&1`
-   (resumable).
-2. `$PY -I spikes/mdwarf_stack/gate2/freeze.py tau` (refuses if any TEST/host output exists; tau_short stays
-   "pending" if its nulls are not done), `analyze2.py tau`, then write the doc frozen entry and **commit**.
-3. Only after that commit: `census.py TEST`, `census.py HOSTS`, `make_jobs2.py test`, `make_jobs2.py hosts`,
-   `holdout.py predict`, then `run_stage.sh test_inj test_inj_none test_real hosts` (long range, criteria a-d),
-   then `run_stage.sh dev_nulls_short_harm test_real_short hosts_short`, then `freeze.py tau_late`.
+Next commands, from the worktree, `PY` as below, every heavy one niced (all job runs are resumable per id):
+1. `$PY -I spikes/mdwarf_stack/gate2/census.py TEST`, `census.py HOSTS`, `make_jobs2.py test`,
+   `make_jobs2.py hosts`, `holdout.py predict` (the job and prediction files are deterministic; re-making them is
+   harmless).
+2. `spikes/mdwarf_stack/gate2/run_stage.sh test_inj test_inj_none test_real hosts >> G2/run_test.log 2>&1`
+   (long range, criteria a-d).
+3. `run_stage.sh dev_nulls_short_harm test_real_short hosts_short >> G2/run_short.log 2>&1`, then
+   `freeze.py tau_late`.
 4. `analyze2.py all`.
 
 `PY` = `/home/antiraedus/Projects/oddball-worlds/.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`.
