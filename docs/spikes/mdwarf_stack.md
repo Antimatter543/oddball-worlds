@@ -469,8 +469,8 @@ without 2-min data depend on TESS-SPOC FFI coverage.
 | total | 12,959 | 68 CPU-h (0.9 d on 3 workers) | ~0.17 weighted |
 
 GPU at CPU / 5: 14 GPU-h (0.6 d). The GPU is not trusted at present. Downloads are the larger cost: at gate-2
-rates (20-45 s per star) the 12,959 stars need roughly 3-6 days from MAST. Restricting to the 4,681 stars with
-6+ sectors keeps 96% of the expected recoveries in the headline cell.
+rates (20-45 s per star) the 12,959 stars need roughly 3-7 days from MAST. Restricting to the 4,681 stars with
+6+ sectors keeps 89% of the expected headline-cell recoveries (1,958 of 2,190 star-weighted) at 36% of the stars.
 
 **Cut, stubbed or unverified:** no vetting at all (detections only). One engine (CPU FFA above P_sw), which gate
 1 showed can rank noise peaks lower than an exact fold, so null maxima may be slightly low. Injections go into
