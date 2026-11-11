@@ -1,5 +1,10 @@
 # Plan
 
+> **Status (2026-11-11): Track A (weird stars) is parked.** Two vetting passes (96 stars in S32, then 150 across six
+> sectors) found nothing unexplained; see `docs/shortlist_candidates_v1.md`. Active work is Track C below
+> (temperate planets around M dwarfs). Track A's open items if it resumes: add VSX CV/RS CVn types and
+> IJspeert+2024 to the catalogue filter, rerun the corrected asteroid check on S32, rebuild the gallery.
+
 ## Goal
 A completeness-calibrated **anomaly hunt** across TESS extended-mission (Sector ≥27) full-frame-image light curves, aimed at the weirdest stars. The named classes are young stars with disks (dippers), Boyajian-like irregular dimmers, exocomets and disintegrating planets. Unclassifiable anomalies are a first-class output, not a by-product.
 
