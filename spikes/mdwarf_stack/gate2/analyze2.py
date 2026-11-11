@@ -207,8 +207,11 @@ def test(S):
     fz = frozen()
     tl, ts = fz["tau_long"], fz["tau_short"]
     real = ok(rd("test_real", "test_real_short"))
-    print(f"\n## (a) TEST real controls; tau_long = {tl:.2f}, tau_short = {ts:.2f}")
+    print(f"\n## (a) TEST real controls; tau_long = {tl:.2f}, tau_short = {ts}")
     for rg, t in (("long", tl), ("short", ts)):
+        if t is None:
+            print(f"{rg}: tau_{rg} pending, skipped")
+            continue
         rr = [r for r in real if r["range"] == rg]
         above = [r for r in rr if top(r) >= t]
         print(f"{rg}: {len(rr)} searched, {len(above)} above tau ({len(above) / max(len(rr), 1):.3f})")

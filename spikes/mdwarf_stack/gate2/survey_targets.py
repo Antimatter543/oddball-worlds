@@ -1,7 +1,7 @@
 """Survey target list (written only if gate 2 passes; the survey itself is the owner's decision).
 
 Source: data/planets_spike/catalogs/tic_mdwarfs_50pc.csv (TIC v8 via MAST, gate 1: Teff 2700-3400 K,
-d < 50 pc, T < 15). Sectors: tess-point pointings up to S98 (taken as already observed on
+d < 50 pc, T < 15). Sectors: tess-point pointings up to S107 (the latest sector in the light curves downloaded on
 2026-11-11; later pointings are listed separately). Kept: >= 2 observed sectors. Per star: sector
 count, baseline, estimated CPU-s and GPU-s (cost model of analyze2 cost, GPU = CPU / 5) and the
 sensitivity bucket, i.e. the TEST headline-cell recovery for its sector bucket.
@@ -25,7 +25,7 @@ sys.path.insert(0, str(HERE))
 from analyze2 import bucket
 from common import CAT_DIR, OUT
 
-LAST_OBSERVED = 98
+LAST_OBSERVED = 107  # latest sector with SPOC 2-min data among the 2026-11-11 downloads
 
 
 def main() -> None:

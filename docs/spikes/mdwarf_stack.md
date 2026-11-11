@@ -360,24 +360,128 @@ exists. A copy is in `outputs/planets_spike/gate2/frozen.json`. Nothing below ch
   13.7/27.4 d multiple or fraction, against 13% expected for log-uniform periods in 10-60 d (about 2 sigma high).
   The top null (53.70 d) is one of them (2 x 27.4 = 54.8 d, -2%).
 
+### 2026-11-11: gate 2 results. All five criteria pass; (a) passes at its limit
+Commands, from the worktree (outputs in `outputs/planets_spike/gate2/`): `run_stage.sh dev_paired`,
+`dev_nulls_long_harm`; `freeze.py fast|arm|tau`; frozen commit; `census.py TEST|HOSTS`, `make_jobs2.py
+test|hosts`, `holdout.py predict`; `run_stage.sh test_inj test_inj_none test_real hosts`; `run_stage.sh
+dev_nulls_short_harm test_real_short hosts_short`; `freeze.py tau_late`; `analyze2.py all` (text in
+`analyze_{dev,tau,test,hosts,all}.txt`). CPU engine only; 3 niced workers.
+
+**Order of events.** Pre-registration 8798f55 (before any gate-2 search). Frozen method 8ab1117, committed
+15:52:58. First TEST search 15:55:50 (`test_inj`); hosts 16:59-17:08. tau_short was filled mechanically at 17:38
+(`freeze.py tau_late`) from the unchanged DEV short-null file; no criterion uses it. One code change after the
+freeze and before the first TEST search: e4ae589 (an import path in `holdout.py`). After TEST: only report fixes
+in `analyze2.py` (skip a pending tau_short) and `survey_targets.py` (last observed sector).
+
+**(a) Honest threshold: PASS, at the limit.** tau_long = 8.054 from 420 DEV nulls (>= 400). TEST real controls,
+long search, any of 3 signals: **1 of 58** at or above tau_long (0.017, 95% Wilson [0.003, 0.091]; limit: at
+most 1). It is TIC 340487632 (10 sectors, a fast rotator): MES 8.76 at 52.879 d, 4 epochs, in the 4 h box, the
+longest one. Next: 8.03 (TIC 302444623, 43.15 d, 4 epochs), 7.82 (TIC 267320484, 52.917 d, 3 epochs). These
+are unvetted; two different stars peaking at 52.9 d is itself suspicious (below). One more such star would have
+failed (a). The per-star false-alarm rate at tau_long is only bounded at < 9%.
+
+**(b) Sensitivity: PASS.** 200 TEST injections, 1.0-1.5 R_e, 15-30 d, all on TEST stars with 6+ sectors (all
+have >= 2 transits in the data): **108 of 200 = 0.54 [0.47, 0.61]**; the lower bound 0.47 is >= 0.20. Misses:
+14 matched below tau_long, 78 not matched by the top signal. By white-noise SNR: 0/64 below 8, 10/34 at 8-12,
+53/57 at 12-20, 45/45 above 20, so the recovery is set by photon noise and sector count.
+
+| cell (TEST, top signal, MES >= 8.054) | all | 6-12 sectors | 13-25 | 26+ | slow | fast |
+|---|---|---|---|---|---|---|
+| 1.0-1.5 R_e, 15-30 d, 6+ sectors | 0.54 [0.47, 0.61] (200) | 0.37 [0.28, 0.47] (103) | 0.50 [0.34, 0.66] (36) | 0.85 [0.74, 0.92] (61) | 0.63 [0.55, 0.70] (149) | 0.27 [0.17, 0.41] (51) |
+| 1.0-1.5 R_e, 30-50 d, 6+ | 0.40 [0.30, 0.51] (80) | 0.21 (42) | 0.36 (14) | 0.75 (24) | 0.45 (60) | 0.25 (20) |
+| 1.5-2.0 R_e, 15-30 d, 6+ | 0.73 [0.61, 0.83] (60) | 0.56 (32) | 0.83 (12) | 1.00 (16) | 0.84 (44) | 0.44 (16) |
+| 1.5-2.0 R_e, 30-50 d, 6+ | 0.72 [0.59, 0.81] (60) | 0.48 (31) | 0.91 (11) | 1.00 (18) | 0.80 (44) | 0.50 (16) |
+| 1.0-1.5 R_e, 15-30 d, 2-5 sectors | 0.03 [0.00, 0.14] (36) | | | | 0.03 (30) | 0.00 (6) |
+
+Headline cell splits: R_p 1.0-1.25 R_e 0.41 [0.32, 0.51] (102), 1.25-1.5 R_e 0.67 [0.58, 0.76] (98); P 15-21 d
+0.58 (89), 21-30 d 0.50 (111); b < 0.5 0.60 (119), b 0.5-0.9 0.46 (81).
+
+Comparison with Gillis et al. (6.5%, 1.0-1.5 R_e, 15-30 d, *vetted candidates*, target-weighted over all their
+stars): ours is a *detection* with no vetting, so it is an upper bound on a like-for-like number. Weighted by the
+survey list's predicted sector buckets (below), the headline cell is about 0.17; on 2-5 sector stars it is 0.03.
+
+**(c) Known planets: PASS.** Non-blind gate-1 hosts, long search: Gliese 12 b MES 12.16 (slot 1), LHS 1140 b
+33.07 (slot 1), TOI-700 d 14.75 (slot 2), all at the exact period and above tau_long. Hold-out (blind): 31
+planets predicted detectable (MES_pred >= 1.25 x tau_long = 10.07), **28 recovered** (>= half). For the 28,
+measured/predicted MES has median 0.96 (16-84%: 0.83-1.07), so the injection-based prediction is not optimistic
+on real planets. All recoveries are at the true period (no aliases). The 3 misses by the frozen match rule:
+- K2-3 b (MES 16.06 at 10.0547 d, slot 1): the period is exact, but every detected epoch sits 111 h from the
+  exoplanet.eu ephemeris. That is a catalogue epoch problem, not a search miss, but it is not counted.
+- LTT 3780 c (MES 19.17, P_det 12.2522 vs 12.2534 d) and LHS 1903 d (MES 18.51, 12.5664 vs 12.5740 d): the right
+  signal with a period error of 1e-4 and 6e-4 relative. Over the long baseline the epochs drift by up to 3-11 h,
+  so only 2 of 9 and 2 of 3 epochs match. This is a real limitation: the refinement (±3 coarse steps) does not
+  always reach the true period on 1,500-2,500 d baselines.
+Also recovered although not predicted detectable: TOI-7166 b (1 sector), K2-133 d. Full table:
+`holdout_result.csv`.
+
+**(d) No harm: PASS.** Every TEST injection was also run with rot = none (66 of 436 are identical by
+construction, since harm changed no sector). Slow rotators (327): harm 194, none 195, difference -0.003 (paired
+bootstrap 95% [-0.012, +0.006]; limit -0.03). Fast rotators (109): harm 0.31 [0.23, 0.40] vs none 0.22 [0.15,
+0.31], +0.092 [+0.037, +0.147]; 10 recovered only with harm, 0 only without.
+
+**(e) Cost: PASS.** 2,204 measured CPU searches, rotation step included (median 0.04 CPU-s per sector; the
+per-iteration search dominates). Fitted per-iteration cost: long 11.2 s median, short 4.3 s. Mean iterations per
+real star: 1.99 long, 1.46 short. For 8,000 draws from the gate-1 TIC sample: **77 CPU-h [75, 80]**, 1.1 days
+on 3 niced workers; at GPU = CPU / 5, **15 GPU-h = 0.6 days** (limit 14 days). Measured: the 58 TEST real stars
+cost 31 CPU-s each on average (long + short). Gate 1, for comparison: 230 CPU-h and 43 GPU-h for 8,000 stars
+with up to 6 signals over 1-60 d. All of gate 2 took 7.5 CPU-h.
+
+**Short range (not a criterion).** tau_short = 6.94, the 2nd highest of 300 DEV short nulls; only 20 of the 300
+had any signal at MES >= 6, so it is poorly measured. It is under-calibrated: 3 of 58 TEST real controls exceed
+it (0.052 [0.018, 0.141]), and 1 of 60 DEV real. The two highest TEST ones are at 1.172 d (TIC 229758887, fast)
+and 1.185 d (TIC 141621885, slow by the rule, 675 epochs), the same 1.17-1.39 d band as the gate-1 rotators.
+Harm does not remove all of that. Any 1-10 d result from this pipeline needs a separate threshold.
+
+**Orbit-period check.** DEV long nulls: 155 of 420 had a top signal; 19% are within 3% of a 13.7 / 27.4 d
+multiple or fraction (13% expected for log-uniform periods), and 1 of the 8 at MES >= 7.5. TEST and DEV real
+long signals: 25% of 87 (the 25-30 d bin holds 15 against 8.9 expected). So the 27.4 d systematic is present at
+low MES, but it does not set the tail. The tail is at long periods with few epochs: nulls at P >= 45 d number 50
+against 25 expected, and the MES >= 7.5 nulls and real signals are at 30-55 d with 2-5 epochs. The top nulls are
+53.70 / 51.07 / 49.99 d (one 5-sector star, 2 epochs each), and the top TEST real signals are 52.88 and 52.92 d.
+52.9 d is not within 3% of 54.8 d (2 x 27.4), but it is close, so it is flagged.
+
+### Gate 2 verdict: the pre-registered gate passes. Recommend the survey, scoped to stars with 6+ sectors
+All five criteria pass. Long-period sensitivity is real: 0.54 [0.47, 0.61] for 1.0-1.5 R_e at 15-30 d on 6+
+sector stars, at detection level; 28 of 31 predicted-detectable hold-out planets were recovered blind with MES
+close to the prediction; and the full search costs about a day of CPU. But (a) passed with no margin (1 of 58,
+the limit), the false-alarm tail sits at 45-55 d with 2-5 epochs, and the short-range threshold is
+under-calibrated. On 2-5 sector stars, which are 64% of the list, the method recovers almost nothing (0.03).
+
+**Biggest remaining risk:** the long-period false-alarm rate. tau_long rests on 3 nulls from one star, and the
+per-star rate on real stars is bounded only at < 9%. Over ~4,700 stars with 6+ sectors that is between ~15 and
+~430 false alarms above tau_long, concentrated at 45-55 d with 2-4 transits. Those are exactly the candidates
+the survey exists to find, so vetting (odd/even, per-transit shape, SAP vs PDCSAP, centroids, the 27.4 d
+aliases) has to be designed before the survey's candidates are looked at.
+
+**Survey preparation (not started; the owner decides).** `gate2/survey_targets.py` writes
+`outputs/planets_spike/gate2/survey_targets.csv`. Catalogue: TIC v8 via MAST (gate 1 sample), Teff 2700-3400 K,
+d < 50 pc, T < 15, 14,471 stars. Sectors: tess-point pointings up to S107, the latest sector seen in today's
+downloads. Kept: >= 2 sectors, which leaves 12,959 stars. Pointings overstate real data: gate-1 controls had
+0.74x the predicted sectors, 2 of 60 TEST controls had no SPOC or TESS-SPOC product at all, and faint stars
+without 2-min data depend on TESS-SPOC FFI coverage.
+
+| predicted sectors | stars | CPU-h | expected recovery, 1.0-1.5 R_e 15-30 d (TEST) |
+|---|---|---|---|
+| 2-5 | 8,278 | 27.1 | 0.03 |
+| 6-12 | 4,008 | 28.3 | 0.37 |
+| 13-25 | 269 | 3.3 | 0.50 |
+| 26+ | 404 | 9.6 | 0.85 |
+| total | 12,959 | 68 CPU-h (0.9 d on 3 workers) | ~0.17 weighted |
+
+GPU at CPU / 5: 14 GPU-h (0.6 d). The GPU is not trusted at present. Downloads are the larger cost: at gate-2
+rates (20-45 s per star) the 12,959 stars need roughly 3-6 days from MAST. Restricting to the 4,681 stars with
+6+ sectors keeps 96% of the expected recoveries in the headline cell.
+
+**Cut, stubbed or unverified:** no vetting at all (detections only). One engine (CPU FFA above P_sw), which gate
+1 showed can rank noise peaks lower than an exact fold, so null maxima may be slightly low. Injections go into
+PDCSAP, after PDC, so PDC's effect on transits is not measured. Circular orbits, fixed limb darkening, b <= 0.9,
+top signal only. The rotation census uses LS power only (the harm `amp` field is unusable). The hold-out
+ephemerides come from catalogues (K2-3 b's is wrong). The survey sector counts are predictions. TIC 17307715 has
+a TESS-SPOC product labelled sector 1751 (6 days at BTJD 4056-4062), kept as a separate sector.
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
-**State at 2026-11-11 15:54 AEST.** CPU only, at most 3 workers under `nice -n 19 ionice -c3`. Pre-registration:
-8798f55. The frozen method above is committed (see `git log` for the commit after 2cf9049). Output files are under
-`/home/antiraedus/Projects/oddball-worlds/outputs/planets_spike/gate2/` (abbreviated `G2`).
-
-Done: `dev_paired` 360/360, `dev_nulls_long_harm` 420/420, `rot_census_DEV.csv`, `frozen.json` (frozen commit
-8ab1117, 15:52:58). After the freeze: `rot_census_{TEST,HOSTS}.csv`, job files (`test_inj` 436, `test_inj_none`
-436, `test_real` 58, `test_real_short` 58, `hosts` 71, `hosts_short` 71), `holdout_pred.csv` (15:54-15:55, no
-search output used). **First TEST search: step 2 started 15:55:5x** (`G2/test_stage_start.txt`).
-
-Next commands, from the worktree, `PY` as below, every heavy one niced (all job runs are resumable per id):
-1. `$PY -I spikes/mdwarf_stack/gate2/census.py TEST`, `census.py HOSTS`, `make_jobs2.py test`,
-   `make_jobs2.py hosts`, `holdout.py predict` (the job and prediction files are deterministic; re-making them is
-   harmless).
-2. `spikes/mdwarf_stack/gate2/run_stage.sh test_inj test_inj_none test_real hosts >> G2/run_test.log 2>&1`
-   (long range, criteria a-d).
-3. `run_stage.sh dev_nulls_short_harm test_real_short hosts_short >> G2/run_short.log 2>&1`, then
-   `freeze.py tau_late`.
-4. `analyze2.py all`.
+**State at 2026-11-11 17:50 AEST: gate 2 complete.** Every stage finished (no errors); results are above. Nothing is
+running. The survey has not been started; that is the owner's decision. Re-running `analyze2.py all` and
+`survey_targets.py` regenerates every table from the cached outputs.
 
 `PY` = `/home/antiraedus/Projects/oddball-worlds/.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`.

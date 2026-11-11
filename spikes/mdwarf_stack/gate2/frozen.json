@@ -37,7 +37,10 @@
  "tau_long_rank": 3,
  "n_null_long": 420,
  "tau_long_status": "final",
- "tau_short": null,
- "tau_short_status": "pending: 0/300 DEV nulls finished; computed later by the same rule from the same fixed job file",
- "tau_time": "2026-11-11T15:52:29+10:00"
+ "tau_short": 6.9422096567898866,
+ "tau_short_status": "final",
+ "tau_time": "2026-11-11T15:52:29+10:00",
+ "tau_short_rank": 2,
+ "n_null_short": 300,
+ "tau_late_time": "2026-11-11T17:38:15+10:00"
 }
