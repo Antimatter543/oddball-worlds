@@ -244,3 +244,28 @@ eats the signal slots on 20% of the controls.
 pairs and edge systematics, and from 30 controls and 120 realisations the post-hoc τ_long is only an estimate.
 If the true long-period tail is near 9-10 rather than 7.6, Gliese 12 b-like and 1.0-1.5 R_e signals sit right
 at it.
+
+## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
+**State at 2026-11-11 ~12:10 AEST.** The GPU fell off the bus at 11:55:21 (Xid 79, reset required) during the
+control downloads, before any gate-2 search touched it. Gate 2 runs on CPU only (the validated gate-1 CPU engine:
+exact brute fold below P_sw, FFA above), at most 3 workers under `nice -n 19 ionice -c3`.
+
+Done:
+- Control set enlarged to 120 (`gate2/select_g2.py`, seeds 20261121 draw / 20261122 split): 24/32/32/32 per
+  sector stratum. DEV = the 30 gate-1 controls plus 30 new; TEST = 60 new. Written to
+  `data/planets_spike/catalogs/controls_g2.csv`. No TEST star has been searched.
+- Hold-out list built (`gate2/holdout.py build`) from the cached exoplanet.eu and ExoFOP TOI tables (the NASA
+  Exoplanet Archive TAP returned a maintenance page): `data/planets_spike/catalogs/holdout_g2.csv`, 84 planets with
+  10 < P <= 60 d on 68 hosts. No hold-out host has been searched.
+- `search.py`: `search_star(..., prange=)` for separate short (1-10 d) and long (10-60 d) searches (None = gate 1).
+- `gate2/search2.py`: rotation removal (per-sector Lomb-Scargle, harmonic fit with spline amplitudes), being
+  tested on DEV fast rotators only.
+
+Running / cached:
+- Downloads of the 90 new controls (`outputs/planets_spike/gate2/fetch_controls.log`) and the 68 hold-out hosts
+  (`fetch_holdout.log`) into `data/planets_spike/lc/` (one NPZ per star; `fetch.py` skips stars already present, so
+  re-running the same command resumes).
+
+Next commands (from the worktree; Python = a venv with wotan, e.g. the gate-1 worktree's `.venv`):
+`nice -n 19 ionice -c3 python -I spikes/mdwarf_stack/fetch.py $(cat data/planets_spike/catalogs/g2_fetch_order.txt)`
+and the same with `holdout_fetch.txt`; then the DEV rotation tests (next commit).

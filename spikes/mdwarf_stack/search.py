@@ -355,8 +355,11 @@ def _epoch_breakdown(pp, k, P, t0):
 
 
 def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float = MES_FLOOR,
-                coarse=None):
+                coarse=None, prange=None):
     """Iterative blind search. Returns (signals, stats).
+
+    prange: optional (Plo, Phi) sub-range of [P_MIN, P_MAX] (gate 2: separate short and long
+    searches). None reproduces gate 1 exactly.
 
     coarse: optional replacement for the coarse search, called as
     coarse(dense_ses, (Plo, Phi), binw, T) -> (P, mes, t0, ops); used for the GPU port."""
@@ -365,6 +368,10 @@ def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float
     plan = []
     for k in DURATIONS:
         pr = period_range_for(k, mass, radius)
+        if pr is not None and prange is not None:
+            pr = (max(pr[0], prange[0]), min(pr[1], prange[1]))
+            if pr[0] >= pr[1]:
+                pr = None
         if pr is None:
             continue
         s = max(1, k // 2)  # amendment 2: coarse stride D/2 (pre-registered D/3)
