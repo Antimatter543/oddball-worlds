@@ -245,6 +245,81 @@ pairs and edge systematics, and from 30 controls and 120 realisations the post-h
 If the true long-period tail is near 9-10 rather than 7.6, Gliese 12 b-like and 1.0-1.5 R_e signals sit right
 at it.
 
+## Gate 2 pre-registration (2026-11-11, committed before any TEST-star or host search)
+Question: with rotation handled and thresholds set per period range, is the all-sector search sensitive enough at
+10-60 d to justify a full survey? A clear "no" is acceptable. Everything not stated here is the gate-1 method above.
+
+### Engine (forced change)
+The GPU fell off the bus at 11:55 (Xid 79) before gate 2 used it. Every gate-2 search uses the gate-1 **CPU
+engine** (exact brute fold below P_sw = sqrt(T·binw), FFA above, then the same CPU refinement), at most 3 workers
+under `nice -n 19 ionice -c3`. Nulls, controls, injections and hosts all use this one engine, so the threshold and
+the recoveries are self-consistent. For P >= 10 d the whole long range is in the FFA regime (its phase error
+T·binw/P^2 is below 1 sample there). Gate 1 showed the FFA coarse grid can rank a real noise peak lower than the exact
+GPU fold (TIC 278078111), so CPU null maxima may be slightly *lower* than exact ones; this is listed as a risk.
+
+### Splits (`gate2/select_g2.py`)
+120 controls, same rules and strata as gate 1 (24/32/32/32 for 2-5/6-12/13-25/26+ predicted sectors), drawn with
+seed 20261121. DEV = the 30 gate-1 controls + 30 new; TEST = 60 new (one third / two thirds of each new stratum, seed
+20261122). Every method choice below is made on DEV only.
+
+### Two independent searches
+- **Short:** 1-10 d. **Long:** 10-60 d. Each is `search_star(..., prange=)` on the same preprocessed light curve,
+  with its own signal slots. Nothing found by one search is masked in the other.
+- Slots: null and injection runs keep the **top** signal only (max_sig 1; the run statistic is that signal's MES,
+  0 if no peak reaches the MES floor of 6). Real-control runs keep 3, host and hold-out runs 6.
+
+### Rotation removal: candidates and DEV choice rule
+- **none:** gate-1 preprocessing.
+- **harm** (`gate2/search2.py`): per sector, Lomb-Scargle of the raw normalised flux over 0.1-5 d. If the peak's
+  normalised power is >= 0.02, fit 3 harmonics of that period with amplitudes that vary as linear splines (knots
+  every 3 d within each segment), plus a spline baseline, by least squares with 3-sigma two-sided clipping of the fit
+  points (3 passes). Divide the flux by the model, then run the unchanged gate-1 preprocessing.
+- Not tested: a biweight window scaled to P_rot (a window of P_rot/3 still passes ~17% of the rotational amplitude at
+  P_rot = 1.3 d, while 0.43 d is under 3× the longest box, so it would cut 3-4 h transits), and a GP (celerite2 is
+  not installed, and a fitted GP per injection does not fit the CPU budget).
+- **Choice rule (DEV):** 120 paired injections (2 per DEV star; R_p 1.0-2.0 R_e, P 15-50 d; the same injection under
+  both arms; long search). Recovery counts at a provisional MES of 7.5 (only for this comparison). Choose harm if,
+  on DEV slow rotators, it loses <= 3 points against none and, on DEV fast rotators, it recovers at least as many.
+  Otherwise choose none. The DEV real controls under both arms are reported too.
+- **Fast/slow** is fixed from DEV, before TEST, using the rotation measured on each star's real (uninjected) light
+  curve. It is recorded in the frozen-method entry and not changed afterwards.
+
+### Thresholds (DEV nulls only)
+- Null realisations per DEV star: long, 7 (inverted; inverted plus roll, 2 seeds; roll, 4 seeds), giving 420; short,
+  5 (inverted; inverted plus roll; roll, 3 seeds), giving 300.
+- **tau_long** = the (floor(0.005 N) + 1)-th highest long-null statistic, so at most 0.5% of DEV null realisations
+  exceed it (3rd highest of 420). **tau_short** uses the same rule on the short nulls (2nd highest of 300).
+- If fewer than 400 long nulls finish, tau_long is not computed and criterion (a) fails.
+
+### Prediction for known planets
+MES_pred = eff × depth × sqrt(sum of 1/sigma^2 over in-transit bins in the preprocessed data), with depth and T14
+from the TOI table (else exoplanet.eu, else computed from R_p, R*, M*, b = 0.3). eff is the median of
+MES_measured / SNR_white over DEV harm-arm injections with SNR_white >= 12 that were matched (fixed in the frozen
+entry). It is 0 if fewer than 2 transits are in the data. **Predicted detectable** means MES_pred >= 1.25 × tau_long.
+
+### Criteria (all five needed to recommend the survey)
+- **(a) Honest threshold:** tau_long comes from >= 400 DEV null realisations, and at most 2% of the 60 TEST real
+  controls (so at most 1) have a long-search signal (any of 3) with MES >= tau_long. If more do, the gate fails on
+  (a), whatever the rest shows.
+- **(b) Sensitivity:** 200 TEST injections, R_p 1.0-1.5 R_e, P 15-30 d, all on TEST stars with 6+ sectors of data.
+  Each goes into the raw binned flux before rotation removal and detrending. It is recovered if the top long signal
+  matches it (the gate-1 match rule) with MES >= tau_long. Pass if the 95% Wilson lower bound is >= 0.20. Also
+  reported: 80 at 1.0-1.5 R_e and 30-50 d, 60 in each 1.5-2.0 R_e cell, 36 in the headline cell on 2-5 sector stars,
+  per sector bucket, and fast vs slow.
+- **(c) Known planets:** Gliese 12 b, LHS 1140 b and TOI-700 d each have a matching long-search signal >= tau_long
+  (reported as non-blind). AND at least half of the predicted-detectable hold-out planets (`holdout_g2.csv`, 10 < P <=
+  60 d) are recovered blind: some long-search signal >= tau_long matches the planet (P or an n <= 6 alias, plus
+  epochs). If fewer than 3 hold-out planets are predicted detectable, (c) is not passed.
+- **(d) No harm:** for every TEST injection the same injection is also run with rot = none. On TEST slow rotators,
+  recovery(harm) − recovery(none) >= −0.03 over all cells. On TEST fast rotators, recovery under harm is above 0;
+  both arms are reported.
+- **(e) Cost:** the CPU cost per star (rotation step, long and short search, measured on every gate-2 search) is
+  extrapolated to 8,000 stars from the gate-1 TIC sample. The GPU cannot be measured now. GPU time = CPU time / 5,
+  the low end of the GPU speed-up measured in gate 1. Pass if that is under 14 days; 3-worker CPU wall time is also
+  reported.
+- **Verdict:** all five pass means recommend the survey. If (a) or (b) fails, recommend stopping, or name the one
+  change that could plausibly fix it. Nothing is adjusted after a TEST or host result is seen.
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
 **State at 2026-11-11 ~12:10 AEST.** The GPU fell off the bus at 11:55:21 (Xid 79, reset required) during the
 control downloads, before any gate-2 search touched it. Gate 2 runs on CPU only (the validated gate-1 CPU engine:
