@@ -134,7 +134,7 @@ def transit_bins(idx, P, t0, dur):
     return np.abs(t - t0 - n * P) < dur / 2
 
 
-def predict(eff: float) -> pd.DataFrame:
+def predict(eff: float, rot: str) -> pd.DataFrame:
     from fetch import load
     from search2 import preprocess2
     from inject import duration_14, epochs_in_data
@@ -149,7 +149,7 @@ def predict(eff: float) -> pd.DataFrame:
             out.append(row)
             continue
         lc, meta = load(int(r["tic"]))
-        pp, rinfo = preprocess2(lc)
+        pp, rinfo = preprocess2(lc, rot)
         M = r["mstar"] if np.isfinite(r["mstar"]) else 0.3
         R = r["rstar"] if np.isfinite(r["rstar"]) else 0.3
         if np.isfinite(r["dur_h"]):
@@ -180,6 +180,6 @@ if __name__ == "__main__":
         build()
     elif sys.argv[1] == "predict":
         cfg = json.loads((G2 / "frozen.json").read_text())
-        o = predict(cfg["pred_eff"])
+        o = predict(cfg["pred_eff"], cfg["rot"])
         print(o[["planet", "tic", "P", "rp_re", "tmag", "n_sectors", "n_tr", "snr_white",
                  "mes_pred"]].to_string())

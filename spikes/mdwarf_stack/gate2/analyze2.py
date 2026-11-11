@@ -30,15 +30,16 @@ G2 = OUT / "gate2"
 PROVISIONAL = 7.5
 
 
-def rd(name):
-    p = G2 / f"{name}.out.jsonl"
-    if not p.exists():
-        return []
+def rd(*names):
     rows = {}
-    for x in open(p):
-        if x.strip():
-            r = json.loads(x)
-            rows[r["id"]] = r
+    for name in names:
+        p = G2 / f"{name}.out.jsonl"
+        if not p.exists():
+            continue
+        for x in open(p):
+            if x.strip():
+                r = json.loads(x)
+                rows[r["id"]] = r
     return list(rows.values())
 
 
@@ -55,11 +56,30 @@ def frozen():
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-def is_fast(rinfo, fz):
-    if not rinfo or not rinfo.get("applied"):
-        return False
-    frac = rinfo["n_sec_applied"] / max(rinfo["n_sec"], 1)
-    return frac >= fz["fast_min_frac"] and (rinfo.get("amp") or 0) >= fz["fast_min_amp"]
+_CENSUS = None
+
+
+def census():
+    """tic -> census row (gate2/census.py, real uninjected light curves)."""
+    global _CENSUS
+    if _CENSUS is None:
+        fr = [pd.read_csv(p) for p in sorted(G2.glob("rot_census_*.csv"))]
+        _CENSUS = ({} if not fr else
+                   pd.concat(fr).drop_duplicates("tic").set_index("tic").to_dict("index"))
+    return _CENSUS
+
+
+def is_fast(tic, fz):
+    """Frozen DEV rule: LS power >= census.POW_STRONG in >= fast_min_frac of the sectors."""
+    c = census().get(int(tic))
+    if c is None:
+        raise KeyError(f"no rotation census for TIC {tic}")
+    return c["frac_strong"] >= fz["fast_min_frac"]
+
+
+def arm_files(fz):
+    rot = fz.get("rot", "harm")
+    return f"dev_nulls_long_{rot}", f"dev_nulls_short_{rot}"
 
 
 def rec_top(r, tau):
@@ -85,13 +105,13 @@ def dev(S):
     print("## DEV real controls, long search (top MES; rotation info from harm arm)")
     print("| tic | n_sec | none: top MES (P) | harm: top MES (P) | harm applied sectors | P_rot | amp | max LS power |")
     print("|---|---|---|---|---|---|---|---|")
-    census = {}
+    cens = {}
     for (t, arm), r in sorted(real.items()):
         if arm != "harm":
             continue
         n = real.get((t, "none"))
         ri = r["rot_info"]
-        census[t] = ri
+        cens[t] = ri
 
         def tp(x):
             if x is None or not x["signals"]:
@@ -108,11 +128,10 @@ def dev(S):
         key = r["id"].rsplit("-", 1)[0]
         pairs.setdefault(key, {})[r["rot"]] = r
     if fz:
-        print(f"\nfast rule: applied in >= {fz['fast_min_frac']} of sectors and amp >= "
-              f"{fz['fast_min_amp'] * 1e3:.1f} ppt")
+        print(f"\nfast rule: LS power >= {fz['fast_pow']} in >= {fz['fast_min_frac']} of sectors")
     for grp in ("slow", "fast"):
         ks = [k for k, v in pairs.items() if len(v) == 2 and fz
-              and (is_fast(census.get(v["harm"]["tic"]), fz) == (grp == "fast"))]
+              and (is_fast(v["harm"]["tic"], fz) == (grp == "fast"))]
         for arm in ("none", "harm"):
             k = sum(rec_top(pairs[x][arm], PROVISIONAL) for x in ks)
             anym = sum(bool(pairs[x][arm]["inj_match"] and pairs[x][arm]["inj_match"][0][0])
@@ -135,7 +154,7 @@ def dev(S):
               f"{len(m)}; median MES/SNR_white {np.median(ratio):.3f} "
               f"(16-84%: {np.percentile(ratio, 16):.3f}-{np.percentile(ratio, 84):.3f})")
         S["eff"] = float(np.median(ratio))
-    S["dev_census"] = {str(k): v for k, v in census.items()}
+    S["dev_rot_info"] = {str(k): v for k, v in cens.items()}
 
 
 def _tau(stats):
@@ -145,7 +164,9 @@ def _tau(stats):
 
 
 def tau(S):
-    for rg, name in (("long", "dev_nulls_long_harm"), ("short", "dev_nulls_short_harm")):
+    fz = frozen()
+    nl, ns = arm_files(fz)
+    for rg, name in (("long", nl), ("short", ns)):
         rows = [r for r in ok(rd(name)) if r["id"].startswith("null")]
         errs = len(rd(name)) - len(ok(rd(name)))
         if not rows:
@@ -171,11 +192,12 @@ def tau(S):
         S[f"null_top_{rg}"] = [float(x) for x in st[:10]]
     # DEV real controls against tau
     if "tau_long" in S:
-        real = [r for r in ok(rd("dev_paired")) if r["id"].startswith("devreal") and r["rot"] == "harm"]
+        real = [r for r in ok(rd("dev_paired")) if r["id"].startswith("devreal")
+                and r["rot"] == fz.get("rot", "harm")]
         above = [(top(r), r["tic"]) for r in real if top(r) >= S["tau_long"]]
         print(f"DEV real controls (harm, long) above tau_long: {len(above)}/{len(real)} {above}")
     if "tau_short" in S:
-        rs = [r for r in ok(rd("dev_nulls_short_harm")) if r["id"].startswith("devrealS")]
+        rs = [r for r in ok(rd(ns)) if r["id"].startswith("devrealS")]
         above = [(round(top(r), 2), r["tic"], round(r["signals"][0]["P"], 3)) for r in rs
                  if top(r) >= S["tau_short"]]
         print(f"DEV real controls (harm, short) above tau_short: {len(above)}/{len(rs)} {above}")
@@ -184,8 +206,7 @@ def tau(S):
 def test(S):
     fz = frozen()
     tl, ts = fz["tau_long"], fz["tau_short"]
-    real = ok(rd("test_real"))
-    census = {r["tic"]: r["rot_info"] for r in real}
+    real = ok(rd("test_real", "test_real_short"))
     print(f"\n## (a) TEST real controls; tau_long = {tl:.2f}, tau_short = {ts:.2f}")
     for rg, t in (("long", tl), ("short", ts)):
         rr = [r for r in real if r["range"] == rg]
@@ -198,7 +219,7 @@ def test(S):
                 continue
             s = max(r["signals"], key=lambda s: s["mes"])
             print(f"| {r['tic']} | {r['n_sectors']} | {s['mes']:.2f} | {s['P']:.3f} | {s['n_ep']} | "
-                  f"{s['dur_h']:.1f} | {near_orbit(s['P'])} | {is_fast(r['rot_info'], fz)} |")
+                  f"{s['dur_h']:.1f} | {near_orbit(s['P'])} | {is_fast(r['tic'], fz)} |")
         S[f"test_real_{rg}_above"] = [len(above), len(rr)]
         S[f"test_real_{rg}_top"] = [[r["tic"], top(r), max(r["signals"], key=lambda s: s["mes"])["P"]]
                                     for r in sorted(rr, key=top, reverse=True)[:6] if r["signals"]]
@@ -214,7 +235,7 @@ def test(S):
         if n is not None and n.get("identical_to_harm"):
             n = r  # harm changed no sector of this injected light curve: identical arms
         rows.append({"cell": r["inj"]["cell"], "nsec": r["n_sectors"], "b": bucket(r["n_sectors"]),
-                     "fast": is_fast(census.get(r["tic"]), fz), "rec": rec_top(r, tl),
+                     "fast": is_fast(r["tic"], fz), "rec": rec_top(r, tl),
                      "rec_none": rec_top(n, tl) if n else np.nan, "has_none": n is not None,
                      "ge2": r["inj"]["n_tr_data"] >= 2, "snr": r["inj"]["snr_white"],
                      "matched_any": bool(r["inj_match"] and r["inj_match"][0][0]),
@@ -349,8 +370,8 @@ def hosts(S):
 def cost(S):
     from select_controls import sectors_for
 
-    names = ["dev_paired", "dev_nulls_long_harm", "dev_nulls_short_harm", "test_real", "test_inj",
-             "test_inj_none", "hosts"]
+    names = ["dev_paired", *arm_files(frozen()), "test_real", "test_real_short", "test_inj",
+             "test_inj_none", "hosts", "hosts_short"]
     runs = [r for n in names for r in ok(rd(n)) if not r.get("identical_to_harm")]
     df = pd.DataFrame([{"cpu": r["cpu_s"], "pre": r["cpu_pre"], "it": r["n_iter"],
                         "bins": r["n_bins"], "T": r["T_base"], "nsec": r["n_sectors"],

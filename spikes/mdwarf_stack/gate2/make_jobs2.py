@@ -107,14 +107,16 @@ def dev(rot):
 
 def test(rot):
     c = _ctl("TEST")
-    jobs = []
+    jobs = {"long": [], "short": []}
     for _, row in c.iterrows():
         m, r = _mr(row)
         t = int(row["tic"])
         for rg in ("long", "short"):
-            jobs.append({"id": f"testreal-{rg}-{t}", "tic": t, "mode": "real", "seed": 0,
-                         "rot": rot, "range": rg, "max_sig": 3, "mass": m, "radius": r})
-    dump("test_real.jsonl", jobs)
+            jobs[rg].append({"id": f"testreal-{rg}-{t}", "tic": t, "mode": "real", "seed": 0,
+                             "rot": rot, "range": rg, "max_sig": 3, "mass": m, "radius": r})
+    # long and short in separate files so the long range (criteria a-d) can run first
+    dump("test_real.jsonl", jobs["long"])
+    dump("test_real_short.jsonl", jobs["short"])
     rng = np.random.default_rng(20261124)
     info = {int(t): _nsec(int(t)) for t in c["tic"]}
     inj, paired = [], []
@@ -139,7 +141,7 @@ def test(rot):
 def hosts(rot):
     h = pd.read_csv(CAT_DIR / "holdout_g2.csv")
     h = h[h["in_range"] & h["tic"].notna()]
-    jobs = []
+    jobs = {"long": [], "short": []}
     seen = set()
     stars = [(t, m, r, "g1host") for t, (m, r) in HOSTS.items()]
     for _, row in h.iterrows():
@@ -154,14 +156,20 @@ def hosts(rot):
         if not (LC_DIR / f"tic{t}.npz").exists():
             continue
         for rg in ("long", "short"):
-            jobs.append({"id": f"{kind}-{rg}-{t}", "tic": t, "mode": "real", "seed": 0, "rot": rot,
-                         "range": rg, "max_sig": 6, "mass": m, "radius": r})
-    dump("hosts.jsonl", jobs)
+            jobs[rg].append({"id": f"{kind}-{rg}-{t}", "tic": t, "mode": "real", "seed": 0,
+                             "rot": rot, "range": rg, "max_sig": 6, "mass": m, "radius": r})
+    dump("hosts.jsonl", jobs["long"])
+    dump("hosts_short.jsonl", jobs["short"])
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("stage")
-    ap.add_argument("--rot", default="harm")
+    ap.add_argument("--rot", default=None)
     a = ap.parse_args()
+    if a.rot is None:
+        if a.stage == "dev":
+            a.rot = "harm"
+        else:  # test / hosts: the frozen arm, never a default
+            a.rot = json.loads((G2 / "frozen.json").read_text())["rot"]
     {"dev": dev, "test": test, "hosts": hosts}[a.stage](a.rot)

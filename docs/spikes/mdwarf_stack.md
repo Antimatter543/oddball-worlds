@@ -320,30 +320,43 @@ entry). It is 0 if fewer than 2 transits are in the data. **Predicted detectable
 - **Verdict:** all five pass means recommend the survey. If (a) or (b) fails, recommend stopping, or name the one
   change that could plausibly fix it. Nothing is adjusted after a TEST or host result is seen.
 
+## Gate 2: DEV-stage notes (before any TEST-star or host search)
+- **Reboot 2026-11-11 ~12:20** killed the first agent with `dev_paired` at 253/360 (all 240 paired injections done,
+  107 real-control runs left). The job runner resumed per id; nothing was re-done or lost.
+- **TEST data:** 58 of the 60 TEST controls have TESS data. TIC 950768810 and 198615518 have no SPOC 2-min or
+  TESS-SPOC product at MAST (`fetch.py`: "no products", twice). They are absent from every TEST stage, so (a) is
+  scored on 58 stars (at most 1 above tau_long, as for 60). Hold-out hosts: 68 of 68 present.
+- **Fast/slow rule (fixed before the arm rule was applied).** The harm `amp` field is unusable: for P_rot ~ 3-5 d
+  the spline-modulated harmonics are nearly collinear with the spline baseline, so the rotational part alone
+  reaches 292 (relative flux) on TIC 82355915 while the total model is fine. The model only blows up on points
+  inside the 0.25 d segment edges (e.g. 3e6 on a 0.68 d segment of TIC 233570240 S53), and the gate-1
+  preprocessing trims exactly those points, so the search is unaffected; the wotan "trend zero or negative"
+  warnings in the run logs come from those edges. The rule therefore uses the LS power only
+  (`gate2/census.py`, real uninjected light curves): **fast = LS peak power >= 0.1 in >= 50% of sectors**. DEV:
+  18 of 60 fast, including all 6 gate-1 rotators. The census is bimodal (38 stars at 0, 17 at >= 0.5).
+- **Arm rule (pre-registered, provisional MES 7.5, 120 DEV pairs): harm chosen.** Slow (84): harm 44, none 46,
+  -2.4 points (rule: >= -3). Fast (36): harm 10, none 2. Either reading of "3 points" (fraction or count) gives
+  harm. On slow stars the median matched-MES change is 0.00, but one injection lost 8.3 MES under harm (it eats
+  some transits). DEV real controls, long search: the fast rotators' 10-12 d peaks under none (TIC 350559457
+  11.83 at 10.28 d, 462637035 9.03, 233570240 8.65) vanish under harm. The DEV real maximum under harm is 7.54.
+- **pred_eff = 0.741** (median MES / SNR_white, 47 matched of 53 DEV harm injections with SNR_white >= 12;
+  16-84%: 0.636-0.816).
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
-**State at 2026-11-11 12:10 AEST.** The GPU fell off the bus at 11:55:21 (Xid 79, reset required) during the control
-downloads, before any gate-2 search used it. Gate 2 runs CPU only (the gate-1 CPU engine), at most 3 workers under
-`nice -n 19 ionice -c3`. The pre-registration above is committed (8798f55). **No TEST star and no host has been
-searched.** The frozen-method entry (`outputs/planets_spike/gate2/frozen.json` plus a doc entry) is not written yet.
+**State at 2026-11-11 15:35 AEST.** CPU only, at most 3 workers under `nice -n 19 ionice -c3`. Pre-registration:
+8798f55. **No TEST star and no host has been searched.** `outputs/planets_spike/gate2/frozen.json` holds the fast
+rule, rot = harm and pred_eff, but is **not yet frozen**: tau_long needs the DEV long nulls.
 
-Done and cached:
-- Controls: `data/planets_spike/catalogs/controls_g2.csv` (120; DEV 60, TEST 60). Light curves: one NPZ per star in
-  `data/planets_spike/lc/`. All 60 DEV stars are in; TEST stars are still downloading (`outputs/planets_spike/gate2/
-  fetch_controls.log`).
-- Hold-out: `data/planets_spike/catalogs/holdout_g2.csv` (83 planets with 10 < P <= 60 d on 68 hosts); hosts are
-  downloading (`fetch_holdout.log`). Re-running a fetch command skips stars already present.
-- Job files: `outputs/planets_spike/gate2/jobs/dev_paired.jsonl` (paired none/harm injections plus DEV real
-  controls), `dev_nulls_long_harm.jsonl` (420), `dev_nulls_short_harm.jsonl` (300 nulls plus 60 real). Results are
-  in `gate2/<name>.out.jsonl` and are resumable per job (finished ids are skipped).
+Done: `dev_paired` 360/360. `rot_census_DEV.csv`. Running: `dev_nulls_long_harm` (420).
 
-Next commands, from the worktree, with `PY` = a venv that has wotan (the gate-1 worktree's
-`.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`):
-1. Downloads, if they were killed: `nice -n 19 ionice -c3 $PY -I spikes/mdwarf_stack/fetch.py $(cat
-   data/planets_spike/catalogs/g2_fetch_order.txt)`, and the same with `holdout_fetch.txt` (the paths are under the
-   main checkout).
-2. DEV stage, resumable: `spikes/mdwarf_stack/gate2/run_stage.sh dev_paired dev_nulls_long_harm
-   dev_nulls_short_harm > outputs/planets_spike/gate2/run_dev.log 2>&1`
-3. `$PY -I spikes/mdwarf_stack/gate2/analyze2.py dev`. Apply the pre-registered arm rule, fix fast/slow and eff,
-   and write `frozen.json` (tau_long, tau_short, rot, fast_min_frac, fast_min_amp, pred_eff). Then run `analyze2.py
-   tau`, commit the frozen entry, and only after that run `make_jobs2.py test`, `make_jobs2.py hosts`, `holdout.py
-   predict`, and `run_stage.sh test_real test_inj test_inj_none hosts`.
+Next commands, from the worktree, `PY` as below, every heavy one niced:
+1. `spikes/mdwarf_stack/gate2/run_stage.sh dev_nulls_long_harm >> outputs/planets_spike/gate2/run_dev.log 2>&1`
+   (resumable).
+2. `$PY -I spikes/mdwarf_stack/gate2/freeze.py tau` (refuses if any TEST/host output exists; tau_short stays
+   "pending" if its nulls are not done), `analyze2.py tau`, then write the doc frozen entry and **commit**.
+3. Only after that commit: `census.py TEST`, `census.py HOSTS`, `make_jobs2.py test`, `make_jobs2.py hosts`,
+   `holdout.py predict`, then `run_stage.sh test_inj test_inj_none test_real hosts` (long range, criteria a-d),
+   then `run_stage.sh dev_nulls_short_harm test_real_short hosts_short`, then `freeze.py tau_late`.
+4. `analyze2.py all`.
+
+`PY` = `/home/antiraedus/Projects/oddball-worlds/.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`.
