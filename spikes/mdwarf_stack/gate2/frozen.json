@@ -1,0 +1,46 @@
+{
+ "fast_pow": 0.1,
+ "fast_min_frac": 0.5,
+ "fast_rule_time": "2026-11-11T15:27:54+10:00",
+ "dev_n_fast": [
+  18,
+  60
+ ],
+ "rot": "harm",
+ "arm_rule": {
+  "slow": {
+   "n": 84,
+   "harm": 44,
+   "none": 46,
+   "diff": -0.023809523809523808
+  },
+  "fast": {
+   "n": 36,
+   "harm": 10,
+   "none": 2,
+   "diff": 0.2222222222222222
+  }
+ },
+ "arm_rule_mes": 7.5,
+ "n_pairs": 120,
+ "arm_time": "2026-11-11T15:27:54+10:00",
+ "pred_eff": 0.7406861963546326,
+ "pred_eff_n": [
+  47,
+  53
+ ],
+ "pred_eff_16_84": [
+  0.6355981615536864,
+  0.8164447991687747
+ ],
+ "tau_long": 8.054233220378304,
+ "tau_long_rank": 3,
+ "n_null_long": 420,
+ "tau_long_status": "final",
+ "tau_short": 6.9422096567898866,
+ "tau_short_status": "final",
+ "tau_time": "2026-11-11T15:52:29+10:00",
+ "tau_short_rank": 2,
+ "n_null_short": 300,
+ "tau_late_time": "2026-11-11T17:38:15+10:00"
+}
