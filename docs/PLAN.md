@@ -45,6 +45,25 @@ A completeness-calibrated **anomaly hunt** across TESS extended-mission (Sector 
 ## Track B (parked): Gaia DR4 neural orbit fitter
 Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimation for stars with 0, 1 or 2 hidden companions, plus a per-source detection-completeness map for the 100 pc volume. Novelty: no published NPE on Gaia orbits (as of Nov 2026). Competition: Flatiron "Epochalypse" (arXiv:2611.06915), DPAC's own NSS tables. Revisit in December.
 
+## Track C (active since 2026-11-11): temperate small planets around nearby M dwarfs
+The owner's main goal is Earth-like planet candidates; the weird-star hunt above does not serve it. A review of
+every public dataset left one route: a blind transit search that stacks **all** TESS sectors per star, for
+15-50 d planets around mid-to-late M dwarfs. The deepest published search (Gillis, Cloutier & Pass,
+arXiv:2602.23364) joined at most four consecutive sectors, searched 57% of its stars only to 14 d, recovered 6.5%
+of 1.0-1.5 R_earth planets at 15-30 d, and missed LHS 1140 b.
+
+- **Kill test (2026-11-11): formal pass, marginal.** Criteria, method and results: `docs/spikes/mdwarf_stack.md`;
+  code: `spikes/mdwarf_stack/`. LHS 1140 b and TOI-700 d were recovered blind; Gliese 12 b was the top signal at
+  the right period but 0.11 below the threshold. Recovery of 1.0-1.5 R_earth at 15-30 d on stars with 6+ sectors:
+  0.23 [0.13, 0.37]. Cost for 8,000 stars: ~230 CPU-h, or ~1.8 days on the GPU.
+- **Why marginal:** fast rotators (P ~1.2-1.4 d) leak through the detrending, set the global threshold and take
+  the search slots on 20% of controls. At the conservative fallback threshold, criteria (a) and (b) fail.
+- **Next gate, before any survey:** remove rotation before the search and test it against injections;
+  pre-register period-dependent thresholds from several hundred nulls; enlarge the control set.
+- **Expected yield:** zero to one marginal candidate. The pipeline should be ready for PLATO public data (~2028).
+- **Fallbacks:** neural inference of unseen companions from transit timing; habitable-zone transits of white
+  dwarfs in ZTF.
+
 ## Results log
 
 ### 2026-11-09: classical baseline on S32 (test split) — gate FAIL
