@@ -13,9 +13,8 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
-from numba import njit
-
 from common import BIN_D
+from numba import njit
 
 G_AU3_MSUN_D2 = 2.959122082855911e-4  # G in AU^3 / (M_sun d^2)
 RSUN_AU = 0.00465047
@@ -221,8 +220,7 @@ def _fold(u, N, D, s2, pu, dom_max):
             acc[b, 0] += N[i]
             acc[b, 1] += D[i]
             acc[b, 2] += 1.0
-            if s2[i] > acc[b, 3]:
-                acc[b, 3] = s2[i]
+            acc[b, 3] = max(acc[b, 3], s2[i])
         bm = 0.0
         bb = -1
         for b in range(nb):
@@ -264,7 +262,7 @@ def _ffa_best(X, p, m_real, dom_max):
                     B[o, x, 2] = A[hr, x, 2] + A[tr, y, 2]
                     a3 = A[hr, x, 3]
                     b3 = A[tr, y, 3]
-                    B[o, x, 3] = a3 if a3 > b3 else b3
+                    B[o, x, 3] = max(b3, a3)
         A, B = B, A
         n *= 2
     best = np.zeros(m)
@@ -371,7 +369,7 @@ def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float
             continue
         s = max(1, k // 2)  # amendment 2: coarse stride D/2 (pre-registered D/3)
         plan.append((k, s, pr))
-    stats = {"T_base": T, "n_periods": 0, "ops": 0, "n_bins": int(len(pp["idx"])),
+    stats = {"T_base": T, "n_periods": 0, "ops": 0, "n_bins": len(pp["idx"]),
              "n_iter": 0}
     sigs: list[Signal] = []
     for _ in range(max_sig):
@@ -406,7 +404,7 @@ def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float
             o = np.argsort(P)
             P, mes, t0s = P[o], mes[o], t0s[o]
             if stats["n_iter"] == 1:
-                stats["n_periods"] += int(len(P))
+                stats["n_periods"] += len(P)
             if len(mes) == 0:
                 continue
             j = int(np.argmax(mes))

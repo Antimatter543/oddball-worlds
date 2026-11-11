@@ -158,4 +158,89 @@ TIC 441721594 (40 sectors) and TIC 278078111 (10 sectors).
   including the desktop. No CUDA errors and no `nvidia-smi` failures.
 
 ## Results log
-(Filled in after the runs.)
+
+### 2026-11-11: kill test. Formal PASS at the pre-registered τ; the threshold is flagged under-calibrated (rotators)
+Commands, run from the worktree (outputs in `outputs/planets_spike/`):
+`fetch.py`, `select_controls.py`, `make_jobs.py`, then `run_jobs.py jobs/{nulls,controls_real,hosts_only}.jsonl`
+(CPU), then `run_jobs.py jobs/inj240.jsonl --gpu` together with `jobs/inj240_rev.jsonl` (CPU), then
+`analyze.py all` and `validate_gpu.py compare`. Data: SPOC 2-min PDCSAP (TESS-SPOC FFI for 5 control sectors),
+downloaded 2026-11-11. Provenance is in each NPZ's `meta`.
+
+**Threshold.** τ = 12.27, from 120 nulls. 4 of the 30 *real* controls exceed it, at P = 1.18-1.39 d: TIC 233570240
+(24.0), 339607562 (15.5), 188777432 (14.3) and 284476342 (13.3). These are the same stars whose inverted nulls
+set τ. They are fast rotators, and the 0.5 d biweight does not remove rotation at P ≈ 1.2-1.4 d. By the
+pre-registered rule the threshold is **flagged**, and results are also given at τ_cons = 23.99.
+
+The orbit-period check is clean. 13% of null signals fall within 3% of a 13.7/27.4 d multiple or fraction, which
+is about the chance rate for those windows. No top null or real-control peak is orbit-related.
+
+A **post-hoc diagnostic (not pre-registered)** restricted to P ≥ 10 d: the null maximum is 8.27 and the 2nd
+highest is 7.56. The real-control maximum is 8.27 (TIC 233903720, 18.08 d, 5 epochs; sub-threshold, not vetted).
+
+**(a) Known planets: blind, all sectors, CPU engine.**
+
+| planet | sectors used | P_true | P_det | order | MES | ≥ τ (12.27) | ≥ τ_cons (23.99) | epoch match (det/known) | alias |
+|---|---|---|---|---|---|---|---|---|---|
+| LHS 1140 b | 3, 30, 107 | 24.7373 | 24.7372 | 1st | 33.07 | yes | yes | 1.00 / 1.00 (3 transits) | none |
+| LHS 1140 c | same | 3.7779 | 3.7779 | 2nd | 25.47 | yes | yes | 1.00 / 0.93 | none |
+| TOI-700 d | 37 sectors, S1-S97 | 37.4237 | 37.4236 | 3rd (after c, b) | 15.12 | yes | no | 1.00 / 0.92 (22 epochs) | none |
+| TOI-700 e | same | 27.8097 | 27.8100 | 4th | 9.90 | no | no | 1.00 / 0.93 | none |
+| TOI-700 b / c | same | 9.977 / 16.051 | exact | 2nd / 1st | 16.98 / 54.25 | yes | c only | ≥ 0.91 | none |
+| Gliese 12 b | 42, 43, 57, 70, 84 | 12.7615 | 12.7614 | 1st | **12.16** | **no (by 0.11)** | no | 1.00 / 1.00 (7 transits) | none |
+
+**(a): 2 of 3 at τ, PASS. 1 of 3 at τ_cons, FAIL.** Gliese 12 b is the top blind signal at the exact period,
+and it sits above every null with P ≥ 10 d (8.27). It misses only the rotator-set τ.
+
+**(b) Injections:** 240 total, 60 per cell. They went into the raw binned PDCSAP of the 30 controls, 8 per star.
+The engines are 176 CPU and 64 GPU (validated equivalent). 95% Wilson intervals; n in brackets.
+
+| cell | all stars | 6+ sectors | 1-5 sectors | 26+ sectors | 6+ sectors at τ_cons | 6+ sectors at post-hoc τ_long = 7.56 |
+|---|---|---|---|---|---|---|
+| 1.0-1.5 R_e, 15-30 d | 0.17 [0.09, 0.28] (60) | **0.23 [0.13, 0.37] (44)** | 0.00 [0.00, 0.19] (16) | 0.50 [0.22, 0.78] (8) | 0.05 [0.01, 0.15] | 0.39 [0.26, 0.53] |
+| 1.0-1.5 R_e, 30-50 d | 0.10 [0.05, 0.20] (60) | 0.18 [0.08, 0.36] (28) | 0.03 [0.01, 0.16] (32) | 0.42 [0.19, 0.68] (12) | 0.14 [0.06, 0.31] | 0.50 [0.33, 0.67] |
+| 1.5-2.0 R_e, 15-30 d | 0.38 [0.27, 0.51] (60) | 0.43 [0.30, 0.58] (44) | 0.25 [0.10, 0.49] (16) | 0.50 [0.22, 0.78] (8) | 0.20 [0.11, 0.35] | 0.57 [0.42, 0.70] |
+| 1.5-2.0 R_e, 30-50 d | 0.38 [0.27, 0.51] (60) | 0.71 [0.53, 0.85] (28) | 0.09 [0.03, 0.24] (32) | 1.00 [0.76, 1.00] (12) | 0.21 [0.10, 0.40] | 0.86 [0.69, 0.94] |
+
+Every 6+ sector injection had at least 2 transits in the data.
+
+**(b): 0.23 vs ≥ 0.20, PASS on the point estimate**, but the interval [0.13, 0.37] includes 0.20. At τ_cons it is
+0.05, FAIL.
+
+Comparison with Gillis (6.5%, all stars, vetted-candidate level): ours over all stars is 0.17 [0.09, 0.28], at
+*detection* level with no vetting, so it is an upper bound on a like-for-like number.
+
+**Where the misses go:** 134 of 240 were never matched by any signal.
+- 48 are the 8 injections on each of the **6 fast rotators**: all 3 signal slots were spent on P < 3 d rotation
+  (failure mode 5).
+- 78 never produced a signal above the MES floor of 6, mostly on stars with 1-5 sectors.
+
+**(c) Compute.** The cost per iteration was fitted on all measured searches (333 CPU, 72 GPU; cheap and 40-sector
+stars alike). It was applied to tess-point coverage of 14,471 TIC M dwarfs (Teff 2700-3400 K, d < 50 pc). That
+coverage includes pointings up to S132, beyond today; on the controls, real data cover 0.74× the predicted
+sectors, so the estimate is conservative. 2.77 signals per star, from the real controls.
+- **CPU:** mean 0.029 CPU-h per star (max 0.33). **3,000 stars: 87 CPU-h; 8,000 stars: 230 CPU-h**
+  (3.2 days on 3 niced workers). Limit 1,500: **PASS**.
+- **GPU:** mean 0.0054 GPU-h per star. **3,000 stars: 16 GPU-h; 8,000 stars: 43 GPU-h** (1.8 days on the
+  1650S). Limit 2 weeks: **PASS**.
+- **What dominates:** the period count grows as T_base/binw. Brute fold costs N_samples × N_periods. The FFA
+  barely helped, because non-consecutive sectors leave the dense series ~83% empty. What actually cut the cost:
+  10-min bins, a D/2 coarse stride, 5 boxes, and the GPU exact fold (about 1.4 G fold-elements/s, ~5-7× one core).
+
+### Verdict: continue-with-changes
+All three criteria pass at the pre-registered τ. But criteria (a) and (b) pass by margins smaller than their own
+uncertainty, and both fail at the τ_cons fallback the pre-registration required once the threshold was flagged.
+The cost question is settled: an 8,000-star all-sector search costs ~230 CPU-h, or ~2 days on the GPU. The
+sensitivity question is not. A single global threshold is set by M-dwarf fast rotation at ~1.2-1.4 d, which also
+eats the signal slots on 20% of the controls.
+
+**Changes before continuing:**
+1. Remove rotation explicitly: fit and subtract P_rot and its harmonics, or use a GP, before the box search, and
+   test it against injections.
+2. Pre-register a period-dependent threshold (for example 1-10 d and 10-60 d) calibrated on several hundred null
+   realisations.
+3. Enlarge the control set, so the 1% false-alarm level is measured rather than extrapolated.
+
+**Biggest risk:** after rotation is handled, the long-period false-alarm tail is unknown. It comes from 13.7 d
+pairs and edge systematics, and from 30 controls and 120 realisations the post-hoc τ_long is only an estimate.
+If the true long-period tail is near 9-10 rather than 7.6, Gliese 12 b-like and 1.0-1.5 R_e signals sit right
+at it.

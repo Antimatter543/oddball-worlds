@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import CAT_DIR  # noqa: E402
+from common import CAT_DIR
 
 HOSTS = {92226327, 150428135, 52005579}
 # Strata of predicted sector count -> number of stars. Weighted to 6+ sectors (criterion b).

@@ -15,14 +15,14 @@ import os
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-import argparse  # noqa: E402
-import json  # noqa: E402
-import sys  # noqa: E402
-import time  # noqa: E402
-from multiprocessing import get_context  # noqa: E402
-from pathlib import Path  # noqa: E402
+import argparse
+import json
+import sys
+import time
+from multiprocessing import get_context
+from pathlib import Path
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -69,7 +69,7 @@ def run_job(job: dict) -> dict:
     if inj:
         dur = duration_14(inj["P"], inj["rp"], inj["b"], job["mass"], job["radius"])
         out["inj"] = dict(inj, dur14=dur)
-        out["inj"]["n_tr_data"] = int(len(epochs_in_data(pp["idx"], inj["P"], inj["t0"], dur)))
+        out["inj"]["n_tr_data"] = len(epochs_in_data(pp["idx"], inj["P"], inj["t0"], dur))
         out["inj_match"] = [list(match(s, inj["P"], inj["t0"], dur, pp["idx"]))
                             for s in out["signals"]]
     return out

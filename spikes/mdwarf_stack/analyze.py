@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import BIN_D, CAT_DIR, OUT  # noqa: E402
+from common import CAT_DIR, OUT
 
 KNOWN = {  # ExoFOP TOI id -> (host TIC, planet name); ephemerides read from toi.csv
     256.01: (92226327, "LHS 1140 b"), 256.02: (92226327, "LHS 1140 c"),

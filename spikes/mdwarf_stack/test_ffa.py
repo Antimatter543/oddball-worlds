@@ -7,8 +7,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import BIN_D  # noqa: E402
-from search import build_ses, ffa_search, fold_grid, search_star  # noqa: E402
+from common import BIN_D
+from search import build_ses, ffa_search, fold_grid, search_star
 
 
 def _fake(P=17.3, t0=1500.2, depth=0.004, dur=2.0 / 24, seed=1):

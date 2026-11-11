@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-
 from common import BIN_D
 from search import G_AU3_MSUN_D2, RSUN_AU
 

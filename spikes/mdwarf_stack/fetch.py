@@ -24,8 +24,9 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from common import BIN_MIN, LC_DIR, USER_AGENT  # noqa: E402
-from oddball.tess.lightcurve import convert_fits_bytes  # noqa: E402
+from common import BIN_MIN, LC_DIR, USER_AGENT
+
+from oddball.tess.lightcurve import convert_fits_bytes
 
 DL = "https://mast.stsci.edu/api/v0.1/Download/file?uri="
 _SEC = re.compile(r"-s(\d{4})")

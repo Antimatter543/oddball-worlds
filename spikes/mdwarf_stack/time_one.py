@@ -5,18 +5,17 @@ from __future__ import annotations
 import os
 
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
-import sys  # noqa: E402
-import time  # noqa: E402
-from pathlib import Path  # noqa: E402
+import sys
+import time
+from pathlib import Path
 
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+import numpy as np
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import BIN_D, CAT_DIR  # noqa: E402
-from fetch import load  # noqa: E402
-from search import (DURATIONS, build_ses, fold_grid, period_grid, period_range_for,  # noqa: E402
-                    preprocess)
+from common import BIN_D, CAT_DIR
+from fetch import load
+from search import DURATIONS, build_ses, fold_grid, period_grid, period_range_for, preprocess
 
 tic = int(sys.argv[1])
 c = pd.read_csv(CAT_DIR / "controls.csv").set_index("tic").loc[tic]

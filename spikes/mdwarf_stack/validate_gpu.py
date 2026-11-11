@@ -1,12 +1,12 @@
 """Validate the GPU coarse fold and full GPU search against the CPU search.
 
   coarse: per-period MES on the same exact grid, GPU vs CPU brute fold (search.fold_grid)
-  full:   GPU search_star vs the CPU results already in controls_real.jsonl / a CPU rerun
+  compare: full GPU searches (run_jobs.py --gpu -> val_gpu.jsonl) vs CPU results
 Tolerance (fixed here, before comparing): top signal period agrees to |dP|/P < 1e-3 (or the
 same integer alias), and MES agrees to within 2% (relative). Per-period coarse MES: median
 |dMES| < 1e-3 and 99th percentile < 2% (float32 sums and bin-edge ties).
 
-Usage: python -I validate_gpu.py coarse TIC | full TIC [TIC ...] | inj ID [ID ...]
+Usage: python -I validate_gpu.py coarse TIC | compare
 """
 
 from __future__ import annotations
@@ -20,12 +20,18 @@ from pathlib import Path
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import numpy as np  # noqa: E402
-
-from common import BIN_D, OUT  # noqa: E402
-from gpu_search import GpuCoarse  # noqa: E402
-from search import (DOMINANCE, DURATIONS, build_ses, fold_grid, period_grid,  # noqa: E402
-                    period_range_for, preprocess, search_star)
+import numpy as np
+from common import BIN_D, OUT
+from gpu_search import GpuCoarse
+from search import (
+    DOMINANCE,
+    DURATIONS,
+    build_ses,
+    fold_grid,
+    period_grid,
+    period_range_for,
+    preprocess,
+)
 
 
 def coarse_check(tic, mass=0.3, radius=0.3):
@@ -58,32 +64,6 @@ def coarse_check(tic, mass=0.3, radius=0.3):
               f"CPU {tc_s:.2f}s; rel dMES median {np.median(d):.1e} p99 {np.percentile(d, 99):.1e}"
               f"; validity flips {nvalid_diff}; top P GPU {pg[np.argmax(full_g)]:.5f} "
               f"({full_g.max():.3f}) CPU {pg[np.argmax(mc)]:.5f} ({mc.max():.3f})", flush=True)
-
-
-def full(jobs):
-    from run_jobs import run_job
-
-    import run_jobs
-    g = GpuCoarse()
-    orig = run_jobs.__dict__.get("search_star")
-    import search as S
-
-    def gpu_search_star(pp, m, r, ms):
-        return S.search_star(pp, m, r, ms, coarse=g)
-
-    out = []
-    for job in jobs:
-        S_ss = S.search_star
-        S.search_star = lambda pp, m, r, ms, floor=S.MES_FLOOR: S_ss(pp, m, r, ms, floor, g)
-        try:
-            g.gpu_s = 0.0
-            res = run_job(job)
-            res["gpu_s"] = g.gpu_s
-        finally:
-            S.search_star = S_ss
-        out.append(res)
-    _ = orig
-    return out
 
 
 def compare():

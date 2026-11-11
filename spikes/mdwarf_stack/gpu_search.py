@@ -19,7 +19,6 @@ import subprocess
 
 import numpy as np
 import torch
-
 from search import DOMINANCE, period_grid
 
 VRAM_BUDGET = 2.0e9  # bytes of temporaries per chunk; desktop keeps the rest of the 4 GB

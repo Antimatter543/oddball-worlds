@@ -19,8 +19,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import BIN_D, CAT_DIR, OUT  # noqa: E402
-from fetch import load  # noqa: E402
+from common import BIN_D, CAT_DIR, OUT
+from fetch import load
 
 FALLBACK_M, FALLBACK_R = 0.3, 0.3
 # TIC v8 stellar parameters as listed by ExoFOP (same source as the controls' TIC values).
@@ -47,8 +47,7 @@ def main() -> None:
 
     def dump(name, jobs):
         with open(jobdir / name, "w") as fh:
-            for j in jobs:
-                fh.write(json.dumps(j) + "\n")
+            fh.writelines(json.dumps(j) + "\n" for j in jobs)
         print(name, len(jobs))
 
     real, nulls = [], []
