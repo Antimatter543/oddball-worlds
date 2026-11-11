@@ -128,7 +128,7 @@ def test(rot):
             base["inj"]["cell"] = ci
             jid = f"testinj{ci}-{i:03d}-{int(row['tic'])}"
             inj.append(dict(base, id=jid, rot=rot))
-            paired.append(dict(base, id=jid + "-none", rot="none"))
+            paired.append(dict(base, id=jid + "-none", rot="none", skip_if_unapplied=True))
     # interleave cells so that any prefix is balanced
     inj.sort(key=lambda j: (int(j["id"].split("-")[1]) / {0: 200, 1: 80, 2: 60, 3: 60, 4: 36}[
         j["inj"]["cell"]]))

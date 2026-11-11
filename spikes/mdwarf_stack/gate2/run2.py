@@ -80,6 +80,17 @@ def run_task(jobs: list[dict]) -> list[dict]:
                 lcj["flux"] = lc["flux"] * binned_model(
                     lc["idx"], P=inj["P"], t0=inj["t0"], rp_re=inj["rp"], b=inj["b"],
                     mass=job["mass"], radius=job["radius"])
+                if job["rot"] == "none" and job.get("skip_if_unapplied"):
+                    # paired arm: if harm changes no sector of this injected light curve, the
+                    # two arms are bitwise identical (flux / (1 + 0)), so the harm row stands in
+                    from search2 import remove_rotation, rot_summary
+
+                    _, infos = remove_rotation(lcj)
+                    if not rot_summary(infos)["applied"]:
+                        out.append({k: job[k] for k in ("id", "tic", "mode", "seed", "rot",
+                                                        "range", "max_sig")}
+                                   | {"identical_to_harm": True, "inj": job["inj"]})
+                        continue
                 pp, rinfo = preprocess2(lcj, job["rot"])
             elif key in cache:
                 pp, rinfo = cache[key]

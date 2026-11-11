@@ -108,6 +108,16 @@ def build() -> None:
         for col, src in (("rstar", "rad"), ("mstar", "mass")):
             v = float(cat[src][0]) if np.isfinite(cat[src][0]) else np.nan
             df.loc[(df["host"] == host) & ~np.isfinite(df[col]), col] = v
+    # the same planet listed twice with an integer period ratio (exoplanet.eu TOI-2285 b at
+    # 13.64 d vs TOI-2285.01 at 27.27 d): keep the TOI (TESS) entry
+    drop = []
+    for i, r in df[df["eph"] == "exoplanet.eu"].iterrows():
+        same = df[(df["tic"] == r["tic"]) & (df["eph"] == "TOI")]
+        for _, s in same.iterrows():
+            q = max(s["P"], r["P"]) / min(s["P"], r["P"])
+            if 2 <= round(q) <= 3 and abs(q - round(q)) < 0.01 * round(q):
+                drop.append(i)
+    df = df.drop(index=drop)
     df["in_range"] = (df["P"] > 10) & (df["P"] <= 60)
     df = df.sort_values(["in_range", "tmag"], ascending=[False, True])
     df.to_csv(CAT_DIR / "holdout_g2.csv", index=False)
