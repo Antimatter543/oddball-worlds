@@ -44,7 +44,7 @@ Everything here was checked first-hand on 2026-11-10 (S32 files, anonymous, no a
 | The same TESS-SPOC LC FITS we already download | `MOM_CENTR1/2` (flux-weighted centroid), `PSF_CENTR1/2`, `POS_CORR1/2` (pointing/DVA motion) and an `APERTURE` image (11×11 px in the S32 file checked). Its bits mark the optimal-aperture pixels and the **pixels used for the background** (bit 3, value 4). **`ingest.py` drops all of these.** | ~400 kB per star from MAST | verified |
 | QLP HLSP (T < 13.5) | Independent photometry: `SAP_FLUX`, `KSPSAP_FLUX` in a best aperture plus **`KSPSAP_FLUX_SML` / `KSPSAP_FLUX_LAG` (small and large apertures)**, its own `SAP_BKG`, `SAP_X/SAP_Y` centroids. Header gives the aperture radii (e.g. `SMALLAP 1.75`, `BESTAP 2.5`, `LARGEAP 3.0` px). Per-sector curl scripts. | ~100 kB per star | verified |
 | TESScut | Pixel cutout of the FFIs. An 11×11 px S32 cutout took 6 s and 9 MB. Limit: 10 concurrent requests per user. | 6 s, 9 MB per star-sector | verified [TESSCUT] |
-| SkyBoT cone search | Known asteroids in a cone at an epoch, **observer code `C57` = TESS**. Returns name, V, offset, motion in RA/Dec ("/h). | ~10 s per query | verified [SKYBOT] |
+| SkyBoT cone search | Known asteroids in a cone at an epoch. **Observer code `C57` does not give TESS's view:** SkyBoT returns geocentric positions for it (checked 2026-11-11, (535) Montague: C57 and `500` agree to 0.02″, JPL Horizons from TESS is 189″ away). Query `-loc=500` with a 12′ cone and shift to TESS's viewpoint with Horizons `-95` vectors (`scripts/skybot_check.py --observer tess`). Returns name, V, offset, motion in RA/Dec ("/h). | ~4–10 s per query | verified [SKYBOT] |
 | VizieR (CfA / IDIA mirrors) | EB catalogues beyond Prša: Kostov+2025 `J/ApJS/279/50` (7,936 new EBs in table3, 2,065 known in table4, **872,720 unvetted NN-flagged targets in table2**); Gaia DR3 EB candidates `I/358/veb`; Gaia DR3 non-single stars `I/357` (incl. `tboeb` eclipsing solutions) | cone queries | ids verified |
 | TESS Data Release Notes (DRN) | Per sector: orbit start/end times, momentum-dump times, cameras with Moon/Earth glints, **a table of fireflies/fireworks (FFI start/end, cameras)**, a **list of smear-affected columns (camera, CCD, column, bright star)**, quality-bit usage | 1 PDF per sector | read DRN48 (S32) |
 
@@ -127,7 +127,7 @@ anonymous service.
 |---|---|---|---|---|---|---|
 | F1 | **Asteroid in the background pixels** (seen) | Sharp 1–4-bin dip in SAP *and* PDCSAP, with a simultaneous **bump in `bkg`**. `sap_flux + bkg` shows no dip. Often dip-spike-dip if the object also crosses the aperture. Neighbours within a few px show `bkg` bumps one after another. Median interaction ~2 h. | **Background-explains-dip, per event.** Measure the event depth in SAP (δ_SAP) and the background rise in the same bins (Δbkg, both already in SAP-median units). Label the event systematic `bkg` when Δbkg ≥ 0.5 δ_SAP and the raw series `sap_flux + bkg` has no significant dip (box SNR < 3). Add this label to `cmv2`'s per-event decision. | have | **High.** Zero new data. It also catches any other background-estimate glitch (glints, firefly in the annulus). Contamination is common: in ecliptic sectors 42–46 and 70–72, **every** 20-s target had minor-planet passes, and > 1% contamination is ~50% of stars at T 13–15 and > 90% at T 15–17 [CASSESE]. **S43 and S44 (in our training set) are ecliptic sectors.** | [CASSESE] §results; [NK25] §4.3; [PHT] §5; [SDPDD] SAP_BKG |
 | F2 | **Asteroid track across neighbours** | A chain of `bkg` bumps (and SAP bumps or dips) in stars along a straight line, at a steady speed: main-belt ~1 px per 30-min cadence [PAL20], i.e. ~40″/h; SkyBoT gave 30–40″/h in a test cone. | **Moving-track test.** For each camera, collect positive `bkg`/raw-flux events (SNR > 5, ≤ 4 bins). Fit lines in (RA, Dec, t) with RANSAC, speed 5–300″/h, ≥ 3 stars per track. Flag any target whose event time matches a track passing within ~6 px (the 11×11 stamp holds the background pixels). | have | **High** on ecliptic and near-ecliptic cameras, low elsewhere (asteroid density falls steeply with ecliptic latitude [PAL20]). It also finds **unknown** asteroids, which SkyBoT can't. | [PAL20]; [ZTF25] space-time clustering; [CASSESE] |
-| F3 | **Known asteroid, confirmation** | As F1/F2 | **SkyBoT** cone at the event epoch, radius ~3′, `-loc=C57` (TESS observer), `-objFilter=100` (asteroids only). Report V, offset and motion; call it explained if a body with V ≲ 19 passes within ~6 px during the event. **Do not use a geocentric observer:** TESS's parallax for a main-belt object is several arcmin, i.e. many pixels ([CASSESE] needed a 15′ search radius from the geocentre). | API (SkyBoT, anonymous, ~10 s per query, so ~100 queries is ~20 min serial) | **High** for the final gallery (~100–300 events), as a label source for F1/F2, and as a gallery annotation. Alternatives: JPL `sb_ident` needs an observer state vector for spacecraft [SBID]; `tess-ephem` is per named object, not a field search [TEPH]; `jorbit` N-body postdiction [CASSESE] is heavier. | [SKYBOT]; [CASSESE] §5 |
+| F3 | **Known asteroid, confirmation** | As F1/F2 | **SkyBoT** cone at the event epoch, radius ~12′, `-loc=500` (geocentre), `-objFilter=100` (asteroids only), then shifted to TESS's viewpoint (parallax from SkyBoT's `Dg` and the Horizons TESS–Earth vector; matches Horizons to 0.2″). SkyBoT's `C57` silently returns geocentric positions (2026-11-11). Report V, offset and motion; call it explained if a body with V ≲ 19 passes within ~6 px during the event. **Do not use a geocentric observer:** TESS's parallax for a main-belt object is several arcmin, i.e. many pixels ([CASSESE] needed a 15′ search radius from the geocentre). | API (SkyBoT, anonymous, ~10 s per query, so ~100 queries is ~20 min serial) | **High** for the final gallery (~100–300 events), as a label source for F1/F2, and as a gallery annotation. Alternatives: JPL `sb_ident` needs an observer state vector for spacecraft [SBID]; `tess-ephem` is per named object, not a field search [TEPH]; `jorbit` N-body postdiction [CASSESE] is heavier. | [SKYBOT]; [CASSESE] §5 |
 | F4 | **Scattered light at orbit start/end, Earth/Moon glints** | Smooth ramps in SAP and `bkg` near orbit edges and data gaps, camera/CCD-correlated. Residual PDCSAP dips at the edges that are *star-specific* (a local background mis-estimate) slip past the common-mode map. | (a) Add QUALITY bits **16** (Argabrightening), **2048** (predicted stray light, FFIs), **32768** (PDC could not correct) and **128** (pointing > 7″) to `cmv2`'s known windows. (b) **Gap-edge test** [LEO III.12]: label an event systematic if it lies within 2 durations of an orbit start/end or a ≥ 0.3-d gap *and* \|d bkg/dt\| there is above the CCD's 90th percentile. (c) Optional: per-camera Earth/Moon angle (JPL Horizons TESS = −95, plus tess-point boresights); risk mask at Earth < 35°, Moon < 35°. | (a)(b) have; (c) API (Horizons, anonymous) | **High** for (a)(b): trivial, and orbit edges are a top systematic in [PHT] and [NK25]. Low for (c): `bkg` already measures the effect. | [DRN48] §1.3, §2; [LEO] III.12; [SDPDD] Table 32 |
 | F5 | **Momentum-dump steps and jitter** | A step, spike or short dip at a dump (bit 32; S32 dumps at 2179.48 and 2193.48). Flux moves in or out of the aperture as the pointing jumps. The dump cadence is dropped at ingest, so the bin has a low `npts`. | (a) Already: `cmv2`'s dump window. (b) **Step-vs-dip model test:** around a dump, compare the BIC of a step (Heaviside) and of a dip. Systematic if the step wins. (c) **Centroid/pointing correlation:** regress the event residual on `POS_CORR`/`MOM_CENTR` and flag when they explain > 50% of its χ². (d) `npts` guard: flag events made mostly of bins with `npts` < 50% of nominal. | (a)(b)(d) have; (c) LC-FITS | **Medium.** Mostly covered by `cmv2` already. (c) matters for bright and saturated stars: η¹ Pic's 0.14% "exocomet" was centroid jitter common to all bright stars nearby [NK25 App. B]. | [DRN48] §1.2; [PHT] §5 (top discard reason); [LEO] III.8/III.11; [NK25] |
 | F6 | **CCD-, camera- or focal-plane-wide events** (seen) | Same event time on many stars | Already `cmv2` (CCD and 512-px cell). **Add a sector-wide event-time histogram** across all 16 CCDs. De-weight bins above the median + 3σ, as SPOC TPS does with TCE pile-ups [DRN48 §4.2], and as the ZTF dipper search drops nights with > 10⁴ dips [ZTF25]. Also mark the DRN **fireworks** windows (all cameras, ~10 min). | have + DRN table | **Medium**: cheap. Catches events spread over several CCDs at a low rate per CCD. | [DRN48] §3.2, §4.2; [ZTF25] |
@@ -195,7 +195,7 @@ and 4a are pure NumPy over the shards we already stream.
    hosts with the `yso1` set (§15): `eb_like > 0.5` for 1 of 1,220 injections into catalogued
    YSO hosts and 0 of their 61 unchanged copies, so the EB down-weight does not hit young-host dippers.
 3. **Asteroid track test + SkyBoT confirmation** (F2, F3; 1–2 days). An internal RANSAC over
-   `bkg` events finds known and unknown movers on every camera. SkyBoT (`C57`) confirms the top
+   `bkg` events finds known and unknown movers on every camera. SkyBoT (geocentric, shifted to TESS's view; `C57` is geocentric in SkyBoT) confirms the top
    ~100–300 at ~10 s each, and the result is written as a gallery annotation. Run it first on
    S43/S44 (ecliptic) to size the problem.
 
@@ -206,6 +206,10 @@ and 4a are pure NumPy over the shards we already stream.
      neighbours for a track.
    - SkyBoT: `scripts/skybot_check.py`, run on the `ens_v2` top 200.
    - S43/S44 are still to do.
+
+   **Status (2026-11-11):** S43/S44 done on the candidates v1 targets, and the SkyBoT check now
+   corrects for TESS parallax (`--observer tess`, default). Every earlier SkyBoT run used `C57`,
+   which SkyBoT treats as geocentric, so those results are off by up to several arcmin.
 4. **Neighbour and blend pack without pixels, then keep centroids** (F10a/b/c, F8, F5c; ~1–2
    days).
    - (a) Neighbour event matching, the CROWDSAP / Δmag maximum-dilution test and the
@@ -229,6 +233,41 @@ and 4a are pure NumPy over the shards we already stream.
 Deferred: Earth/Moon angle masks (F4c; `bkg` already shows it), DRN firefly and smear-column
 parsing (F7, F8 lists; low counts), TRICERATOPS (built for periodic planets), Gaia binarity (E10;
 annotation only).
+
+## 5. Card triage protocol (cross-sector gallery, 2026-11-11)
+
+Fixed before any card of `cand_v1_n150` was labelled. Every card is labelled per star in
+`labels/triage_allsectors_v1.csv` through `scripts/triage_append.py`, which refuses a row
+without a reason, catalogue evidence, an "already known?" answer and a confirm/kill test, and
+refuses `unexplained` unless the row says why EB, systematic and blend each fail.
+
+**Inputs per star.** The card (`cards/<tic>_s<NNNN>.png`: best sector, zoom on the strongest
+`cmv3` residual event, the nearest CCD stars in the same window, every other ingested sector),
+the pixel card (`cards/<tic>_s<NNNN>_pix.png`, `scripts/pixel_check.py`: TESScut difference
+image, signal-locus map, 7x7 per-pixel light curves, Gaia neighbours) and the dossier block
+(`dossier.md`, `scripts/vet_dossier.py`: ranks and events per sector, EB-test features,
+Lomb-Scargle period, SkyBoT, Gaia DR3 incl. RUWE and CMD height, AllWISE colours, VSX within
+120", Gaia variability, Kostov+2025, young-star lists, SIMBAD, TOI/CTOI).
+`scripts/fold_quicklook.py` folds a star at a trial period across all its sectors.
+
+**Order of explanations (sceptical; the first that fits wins).**
+1. *Systematic*: the event sits on an orbit edge or scattered-light band, at a momentum dump,
+   is SAP-only or PDC-only without the other, is shared by the CCD neighbours, or is a
+   crowding blow-up (CROWDSAP < ~0.5 and a PDCSAP amplitude SAP does not show).
+2. *Asteroid*: SkyBoT explained it; or a 2-8 h dip/bump in an ecliptic sector with an
+   opposite-sign blob in the difference image (a mover in the background pixels).
+3. *Blend*: the difference-image or signal-locus centroid is > 1 px from the target, toward a
+   Gaia neighbour; or a VSX variable within 2 px has the same period; or the neighbours within
+   2 px outshine the target (LMC/SMC fields) and the pixel check cannot place the signal.
+4. *Known class by morphology*: EB (strict period, constant depths, secondary or ellipsoidal
+   equal minima), rotation (quasi-sinusoidal and evolving, cool star), pulsator (stable,
+   multi-periodic), stochastic (luminous or giant star: M_G < ~1 or > 2 mag above the MS,
+   irregular), Be outburst (hot star, bumps), flare (fast rise, slow decay, M dwarf), known YSO.
+5. *Unexplained*: only when 1-4 each fail, with the reason for each written down.
+
+**Research depth.** `full` = card + pixel card + dossier, plus targeted lookups where they
+decide the class; `visual` = card only. Infrared excess and a young-star CMD position up-weight
+a dipper reading but never prove it (E9); a known variable within ~1 px makes a blend likely.
 
 ## References
 

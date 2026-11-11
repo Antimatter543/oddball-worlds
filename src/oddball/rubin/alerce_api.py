@@ -22,6 +22,8 @@ from typing import Any
 
 import requests
 
+from oddball.common.http import ANON_USER_AGENT
+
 BASE_URL = os.environ.get("ODDBALL_ALERCE_LSST_URL", "https://api-lsst.alerce.online/")
 SURVEY = "lsst"
 MAX_PAGE_SIZE = 200  # enforced server side (HTTP 422 above this)
@@ -43,7 +45,7 @@ class AlerceLSST:
         self.max_retries = max_retries
         self.timeout = timeout
         self.session = requests.Session()
-        self.session.headers["User-Agent"] = "oddball-worlds (github.com/Antimatter543/oddball-worlds)"
+        self.session.headers["User-Agent"] = ANON_USER_AGENT
         self._last = 0.0
         self.n_requests = 0
         self.n_cache_hits = 0

@@ -78,9 +78,18 @@ def main() -> None:
     ap.add_argument("--name", default="cmv3")
     ap.add_argument("--batch-rows", type=int, default=2000)
     ap.add_argument("--reuse", action="store_true", help="reuse the cached real scan")
+    ap.add_argument("--configs", nargs="+", default=None,
+                    help="classify only these veto3.CONFIGS (default: all 18, as tuned on S32). "
+                         "Sectors with a fixed rule need only 'cmv2' (reproduction check) and "
+                         "the chosen one ('all'); ~9x faster")
     ap.add_argument("--watch", type=Path, default=None,
                     help="CSV with a tic column: keep their full event lists (inspection)")
     a = ap.parse_args()
+    if a.configs:
+        bad = set(a.configs) - set(V3.CONFIGS)
+        if bad:
+            raise SystemExit(f"unknown configs {sorted(bad)}")
+    configs = {k: V3.CONFIGS[k] for k in (a.configs or V3.CONFIGS)}
     sec = a.sector
     t0 = time.time()
     out = outputs_root() / "veto" / a.name / f"s{sec:04d}"
@@ -133,7 +142,8 @@ def main() -> None:
         known |= set(pd.read_csv(a.watch).tic.astype(int).tolist())
     log("pass C (classify) over the real sector")
     feats, ev_watch = V3.classify_dir(sdir, grid, meta, cells, masks, st_r, lab_r,
-                                      batch_rows=a.batch_rows, log=log, keep_events=known)  # fmt: skip
+                                      configs=configs, batch_rows=a.batch_rows, log=log,
+                                      keep_events=known)  # fmt: skip
     feats.insert(2, "sector", sec)
     feats.to_parquet(out / "real.parquet", index=False)
     if ev_watch is not None:
@@ -141,7 +151,7 @@ def main() -> None:
     # sanity: the cmv2 configuration must reproduce the cmv2 build
     p2 = outputs_root() / "veto" / "cmv2" / f"s{sec:04d}" / "real.parquet"
     chk = {}
-    if p2.exists():
+    if p2.exists() and "cmv2" in configs:
         r2 = pd.read_parquet(p2, columns=["tic", "cmv2_res_snr", "cmv2_sys_snr",
                                           "cmv2_res_snr_pdc", "cmv2_sys_snr_pdc"])  # fmt: skip
         j = feats[["tic", "cmv2_res_snr", "cmv2_sys_snr", "cmv2_res_snr_pdc",
@@ -171,7 +181,8 @@ def main() -> None:
             lab_i, _, tr_i = V3.cross_labels(scan_i[0], scan_i[1], scan_i[2], cells,
                                                  st_r.n_ccd, grid.length,
                                                  ref=(lcs_r, ev_r, pts_r))  # fmt: skip
-            f, _ = V3.classify_dir(d, grid, mi, cells, sm, st_r, lab_i, batch_rows=a.batch_rows)
+            f, _ = V3.classify_dir(d, grid, mi, cells, sm, st_r, lab_i, configs=configs,
+                                   batch_rows=a.batch_rows)  # fmt: skip
             f.insert(2, "sector", sec)
             parts.append(f)
             set_info[f"{name}/{split}"] = {
@@ -185,7 +196,7 @@ def main() -> None:
             log(f"wrote inj_{name}")
 
     prov = {"name": a.name, "sector": sec, "inj": a.inj, "real_masks_only": a.real_masks_only,
-            "labels": list(V3.LABELS), "configs": {k: list(v) for k, v in V3.CONFIGS.items()},
+            "labels": list(V3.LABELS), "configs": {k: list(v) for k, v in configs.items()},
             "params": {k: getattr(V3, k) for k in (
                 "SAP_MIN_SNR", "BKG_FRAC", "RAW_SNR", "PDC_RATIO", "PDC_SIG", "GAP_BINS",
                 "GAP_DUR", "SLOPE_Q", "QBITS", "QB_FRAC", "POINT_SNR", "POINT_MAXLEN", "TMAX",

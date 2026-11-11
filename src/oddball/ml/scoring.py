@@ -10,6 +10,10 @@ Sub-scores (all: higher = weirder):
   expectation under the model, so a star's overall noise level does not shift it). Star score =
   mean of the 4 most surprising patches (~32 h): localised events are not diluted.
   ``score_recon_mean`` (all bins) and ``score_recon_sap`` (SAP channel, top-4) are kept too.
+  The block masks of a light curve are drawn from its own generator, seeded by
+  ``(seed, host TIC)`` (:func:`mask_rng`), so a star's score does not depend on its row or on
+  the other rows scored with it (a matched null copy scores exactly like its host). Before
+  2026-11-10 one stream per run was consumed in row order (``mask_seeding="stream"``).
 * ``score_iforest``: Isolation Forest on embedding + scalar context.
 * ``score``: rank-average of (knn, recon, iforest), each first converted to a percentile against
   the real stars, then re-expressed as a percentile within Tmag-bin x camera/CCD strata over the
@@ -30,21 +34,46 @@ CTX_WEIGHT = 2.0
 COMBINE = ("score_knn", "score_recon", "score_iforest")
 
 
+def mask_rng(seed: int, tic: int) -> np.random.Generator:
+    """The scoring-mask generator of one light curve: a function of (run seed, TIC) only.
+
+    ``SeedSequence`` hashes the pair, so consecutive TICs get unrelated streams."""
+    return np.random.default_rng([int(seed), int(tic)])
+
+
 @torch.no_grad()
 def encode_and_surprise(model, cache: Cache, rows, obs_mask=None, drop_sap=False, n_masks=5,
                         batch_size=256, seed=0, surprise_out=None, amp=True, log=print,
-                        block=4):  # fmt: skip
-    """Pooled embeddings and reconstruction surprise for ``rows`` of ``cache``.
+                        block=4, mask_seeding="tic"):  # fmt: skip
+    """Pooled embeddings and reconstruction surprise for ``rows`` of ``cache``, in the order of
+    ``rows`` (which must be unique).
+
+    ``mask_seeding``: ``"tic"`` (default) draws each light curve's masks from
+    ``mask_rng(seed, host_tic)``; for real stars ``host_tic == tic``, and an injected light curve
+    gets its host's masks, so an unchanged copy scores exactly like the host. ``"stream"`` is the
+    pre-2026-11-10 behaviour (one generator consumed in row order: row-order dependent), kept
+    only to reproduce old files.
 
     ``surprise_out``: optional writable array [len(rows), L] (e.g. a memmap) that receives the
-    time-resolved per-bin pdc surprise (NaN where no estimate)."""
+    time-resolved per-bin pdc surprise (NaN where no estimate), row ``j`` for ``rows[j]``."""
+    if mask_seeding not in ("tic", "stream"):
+        raise ValueError(f"mask_seeding must be 'tic' or 'stream', not {mask_seeding!r}")
+    rows = np.asarray(rows)
+    order = np.argsort(rows, kind="stable")
+    if len(rows) and np.any(np.diff(rows[order]) == 0):
+        raise ValueError("rows must be unique")
+    keys = (cache.index["host_tic"] if "host_tic" in cache.index else cache.index["tic"])
+    keys = keys.to_numpy()
     dev = next(model.parameters()).device
     P = model.cfg.n_patches
     om = None if obs_mask is None else torch.as_tensor(np.asarray(obs_mask), device=dev)
-    pooled, rec_peak, rec_mean, rec_sap = [], [], [], []
+    pooled, rec_peak, rec_mean, rec_sap, pos_all = [], [], [], [], []
     rng = np.random.default_rng(seed)
     done = 0
-    for _, x, _ in iter_batches(cache, rows, batch_size, shuffle=False):
+    for r, x, _ in iter_batches(cache, rows, batch_size, shuffle=False):
+        # iter_batches sorts rows within a batch: map them back to positions in ``rows``
+        pos = order[np.searchsorted(rows[order], r)]
+        pos_all.append(pos)
         xt = torch.from_numpy(x).to(dev)
         if drop_sap:
             xt[:, 1] = float("nan")
@@ -52,7 +81,11 @@ def encode_and_surprise(model, cache: Cache, rows, obs_mask=None, drop_sap=False
         B = len(x)
         with torch.autocast("cuda", dtype=torch.float16, enabled=amp and dev.type == "cuda"):
             pooled.append(model.embed_pooled(inp).float().cpu().numpy())
-            masks = np.stack([scoring_masks(P, n_masks, rng, block) for _ in range(B)], 1)  # [M,B,P]
+            if mask_seeding == "tic":
+                masks = np.stack([scoring_masks(P, n_masks, mask_rng(seed, keys[j]), block)
+                                  for j in r], 1)  # [M,B,P]  # fmt: skip
+            else:
+                masks = np.stack([scoring_masks(P, n_masks, rng, block) for _ in range(B)], 1)
             s_sum = torch.zeros(B, 2, inp.shape[1] * PATCH, device=dev)
             s_cnt = torch.zeros_like(s_sum)
             for mi in range(n_masks):
@@ -75,12 +108,20 @@ def encode_and_surprise(model, cache: Cache, rows, obs_mask=None, drop_sap=False
         rec_sap.append(torch.nanmean(top[:, 1], -1).cpu().numpy())
         rec_mean.append(torch.nanmean(sur[:, 0], -1).cpu().numpy())
         if surprise_out is not None:
-            surprise_out[done : done + B] = sur[:, 0].cpu().numpy().astype(surprise_out.dtype)
+            sv = sur[:, 0].cpu().numpy().astype(surprise_out.dtype)
+            if np.array_equal(pos, np.arange(done, done + B)):
+                surprise_out[done : done + B] = sv  # contiguous (memmap-friendly)
+            else:
+                surprise_out[pos] = sv
         done += B
         if done % (batch_size * 100) == 0:
             log(f"    encoded {done}/{len(rows)}")
-    return (np.concatenate(pooled), np.concatenate(rec_peak), np.concatenate(rec_mean),
-            np.concatenate(rec_sap))  # fmt: skip
+    if not pos_all:
+        d = model.cfg.d_model
+        return np.zeros((0, d), np.float32), *(np.zeros(0, np.float32) for _ in range(3))
+    inv = np.empty(len(rows), dtype=np.int64)
+    inv[np.concatenate(pos_all)] = np.arange(len(rows))
+    return tuple(np.concatenate(a)[inv] for a in (pooled, rec_peak, rec_mean, rec_sap))
 
 
 def embedding_matrix(pooled: np.ndarray, ctx: np.ndarray, stats: dict) -> np.ndarray:

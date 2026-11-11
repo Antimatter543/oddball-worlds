@@ -56,8 +56,10 @@ def log(s):
 
 
 def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, seed: int,
-                obs_mask, block: int = 4):  # fmt: skip
+                obs_mask, block: int = 4, mask_seeding: str = "tic"):  # fmt: skip
     rows = np.arange(len(cache))
+    if mask_seeding == "tic":  # never reuse encodings made with the row-order mask stream
+        tag += "_pt"
     enc_file = workdir / f"enc_{tag}.npz"
     if enc_file.exists() and (workdir / f"surprise_{tag}.npy").exists():
         d = np.load(enc_file)
@@ -72,6 +74,7 @@ def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, 
         pooled, rpk, rmn, rsap = encode_and_surprise(
             model, cache, rows, obs_mask=obs_mask, drop_sap=ck["train_cfg"]["drop_sap"],
             n_masks=n_masks, seed=seed, surprise_out=sur, amp=False, log=log, block=block,
+            mask_seeding=mask_seeding,
         )  # fmt: skip
         sur.flush()
         del sur
@@ -84,7 +87,17 @@ def score_cache(model, ck, cache: Cache, workdir: Path, tag: str, n_masks: int, 
     sub["score_recon_mean"] = rmn
     if not ck["train_cfg"]["drop_sap"]:
         sub["score_recon_sap"] = rsap
+    sub.attrs["surprise_file"] = str(workdir / f"surprise_{tag}.npy")
     return sub, pooled, cache.ctx(rows)
+
+
+def ref_state_path(work: Path, sector: int, write: bool = False) -> Path:
+    """Per-sector fitted reference state (embedding statistics, IsolationForest). Files written
+    before 2026-11-10 used one ``ref_state.pkl`` per run (S32 only); it is read as a fallback."""
+    p = work / f"ref_state_s{sector:04d}.pkl"
+    if write or p.exists() or sector != 32:
+        return p
+    return work / "ref_state.pkl"
 
 
 def attach_sys(sub: pd.DataFrame, sector: int, which: str, source: str = "classical") -> pd.DataFrame:
@@ -153,7 +166,11 @@ def main() -> None:
                     help="scoring-mask block in patches (ssl_v1: 4; 8 chosen on val injections)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rescore-real", action="store_true")
+    ap.add_argument("--mask-seeding", choices=("tic", "stream"), default="tic",
+                    help="tic: masks seeded per (seed, host TIC), row-order invariant (default); "
+                         "stream: the pre-2026-11-10 row-order stream (reproduction only)")
     a = ap.parse_args()
+    ms = a.mask_seeding
 
     run = a.run if a.run.is_absolute() else REPO_ROOT / a.run
     model, ck = load_model(run / "best.pt")
@@ -170,13 +187,14 @@ def main() -> None:
         f"{ck.get('sectors')}; s{a.sector:04d} held out: {held_out}")
 
     # ---------------- real stars (reference) ----------------
-    ref_file = work / f"real_sub_{sdir}_b{a.mask_block}.parquet"
+    ref_file = work / f"real_sub_{sdir}_b{a.mask_block}{'_pt' if ms == 'tic' else ''}.parquet"
     real_cache = Cache(build_cache(sector_dir(a.sector), cache_dir_for(sector_dir(a.sector)),
                                    log=log))  # fmt: skip
     obs_mask = obs_mask_for(ck, a.sector, real_cache, work, log)
     if a.rescore_real or not ref_file.exists():
         sub, pooled, ctx = score_cache(model, ck, real_cache, work, f"real_{sdir}_b{a.mask_block}",
-                                       a.n_masks, a.seed, obs_mask, a.mask_block)  # fmt: skip
+                                       a.n_masks, a.seed, obs_mask, a.mask_block, ms)  # fmt: skip
+        sur_file = Path(sub.attrs["surprise_file"])
         is_ref = sub.split.isin(["train", "val"]).to_numpy()
         stats = fit_embedding_stats(pooled[is_ref], ctx[is_ref])
         emb = embedding_matrix(pooled, ctx, stats)
@@ -191,26 +209,30 @@ def main() -> None:
         sub = attach_sys(sub, a.sector, "real")
         np.save(work / f"emb_real_{sdir}.npy", emb.astype(np.float16))
         np.save(work / f"pooled_real_{sdir}.npy", pooled.astype(np.float32))
-        with open(work / "ref_state.pkl", "wb") as fh:
+        with open(ref_state_path(work, a.sector, write=True), "wb") as fh:
             pickle.dump({"stats": stats, "iforest": iso, "is_ref": is_ref}, fh)
         sub.to_parquet(ref_file, index=False)
-        save_time_resolved(sub, work / f"surprise_real_{sdir}_b{a.mask_block}.npy",
+        save_time_resolved(sub, sur_file,
                            ml_dir / f"timeresolved_{sdir}_real.parquet", TOP_TIME_RESOLVED)  # fmt: skip
     real_sub = pd.read_parquet(ref_file)
     emit(real_sub, real_sub, scorers, sdir, "real.parquet", real=True)
     ml_dir.mkdir(parents=True, exist_ok=True)
-    (ml_dir / "score_meta.json").write_text(json.dumps({
-        "run": str(run), "epoch": ck["epoch"], "val_nll": ck["val_nll"], "k": a.k,
-        "n_masks": a.n_masks, "mask_block": a.mask_block,
+    meta_txt = json.dumps({
+        "run": str(run), "sector": a.sector, "epoch": ck["epoch"], "val_nll": ck["val_nll"],
+        "k": a.k, "n_masks": a.n_masks, "mask_block": a.mask_block, "mask_seeding": ms,
+        "seed": a.seed,
         "scorers": {k: list(v) for k, v in scorers.items()},
         "trained_on_sectors": ck.get("sectors"), "held_out": held_out,
         "reference": "real train+val", "data_root": str(data_root()),
         "sys_columns": "copied from outputs/scores/classical (sys_flag veto)",
-    }, indent=1))  # fmt: skip
+        "real_sub": str(ref_file),
+    }, indent=1)  # fmt: skip
+    (ml_dir / "score_meta.json").write_text(meta_txt)  # latest run (gallery lookup)
+    (ml_dir / f"score_meta_{sdir}.json").write_text(meta_txt)
 
     # ---------------- injection sets ----------------
     if a.shards:
-        with open(work / "ref_state.pkl", "rb") as fh:
+        with open(ref_state_path(work, a.sector), "rb") as fh:
             st = pickle.load(fh)
         emb_real = np.load(work / f"emb_real_{sdir}.npy").astype(np.float32)
         ref_mask = st["is_ref"]
@@ -227,12 +249,13 @@ def main() -> None:
                                       log=log))  # fmt: skip
             tag = "inj_" + "_".join(cache.dir.name.split("__")[-3:]) + f"_b{a.mask_block}"
             sub, pooled, ctx = score_cache(model, ck, cache, work, tag, a.n_masks, a.seed,
-                                           obs_mask, a.mask_block)  # fmt: skip
+                                           obs_mask, a.mask_block, ms)  # fmt: skip
+            sur_file = sub.attrs["surprise_file"]
             emb = embedding_matrix(pooled, ctx, st["stats"])
             sub["score_knn"] = knn_score(emb, sub.host_tic.to_numpy(), ref_emb, ref_tic, k=a.k)
             sub["score_iforest"] = -st["iforest"].score_samples(emb)
             sub["score_rankavg"], sub["score"] = combine(sub, real_sub)
-            sub["_sur"] = str(work / f"surprise_{tag}.npy")
+            sub["_sur"] = sur_file
             frames.append(sub)
         allsub = attach_sys(pd.concat(frames, ignore_index=True), a.sector, f"inj_{name}")
         sub_file = work / f"inj_{name}_sub_{sdir}_b{a.mask_block}.parquet"

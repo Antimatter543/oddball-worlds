@@ -300,3 +300,20 @@ def test_server_rejects_bad_posts(server, body, hdr, code):
     st, _ = _post(srv, body, **hdr)
     assert st == code
     assert LabelStore(labels).rows() == []
+
+
+def test_candidate_card_html_lists_every_sector_and_escapes():
+    from oddball.gallery.server import _candidate_html
+
+    cd = {"list": "v1", "multi": True, "source": "both", "cat_class": "<b>EB</b>",
+          "kostov_nn": True, "skybot_checked": False, "triage_s32": "",
+          "per_sector": [{"sector": 43, "cls_rank": 5, "ens_rank": 900, "n_stars": 159977,
+                          "candidate": True, "cmv3_flag": False, "eb_like": 0.0,
+                          "res_event": "pdc/dip/8h/none", "res_t": 2500.1},
+                         {"sector": 44, "cls_rank": 12000, "ens_rank": 40, "n_stars": 159980,
+                          "candidate": True, "cmv3_flag": True, "eb_like": 0.1,
+                          "res_event": "<i>", "res_t": None}]}  # fmt: skip
+    h = _candidate_html(cd)
+    assert "S43: <b>candidate</b>, classical #5" in h and "S44:" in h and "cmv3-flagged" in h
+    assert "<b>EB</b>" not in h and "&lt;b&gt;EB" in h and "<i>" not in h
+    assert "multi-sector" in h and _candidate_html(None) == ""

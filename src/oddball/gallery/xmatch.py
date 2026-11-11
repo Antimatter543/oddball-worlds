@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 import requests
 
+from oddball.common.http import ANON_USER_AGENT
 from oddball.common.paths import data_root
 from oddball.knownclass import catalogs
 from oddball.knownclass.labels import GAIA_EXCLUDE, VSX_LABEL_RADIUS, vsx_class, vsx_excluded
@@ -41,7 +42,7 @@ EXOFOP_MAX_AGE_DAYS = 7.0
 SIMBAD_RADIUS = 21.0  # arcsec, one TESS pixel
 MATCH_RADIUS = 5.0  # arcsec: "this star" (VSX labels use the same)
 TIMEOUT = 30.0
-USER_AGENT = "oddball-worlds gallery (research; anonymous)"
+USER_AGENT = ANON_USER_AGENT
 
 # SIMBAD otype codes (otypedef). Common, well-understood variable types: "boring" here.
 SIMBAD_COMMON = {

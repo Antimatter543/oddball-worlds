@@ -17,6 +17,17 @@ read here (real stars of every split are written to the score files, as for ever
 Also, for the evaluator, the two reference scorers are applied unchanged to the sets they lack
 (never overwriting an existing file): ``ens_v2`` (wmax 1:2:2, alpha 0, cmv3) and ``ens_v1_eb``
 (wmax 1:1.5:1.5, alpha 0.75, cmv2). Both are first reproduced exactly from their own files.
+
+**Applying the frozen rule to another sector** (the search; nothing is tuned there):
+
+    uv run python -I scripts/ensemble_v3.py --sector 43 --name ens_v3 --fixed ens_v3 \\
+        --fixed-sector 32 --sets
+
+reads the rule, weights and alpha from ``outputs/scores/ens_v3/s0032/provenance.json`` and
+writes only ``real.parquet`` (no injection sets exist there, so no val metrics). Stratum
+percentiles are always against the scored sector's own real stars, as on S32. With ``--fixed``
+the reference reproduction check is skipped: ``ens_v2`` / ``ens_v1_eb`` were built from the
+row-order-dependent ``ssl_v2_recon`` (fixed 2026-11-10) and are not rebuilt.
 """
 
 from __future__ import annotations
@@ -85,18 +96,34 @@ def main() -> None:
                     help="component scorers (e.g. another ssl_v2 seed's), in COMPS order")
     ap.add_argument("--fixed", default=None,
                     help="reuse this scorer's rule / weights / alpha (no sweep; seed checks)")
+    ap.add_argument("--fixed-sector", type=int, default=None,
+                    help="sector whose --fixed provenance holds the rule (default: --sector)")
+    ap.add_argument("--no-ref-check", action="store_true",
+                    help="skip reproducing ens_v2 / ens_v1_eb (stale since the recon fix); "
+                         "for diagnostic sweeps")
+    ap.add_argument("--sets", nargs="*", default=list(SETS),
+                    help="injection sets (none for sectors without injections; needs --fixed)")
     a = ap.parse_args()
     sec = a.sector
+    sets = tuple(a.sets)
+    if set(sets) - set(SETS):
+        raise SystemExit(f"unknown sets {sorted(set(sets) - set(SETS))}")
+    if (sets and set(sets) != set(SETS)) or (not sets and not a.fixed):
+        raise SystemExit("give all of " + ", ".join(SETS) + " (default), or none with --fixed")
     comps = tuple(a.components)
     t_start = time.time()
     meta = dir_metadata(sector_dir(sec))[["tic", "tmag", "camera", "ccd"]]
 
     # ---- real stars
     real = meta.copy()
+    n_in = {"metadata": len(meta)}
     for c in comps:
         r = pd.read_parquet(score_dir(c, sec) / "real.parquet", columns=["tic", "score"])
+        n_in[c] = len(r)
         real = real.merge(r.rename(columns={"score": f"raw_{c}"}), on="tic", how="inner",
                           validate="one_to_one")  # fmt: skip
+    n_in["joined"] = len(real)
+    log(f"real light curves: {n_in}")
     real["split"] = split_array(real.tic.to_numpy())
     real["stratum"] = stratum_id(real.tmag, real.camera, real.ccd)
     for v in ("cmv2", "cmv3"):
@@ -112,7 +139,7 @@ def main() -> None:
     frames = {"real": real}
 
     # ---- injection sets
-    for name in SETS:
+    for name in sets:
         t = load_truth(name, sec)
         t["depth_bin"] = pd.cut(t.depth, DEPTH_EDGES, labels=DEPTH_LABELS, right=False)
         cols = ["inj_id", "host_tic", "split", "kind", "depth", "is_null", "depth_bin", "tmag",
@@ -146,12 +173,12 @@ def main() -> None:
         log(f"{name}: {len(q)} light curves ({int((q.split == 'val').sum())} val); cmv3 flags "
             f"{flags['cmv3'][name].mean():.3f}")
 
-    parts = ("real", *SETS)
+    parts = ("real", *sets)
 
     def base(rule, w):
         st_r = combine(P["real"], rule, w)
         out = {"real": stratum_pct(st_r, real.stratum, st_r, real.stratum)}
-        for n in SETS:
+        for n in sets:
             out[n] = stratum_pct(st_r, real.stratum, combine(P[n], rule, w), frames[n].stratum)
         return out
 
@@ -164,19 +191,25 @@ def main() -> None:
 
     def val_hits(sc, veto="cmv3"):
         return {n: E3.top1(real, frames[n], sc["real"], sc[n], flags[veto]["real"],
-                           flags[veto][n], "val") for n in SETS}  # fmt: skip
+                           flags[veto][n], "val") for n in sets}  # fmt: skip
 
-    vrows = {n: frames[n][frames[n].split == "val"].reset_index(drop=True) for n in SETS}
+    vrows = {n: frames[n][frames[n].split == "val"].reset_index(drop=True) for n in sets}
 
     def metrics(hits):
+        if not sets:
+            return {}
         t = {}
-        for n in SETS:
+        for n in sets:
             t.update(E3.set_terms(n, vrows[n], hits[n]))
         return {**t, **E3.objective(t)}
 
     # ---- reproduce the reference scorers from their own files (seed-0 components only)
     checks = {}
-    for nm, (rule, w, al, _v) in (REFS.items() if comps == COMPS else ()):
+    skip_refs = bool(a.fixed) or a.no_ref_check
+    if skip_refs:
+        log("reference reproduction check skipped (--fixed / --no-ref-check); the reference "
+            "scorers' missing set files are not written either")
+    for nm, (rule, w, al, _v) in (REFS.items() if comps == COMPS and not skip_refs else ()):
         sc = final(base(rule, w), al)
         for p in parts:
             f = score_dir(nm, sec) / ("real.parquet" if p == "real" else f"inj_{p}.parquet")
@@ -195,7 +228,11 @@ def main() -> None:
     sweep = []
     fixed = None
     if a.fixed:
-        fixed = json.loads((score_dir(a.fixed, sec) / "provenance.json").read_text())
+        fsec = a.fixed_sector if a.fixed_sector is not None else sec
+        fixed_path = score_dir(a.fixed, fsec) / "provenance.json"
+        fixed = json.loads(fixed_path.read_text())
+        log(f"fixed rule from {fixed_path}: {fixed['rule']} {fixed['weights']} alpha "
+            f"{fixed.get('alpha')}")
         cands = [(fixed["rule"], tuple(fixed["weights"]) if fixed["weights"] else None)]
         fixed["alpha"] = float(fixed.get("alpha") or 0.0)  # ens_v2 has no EB step: alpha 0
         alphas = (0.0, fixed["alpha"]) if fixed["alpha"] else (0.0,)
@@ -205,12 +242,18 @@ def main() -> None:
         e = base(rule, w)
         dusty0 = None
         for al in alphas:
+            if not sets:  # another sector: nothing to measure, the rule is applied as is
+                sweep.append({"rule": rule, "weights": list(w) if w else None, "alpha": al,
+                              "ok_dusty": True})  # fmt: skip
+                continue
             m = metrics(val_hits(final(e, al)))
             if al == 0.0:
                 dusty0 = m["dusty"]
             m.update(rule=rule, weights=list(w) if w else None, alpha=al,
                      ok_dusty=bool(m["dusty"] >= dusty0 - E3.DUSTY_DROP))  # fmt: skip
             sweep.append(m)
+        if not sets:
+            continue
         best = max((s for s in sweep[-len(alphas):]), key=lambda s: s["J"])
         log(f"  {rule:8s} {w!s:18s} best alpha {best['alpha']:.2f}: J {best['J']:.4f} "
             f"R_gen {best['R_gen']:.3f} R_yso {best['R_yso']:.3f} N_inst {best['N_inst']:.3f} "
@@ -219,9 +262,13 @@ def main() -> None:
         pick = next(s for s in sweep if s["alpha"] == fixed["alpha"])
     else:
         pick = E3.pick(sweep)
-    best_j = max(s["J"] for s in sweep if s["ok_dusty"])
-    log(f"chosen: {pick['rule']} {pick['weights']} alpha {pick['alpha']} (val J {pick['J']:.4f}, "
-        f"best {best_j:.4f})")
+    if sets:
+        best_j = max(s["J"] for s in sweep if s["ok_dusty"])
+        log(f"chosen: {pick['rule']} {pick['weights']} alpha {pick['alpha']} (val J "
+            f"{pick['J']:.4f}, best {best_j:.4f})")
+    else:
+        best_j = None
+        log(f"applied: {pick['rule']} {pick['weights']} alpha {pick['alpha']} (no injection sets)")
 
     families, old_obj, boot, yso_ci = {}, None, {}, None
     if not fixed:
@@ -299,12 +346,12 @@ def main() -> None:
         return wrote
 
     written = {a.name: write(a.name, pick["rule"], pick["weights"], pick["alpha"], "cmv3", True)}
-    for nm, (rule, w, al, veto) in (REFS.items() if not fixed else ()):
+    for nm, (rule, w, al, veto) in (REFS.items() if not skip_refs else ()):
         written[nm] = write(nm, rule, w, al, veto, False)
     log(f"written: {written}")
     od = score_dir(a.name, sec)
     pd.DataFrame(sweep).to_csv(od / "val_sweep.csv", index=False)
-    prov = {"scorer": a.name, "sector": sec, "components": list(comps), "sets": list(SETS),
+    prov = {"scorer": a.name, "sector": sec, "components": list(comps), "sets": list(sets),
             "veto": "cmv3", "rule": pick["rule"], "weights": pick["weights"],
             "alpha": pick["alpha"], "w_single": 0.0,
             "rule_text": "score = pct_stratum(1 - (1 - e)^(1 - alpha * eb_like)), "
@@ -319,6 +366,10 @@ def main() -> None:
             "pick_under_ens_v2_objective": ({k: old_obj[k] for k in ("rule", "weights", "alpha",
                                                                     "J", "J_v2")}
                                             if old_obj else None), "fixed_from": a.fixed,
+            "fixed_from_sector": (a.fixed_sector if a.fixed_sector is not None else sec)
+            if a.fixed else None, "n_real_inputs": n_in,
+            "cmv3_flag_frac_real": float(flags["cmv3"]["real"].mean()),
+            "eb_like_gt_0.5_frac_real": float(np.mean(eb["real"] > 0.5)),
             "bootstrap": boot, "val_yso_recall_host_ci90": yso_ci,
             "reproduction_maxdiff": checks, "written": written,
             "seconds": round(time.time() - t_start),

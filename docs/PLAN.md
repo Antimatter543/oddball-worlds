@@ -150,7 +150,7 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
 - **`ens_v2`** = `ens_v1` re-selected on val with the cmv3 veto. It is a weighted max 1 : 2 : 2.
   - Test, cmv3 veto: recall **0.321 / 0.590 / 0.794**, all depths 0.624, null FPR 0.020.
   - Known positives in the top 1%: **3 of 18**. Still the §12 problem.
-- **SkyBoT (C57)** on the `ens_v2` top 200 that survive the veto, plus the triage stars (296 anonymous queries, ~20 min):
+- **SkyBoT (C57; 2026-11-11: SkyBoT treats C57 as geocentric, so these offsets ignore TESS parallax)** on the `ens_v2` top 200 that survive the veto, plus the triage stars (296 anonymous queries, ~20 min):
   - **2 of the top 200** have a known asteroid with V ≤ 19 within 6 px during their strongest event (ranks 52 and 92). Both are PDC bumps that `cmv3` missed.
   - **5 of 29 triage artefacts** are explained: Nemausa (V 10.9) accounts for 3 of them, including one card called scattered light.
   - Five bright "asteroid" crossings have no V ≤ 19 body nearby. They may be comets, uncatalogued bodies or the wrong epoch; not resolved.
@@ -185,3 +185,19 @@ Gaia DR4 is released 2 Dec 2026. The idea is amortized neural posterior estimati
   3. Build the candidates: classical top 300 ∪ ens_v3 top 300 per sector, plus SkyBoT on S43/S44.
   4. Build a ~150-card gallery.
   Later: pre-register yso2 (only count hosts not already in the top 1%, use deeper dips, take hosts from the other sectors' val).
+
+### 2026-11-11: cross-sector gallery (candidates v1, 150 cards) vetted with catalogue and pixel research: nothing unexplained
+- Shortlist: `outputs/candidates/v1/shortlist.md` (copy in `docs/shortlist_candidates_v1.md`). Labels, one row per star: `labels/triage_allsectors_v1.csv` (vetter parts in `labels/triage_parts/`). Gallery: `outputs/gallery/cand_v1_n150/` (`index.html`, `dossier.md`, `pixels.csv`, `research.csv`).
+- **Commands:** `scripts/build_candidates.py`; `scripts/gallery_build.py --candidates v1 --n 150`; `scripts/pixel_check.py` (TESScut 11×11, deleted after binning); `scripts/vet_dossier.py` (Gaia DR3, AllWISE, VSX, Gaia vari, Kostov+2025, Marton+2019, Kounkel+2020, SIMBAD, ExoFOP); `scripts/fold_quicklook.py`; `scripts/triage_append.py --merge`. Protocol: VETTING §5. Scores frozen, nothing retrained.
+- **Gallery:** 69 multi-sector (all that pass the gallery filter) + 81 top single-sector stars. No TOIs.
+- **Pixel check (150):** on target 91, off target 30, not detected 15, no residual event 14; variability off target 45 (unreliable for weak or saturated signals).
+- **Classes:** EB 56 (21 multi / 35 single), scattered light 17, rotation 16, pulsator 13, asteroid 11 (all single-sector), blend 10, stochastic 7, flare star 5, other systematic 5, quiet 3, momentum dump 2, cataclysmic 2, known YSO 2, Be outburst 1, **unexplained 0**. Confidence high 86 / med 58 / low 6. Already known: yes 32, partly 55, no 63.
+- **Most interesting real signals (none unexplained):**
+  - TIC 435923212 = IRAS 04193+1518 (S32/43/44): 10–30% irregular day-long dips, on target in pixels and in SAP; a WISE class-II disk star (W1−W4 5.0, Marton YSO 0.96), so a dipper, but no variability report among its SIMBAD references.
+  - Uncatalogued high-amplitude γ Dor candidates (Paunzen+2020 HAGDOR): TIC 411991552 (peaks to 22%), 19701483, 307568749.
+  - ~30 uncatalogued EBs with periods, mostly only an unvetted Kostov+2025 table-2 flag (table in the shortlist), plus 14 single eclipses.
+- **Catalogue gaps in the "uncatalogued" filter:** 10 gallery stars have VSX on target (incl. dwarf novae VW Hyi and CZ Ori, an RS CVn); 9 "uncatalogued" EBs are in IJspeert+2024 (`J/A+A/691/A242`). `ebf_v1` misses obvious long-period EBs (`eb_like` ≈ 0) and often halves the period.
+- **SkyBoT bug, fixed:** SkyBoT's `-loc=C57` returns geocentric positions (Montague: C57 vs `500` 0.02″; Horizons from TESS 189″ away). `scripts/skybot_check.py --observer tess` (default) now queries the geocentre with a 12′ cone and shifts each body by the TESS parallax from Horizons `-95` vectors; it matches Horizons to 0.2″ (`test_skybot_parallax_matches_horizons`). The S32 `ens_v2` SkyBoT result above used C57 and is stale; its five unexplained bright crossings may be parallax misses.
+- **SkyBoT rerun with the fix (S43/S44 candidate targets, 309 + 310 queries, `--tag cand_v1`):** explained 12 -> 54 (S43) and 12 -> 29 (S44). Candidate table: 83 of 572 checked explained (was 24); gallery-eligible 2,091 -> 2,035 (69 multi-sector). On the vetted gallery it explains 8 of 150, all 8 labelled asteroid by eye, and no star with any other label. The other 3 asteroid labels are confirmed at the vetter's crossing epoch (new optional `epoch_btjd` column in `--candidates`; `skybot_astlabels.csv` in S33/S44). One "quiet" star (TIC 405266889) was relabelled asteroid (2000 XP4, V 18.8, 5.5″). The gallery was not rebuilt.
+- **Tests:** 327 passed.
+- **Next:** add VSX CV/RS CVn types and IJspeert+2024 to the catalogue label set; rerun SkyBoT (TESS view) on S32 and the other near-ecliptic cameras; a better long-period EB test; follow-up suggestions for IRAS 04193+1518 (colour during dips, Hα) and the HAGDOR candidates (frequency analysis of more sectors).
