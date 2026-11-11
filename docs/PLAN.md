@@ -65,6 +65,17 @@ of 1.0-1.5 R_earth planets at 15-30 d, and missed LHS 1140 b.
   the search slots on 20% of controls. At the conservative fallback threshold, criteria (a) and (b) fail.
 - **Next gate, before any survey:** remove rotation before the search and test it against injections;
   pre-register period-dependent thresholds from several hundred nulls; enlarge the control set.
+- **Gate 2 (2026-11-11): pass, all five pre-registered criteria.** Rotation harmonics removed, a separate
+  10-60 d search with its own threshold (tau_long 8.05 from 420 nulls), 120 controls split DEV/TEST, method frozen
+  (8ab1117) before any TEST or host search. On TEST: 1 of 58 real controls above tau_long (the limit); recovery of
+  1.0-1.5 R_earth at 15-30 d on 6+ sector stars 0.54 [0.47, 0.61] (0.03 on 2-5 sector stars); 28 of 31
+  predicted-detectable hold-out planets recovered blind; Gliese 12 b, LHS 1140 b and TOI-700 d all above threshold.
+  Unvetted detections, so not like-for-like with Gillis et al.'s vetted 6.5%.
+- **Survey (prepared, not started):** `outputs/planets_spike/gate2/survey_targets.csv`, 12,959 stars (Teff
+  2700-3400 K, < 50 pc, T < 15); scope to the 4,681 with 6+ sectors. About a day of CPU; MAST downloads are the
+  long pole (days).
+- **Before looking at survey candidates:** pre-register vetting. The long-period false-alarm rate is only bounded
+  at under 9% of stars, concentrated at 45-55 d with 2-4 transits; a 27.4 d systematic exists at low signal.
 - **Expected yield:** zero to one marginal candidate. The pipeline should be ready for PLATO public data (~2028).
 - **Fallbacks:** neural inference of unseen companions from transit timing; habitable-zone transits of white
   dwarfs in ZTF.
