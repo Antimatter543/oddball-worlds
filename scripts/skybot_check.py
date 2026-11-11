@@ -10,7 +10,14 @@ its veto (score >= 0; known positives excluded), and for the TICs in ``--extra``
 only), query SkyBoT at the epoch of the star's strongest ``cmv3`` event: the strongest residual
 event for a surviving star, the strongest event of either kind for an ``--extra`` star. Cone
 radius ``--radius`` (default 5 arcmin), asteroids only (``-objFilter=100``), observer
-``-loc=C57`` (TESS; a geocentric query would be off by arcminutes of parallax).
+``-loc=C57`` was meant to give TESS's viewpoint, but **SkyBoT returns geocentric positions for
+C57** (2026-11-11: (535) Montague at BJD 2459482.9 is at the same place, to 0.02", for C57 and for
+the geocentre ``500``, while JPL Horizons with TESS as observer, ``500@-95``, puts it 190" away,
+where the TESS pixels saw it cross). TESS orbits up to ~80 Earth radii out, so its parallax for a
+main-belt object is several arcmin. The default ``--observer tess`` therefore queries the
+geocentre with a wider cone (``--radius`` 12') and moves every body to TESS's viewpoint with its
+geocentric distance and TESS's geocentric position (Horizons vectors, cached per sector).
+``--observer c57`` reproduces the old, uncorrected check.
 
 A star is *explained* when a body with V <= ``--vmax`` lies within ``--match`` arcsec
 (6 px x 21 arcsec, the stamp's background pixels) at the epoch. Each body's offset is also
@@ -52,12 +59,15 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def query(ra: float, dec: float, jd: float, radius_deg: float, cache: Path, sleep: float):
+def query(ra: float, dec: float, jd: float, radius_deg: float, cache: Path, sleep: float,
+          loc: str = "C57"):  # fmt: skip
     params = {"-ep": f"{jd:.5f}", "-ra": f"{ra:.6f}", "-dec": f"{dec:.6f}",
-              "-rd": f"{radius_deg:.5f}", "-loc": "C57", "-mime": "text", "-output": "basic",
+              "-rd": f"{radius_deg:.5f}", "-loc": loc, "-mime": "text", "-output": "basic",
               "-objFilter": "100"}  # fmt: skip
     url = URL + "?" + urllib.parse.urlencode(params)
     key = f"ra{ra:.5f}_dec{dec:.5f}_jd{jd:.5f}_r{radius_deg:.4f}".replace("-", "m")
+    if loc != "C57":  # old cache files (C57) keep their names
+        key += f"_loc{loc}"
     f = cache / f"{key}.json"
     if f.exists():
         return json.loads(f.read_text()), False
@@ -95,12 +105,61 @@ def parse(text: str) -> pd.DataFrame:
     return df
 
 
+HORIZONS = "https://ssd.jpl.nasa.gov/api/horizons.api"
+AU_KM = 149597870.7
+
+
+def tess_vectors(jd0: float, jd1: float, cache: Path) -> pd.DataFrame:
+    """TESS's geocentric ICRF position (au) every 30 min over [jd0, jd1] (TDB), from JPL Horizons
+    (target -95, centre 500@399), cached as one CSV per span."""
+    f = cache / f"tess_vec_{jd0:.1f}_{jd1:.1f}.csv"
+    if f.exists():
+        return pd.read_csv(f)
+    params = {"format": "text", "COMMAND": "'-95'", "CENTER": "'500@399'",
+              "EPHEM_TYPE": "'VECTORS'", "REF_PLANE": "'FRAME'", "START_TIME": f"'JD {jd0:.4f}'",
+              "STOP_TIME": f"'JD {jd1:.4f}'", "STEP_SIZE": "'30m'", "OUT_UNITS": "'AU-D'",
+              "VEC_TABLE": "'1'", "CSV_FORMAT": "'YES'"}  # fmt: skip
+    req = urllib.request.Request(HORIZONS + "?" + urllib.parse.urlencode(params),
+                                 headers={"User-Agent": UA})  # fmt: skip
+    with urllib.request.urlopen(req, timeout=120) as r:
+        text = r.read().decode("utf-8", "replace")
+    body = text.split("$$SOE")[1].split("$$EOE")[0]
+    rows = [[float(p[0]), float(p[2]), float(p[3]), float(p[4])]
+            for p in (ln.split(",") for ln in body.strip().splitlines())]  # fmt: skip
+    df = pd.DataFrame(rows, columns=["jd", "x", "y", "z"])
+    if len(df) < 2 or df[["x", "y", "z"]].abs().max().max() > 0.01:  # TESS stays < ~0.003 au
+        raise RuntimeError("Horizons TESS vectors look wrong")
+    df.to_csv(f, index=False)
+    return df
+
+
+def to_tess_view(ra_deg, dec_deg, dg_au, r_tess) -> tuple[np.ndarray, np.ndarray]:
+    """Shift geocentric astrometric positions to TESS's viewpoint (parallax), given each body's
+    geocentric distance (au) and TESS's geocentric position (au, ICRF)."""
+    ra, dec = np.radians(ra_deg), np.radians(dec_deg)
+    u = np.stack([np.cos(dec) * np.cos(ra), np.cos(dec) * np.sin(ra), np.sin(dec)], -1)
+    v = u * np.asarray(dg_au, float)[:, None] - np.asarray(r_tess, float)[None, :]
+    ra2 = np.degrees(np.arctan2(v[:, 1], v[:, 0])) % 360.0
+    dec2 = np.degrees(np.arcsin(v[:, 2] / np.linalg.norm(v, axis=1)))
+    return ra2, dec2
+
+
+def sep_arcsec(ra1, dec1, ra0, dec0):
+    r1, d1, r0, d0 = (np.radians(np.asarray(x, float)) for x in (ra1, dec1, ra0, dec0))
+    c = np.sin(d1) * np.sin(d0) + np.cos(d1) * np.cos(d0) * np.cos(r1 - r0)
+    return np.degrees(np.arccos(np.clip(c, -1, 1))) * 3600.0
+
+
 def closest_in_window(df: pd.DataFrame, ra0: float, dec0: float, hours: float = 1.0):
-    """Closest approach (arcsec) of each body to (ra0, dec0) over +-hours (linear motion)."""
+    """Closest approach (arcsec) of each body to (ra0, dec0) over +-hours (linear motion).
+    Uses ``ra_deg``/``dec_deg`` when present (parallax-corrected), else the SkyBoT columns."""
     if df.empty:
         return np.array([])
-    ra = np.array([_hms(x) for x in df.ra_h]) * 15.0
-    dec = np.array([_dms(x) for x in df.dec_deg])
+    if "ra_deg" in df:
+        ra, dec = df.ra_deg.to_numpy(), df.dec_deg_num.to_numpy()
+    else:
+        ra = np.array([_hms(x) for x in df.ra_h]) * 15.0
+        dec = np.array([_dms(x) for x in df.dec_deg])
     x = (ra - ra0) * np.cos(np.radians(dec0)) * 3600.0
     y = (dec - dec0) * 3600.0
     vx, vy = df.dra_arcsec_h.to_numpy(), df.ddec_arcsec_h.to_numpy()
@@ -130,13 +189,20 @@ def main() -> None:
     ap.add_argument("--extra", type=Path, default=None)
     ap.add_argument("--candidates", type=Path, default=None,
                     help="CSV with a tic column: queried like the top list (strongest residual "
-                         "event), group 'cand' (e.g. outputs/candidates/v1/skybot_targets_*.csv)")
+                         "event, or an optional epoch_btjd column), group 'cand' "
+                         "(e.g. outputs/candidates/v1/skybot_targets_*.csv)")
     ap.add_argument("--tag", default=None, help="output name skybot_<tag>.csv (default: scorer)")
-    ap.add_argument("--radius", type=float, default=5.0, help="arcmin")
+    ap.add_argument("--observer", choices=("tess", "c57"), default="tess",
+                    help="tess: geocentric query + parallax shift to TESS (default); c57: old")
+    ap.add_argument("--radius", type=float, default=None,
+                    help="arcmin (default 12 for --observer tess, 5 for c57)")
     ap.add_argument("--match", type=float, default=126.0, help="arcsec")
     ap.add_argument("--vmax", type=float, default=19.0)
     ap.add_argument("--sleep", type=float, default=2.0)
     a = ap.parse_args()
+    if a.radius is None:
+        a.radius = 12.0 if a.observer == "tess" else 5.0
+    loc = "500" if a.observer == "tess" else "C57"
     sec = a.sector
     cache = data_root() / "skybot" / f"s{sec:04d}"
     cache.mkdir(parents=True, exist_ok=True)
@@ -151,8 +217,11 @@ def main() -> None:
     rows = [top]
     if a.candidates:
         cd = pd.read_csv(a.candidates)
-        rows.append(pd.DataFrame({"tic": cd.tic.astype("int64"), "group": "cand",
-                                  "rank": np.arange(1, len(cd) + 1)}))  # fmt: skip
+        cr = pd.DataFrame({"tic": cd.tic.astype("int64"), "group": "cand",
+                           "rank": np.arange(1, len(cd) + 1)})  # fmt: skip
+        if "epoch_btjd" in cd:  # optional per-target epoch (e.g. a crossing found by eye)
+            cr["epoch_given"] = cd.epoch_btjd.astype(float).to_numpy()
+        rows.append(cr)
     if a.extra:
         ex = pd.read_csv(a.extra)
         rows.append(pd.DataFrame({"tic": ex.tic, "group": "extra:" + ex.label.astype(str)}))
@@ -163,19 +232,36 @@ def main() -> None:
     use_sys = (~q.group.isin(["top", "cand"])) & (q[f"{vc}sys_snr"] > q[f"{vc}res_snr"])
     q["epoch_btjd"] = np.where(use_sys, q[f"{vc}sys_t"], q[f"{vc}res_t"])
     q["epoch_event"] = np.where(use_sys, q[f"{vc}sys_ev"], q[f"{vc}res_ev"])
+    if "epoch_given" in q:
+        g = np.isfinite(q.epoch_given.to_numpy(float))
+        q.loc[g, "epoch_btjd"] = q.loc[g, "epoch_given"]
+        q.loc[g, "epoch_event"] = "given"
+        q = q.drop(columns="epoch_given")
     out = []
     n_new = 0
+    tv = None
+    if a.observer == "tess":
+        ep = q.epoch_btjd.to_numpy(float)
+        ep = ep[np.isfinite(ep)] + 2457000.0
+        tv = tess_vectors(np.floor(ep.min()) - 1.0, np.ceil(ep.max()) + 1.0, cache)
     for i, r in enumerate(q.itertuples(index=False)):
         if not np.isfinite(r.epoch_btjd):
             out.append({"tic": r.tic, "status": "no event"})
             continue
         jd = float(r.epoch_btjd) + 2457000.0  # BJD_TDB; SkyBoT epoch (minutes off: < 1 px)
-        rec, new = query(float(r.ra), float(r.dec), jd, a.radius / 60.0, cache, a.sleep)
+        rec, new = query(float(r.ra), float(r.dec), jd, a.radius / 60.0, cache, a.sleep, loc)
         n_new += new
         if rec.get("error"):
             out.append({"tic": r.tic, "status": f"error {rec['error']}"})
             continue
         df = parse(rec["text"])
+        if tv is not None and len(df):
+            rt = [np.interp(jd, tv.jd, tv[c]) for c in ("x", "y", "z")]
+            ra_g = np.array([_hms(x) for x in df.ra_h]) * 15.0
+            de_g = np.array([_dms(x) for x in df.dec_deg])
+            df["ra_deg"], df["dec_deg_num"] = to_tess_view(ra_g, de_g, pd.to_numeric(
+                df.dg_au, errors="coerce").to_numpy(), rt)  # fmt: skip
+            df["d_arcsec"] = sep_arcsec(df.ra_deg, df.dec_deg_num, float(r.ra), float(r.dec))
         dmin = closest_in_window(df, float(r.ra), float(r.dec))
         bright = df.vmag.to_numpy() <= a.vmax if len(df) else np.array([], bool)
         at_ep = df.d_arcsec.to_numpy() if len(df) else np.array([])
@@ -200,7 +286,9 @@ def main() -> None:
     tag = a.tag or a.scorer
     p = vd / f"skybot_{tag}.csv"
     res.to_csv(p, index=False)
-    prov = {"service": URL, "observer": "C57", "objFilter": 100, "radius_arcmin": a.radius,
+    prov = {"service": URL, "observer": a.observer, "skybot_loc": loc,
+            "parallax": "Horizons TESS (-95) geocentric vectors" if tv is not None else None,
+            "objFilter": 100, "radius_arcmin": a.radius,
             "match_arcsec": a.match, "vmax": a.vmax, "sleep_s": a.sleep, "cache": str(cache),
             "n_queries": len(q), "n_new": n_new, "scorer": a.scorer, "veto": a.veto,
             "top": a.top, "candidates": str(a.candidates) if a.candidates else None,

@@ -31,6 +31,7 @@ CLASSES = {
     "stochastic",  # massive-star SLF, red-giant granulation, semi-regular / LPV
     "be_outburst",  # Be star / gamma Cas outbursts
     "flare_star",
+    "cataclysmic",  # dwarf nova / CV outbursts (added after the first pass: VW Hyi, CZ Ori)
     "yso_known",  # catalogued young star whose variability is already explained by youth
     "asteroid",
     "scattered_light",

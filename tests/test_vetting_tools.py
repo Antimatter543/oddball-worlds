@@ -146,3 +146,22 @@ def test_triage_rows_need_evidence(tmp_path):
     ta.append(p, {**ok, "tic": 2, "reason": 'comma, "quote"'})
     df = pd.read_csv(p)
     assert list(df.tic) == [1, 2] and df.reason.iloc[1] == 'comma, "quote"'
+
+
+def test_skybot_parallax_matches_horizons():
+    """SkyBoT returns geocentric positions even for observer C57; the shift to TESS's viewpoint
+    must reproduce JPL Horizons (observer 500@-95) for (535) Montague at JD 2459482.9."""
+    import importlib.util
+
+    from oddball.common.paths import REPO_ROOT
+
+    spec = importlib.util.spec_from_file_location("sk", REPO_ROOT / "scripts" / "skybot_check.py")
+    sk = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sk)
+    ra = (4 + 4 / 60 + 36.5638 / 3600) * 15  # SkyBoT geocentric
+    dec = 14 + 33 / 60 + 20.100 / 3600
+    r_tess = np.array([-9.6593e-04, 1.92202e-03, 3.2843e-04])  # Horizons -95 wrt 500@399, au
+    ra2, de2 = sk.to_tess_view(np.array([ra]), np.array([dec]), np.array([1.9383385]), r_tess)
+    h_ra, h_de = (4 + 4 / 60 + 23.57 / 3600) * 15, 14 + 33 / 60 + 18.7 / 3600  # Horizons @TESS
+    assert sk.sep_arcsec(ra2, de2, h_ra, h_de)[0] < 2.0
+    assert sk.sep_arcsec(ra, dec, h_ra, h_de) > 150.0  # uncorrected: off by ~3 arcmin
