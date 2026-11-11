@@ -120,5 +120,17 @@ TIC 441721594 (40 sectors) and TIC 278078111 (10 sectors).
 3. **Injection count.** 100 per cell (400 total) instead of 200, to fit the time budget. The criteria are unchanged,
    and Wilson intervals are reported.
 
+4. **Injection count, second cut.** 60 per cell (240 total; 8 per control) instead of 100. The sector-count
+   ordering of the run put the expensive 26+ sector controls last, and they made 400 too slow.
+
+## Threshold (fixed from the nulls; committed before the host search)
+- **τ = 12.27.** This is the 2nd-highest of 120 null statistics, by the pre-registered rule. The maximum is 31.24.
+- All 5 top nulls are **inverted** light curves with best periods of 1.17-1.39 d and 93-596 epochs. The
+  inverted-plus-rolled copies of the same stars do not show this. A coherent ~1.2-1.4 d signal across years, in
+  different stars, is consistent with fast rotation of mid-to-late M dwarfs leaking through the 0.5 d biweight
+  (failure mode 5).
+- The pre-registered τ is what the pass/fail uses. A **post-hoc diagnostic**, restricted to signals with P ≥ 10 d,
+  is reported separately and is labelled as not pre-registered.
+
 ## Results log
 (Filled in after the runs.)
