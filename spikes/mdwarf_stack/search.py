@@ -356,8 +356,12 @@ def _epoch_breakdown(pp, k, P, t0):
     return out
 
 
-def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float = MES_FLOOR):
-    """Iterative blind search. Returns (signals, stats)."""
+def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float = MES_FLOOR,
+                coarse=None):
+    """Iterative blind search. Returns (signals, stats).
+
+    coarse: optional replacement for the coarse search, called as
+    coarse(dense_ses, (Plo, Phi), binw, T) -> (P, mes, t0, ops); used for the GPU port."""
     pp = {k: v.copy() for k, v in pp.items()}
     T = (pp["idx"].max() - pp["idx"].min() + 1) * BIN_D
     plan = []
@@ -380,7 +384,11 @@ def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float
             binw = s * BIN_D
             p_sw = math.sqrt(FFA_ERR_MAX * T * binw)
             parts = []
-            if pr[0] < p_sw:  # exact brute fold at short periods
+            if coarse is not None:
+                Pg, mg, tg, ops = coarse(dn, pr, binw, T)
+                parts.append((Pg, mg, tg))
+                stats["ops"] += ops
+            elif pr[0] < p_sw:  # exact brute fold at short periods
                 pg = period_grid(pr[0], min(pr[1], p_sw), binw, T)
                 v = dn["cnt"] > 0
                 tt = np.flatnonzero(v) * binw
@@ -388,7 +396,7 @@ def search_star(pp: dict, mass: float, radius: float, max_sig: int, floor: float
                 ok = bb >= 0
                 parts.append((pg[ok], mb[ok], dn["t_start"] + (bb[ok] + 0.5) * binw))
                 stats["ops"] += int(v.sum()) * len(pg)
-            if pr[1] > p_sw:
+            if coarse is None and pr[1] > p_sw:
                 Pf, mf, tf, ops = ffa_search(dn, max(pr[0], p_sw), pr[1], binw, DOMINANCE)
                 parts.append((Pf, mf, tf))
                 stats["ops"] += ops

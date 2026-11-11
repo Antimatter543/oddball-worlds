@@ -55,10 +55,15 @@ def run_job(job: dict) -> dict:
             pp["flux"][m] = np.roll(pp["flux"][m], sh)
             pp["sigma"][m] = np.roll(pp["sigma"][m], sh)
     c1 = time.process_time()
-    sigs, stats = search_star(pp, job["mass"], job["radius"], job["max_sig"])
+    if _COARSE is not None:
+        _COARSE.gpu_s = 0.0
+    sigs, stats = search_star(pp, job["mass"], job["radius"], job["max_sig"], coarse=_COARSE)
     out["cpu_pre"] = c1 - c0
     out["cpu_s"] = time.process_time() - c0
     out["wall_s"] = time.time() - w0
+    out["engine"] = "cpu" if _COARSE is None else "gpu"
+    if _COARSE is not None:
+        out["gpu_s"] = _COARSE.gpu_s
     out.update(stats)
     out["signals"] = [s.as_dict() for s in sigs]
     if inj:
@@ -68,6 +73,9 @@ def run_job(job: dict) -> dict:
         out["inj_match"] = [list(match(s, inj["P"], inj["t0"], dur, pp["idx"]))
                             for s in out["signals"]]
     return out
+
+
+_COARSE = None  # GpuCoarse instance in --gpu mode (single in-process worker)
 
 
 def _safe(job):
@@ -81,7 +89,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("jobs")
     ap.add_argument("out")
-    ap.add_argument("--procs", type=int, default=6)
+    ap.add_argument("--procs", type=int, default=3)
+    ap.add_argument("--gpu", action="store_true",
+                    help="one in-process worker with the torch/CUDA coarse search")
     a = ap.parse_args()
     jobs = [json.loads(x) for x in open(a.jobs)]
     done = set()
@@ -90,6 +100,32 @@ def main() -> None:
     todo = [j for j in jobs if j["id"] not in done]
     print(f"{len(todo)} jobs to run ({len(done)} done)", flush=True)
     t0 = time.time()
+    if a.gpu:
+        global _COARSE
+        from gpu_search import GpuCoarse, gpu_healthy
+
+        _COARSE = GpuCoarse()
+        with open(a.out, "a") as fh:
+            for i, job in enumerate(todo):
+                if not gpu_healthy():
+                    print("GPU UNHEALTHY (nvidia-smi failed): stopping GPU run", flush=True)
+                    sys.exit(3)
+                try:
+                    r = run_job(job)
+                except Exception as e:  # noqa: BLE001
+                    msg = repr(e)[:300]
+                    if "CUDA" in msg or "cuda" in msg or "device" in msg:
+                        print(f"CUDA ERROR on {job['id']}: {msg}; stopping GPU run", flush=True)
+                        sys.exit(4)
+                    r = {"id": job["id"], "tic": job["tic"], "error": msg}
+                fh.write(json.dumps(r) + "\n")  # checkpoint per star
+                fh.flush()
+                if (i + 1) % 10 == 0 or "error" in r or i < 3:
+                    print(f"{i + 1}/{len(todo)} {time.time() - t0:.0f}s last={r.get('id')} "
+                          f"cpu={r.get('cpu_s', float('nan')):.1f} "
+                          f"gpu={r.get('gpu_s', float('nan')):.1f} {r.get('error', '')}",
+                          flush=True)
+        return
     with get_context("spawn").Pool(a.procs, maxtasksperchild=50) as pool, open(a.out, "a") as fh:
         for i, r in enumerate(pool.imap_unordered(_safe, todo, chunksize=1)):
             fh.write(json.dumps(r) + "\n")

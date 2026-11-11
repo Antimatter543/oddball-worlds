@@ -132,5 +132,30 @@ TIC 441721594 (40 sectors) and TIC 278078111 (10 sectors).
 - The pre-registered τ is what the pass/fail uses. A **post-hoc diagnostic**, restricted to signals with P ≥ 10 d,
   is reported separately and is labelled as not pre-registered.
 
+## Mid-run change from the owner (2026-11-11, after the host search, before the injections)
+- **CPU:** the machine has 6 physical cores, so the work was cut to ≤ 3 worker processes under
+  `nice -n 19 ionice -c3`. The real-control and host runs were restarted at 3 workers. `run_jobs` resumes, so no
+  results were lost.
+- **GPU:** the coarse search was ported to torch/CUDA (`gpu_search.py`). It does an exact brute fold of every
+  period on the pre-registered grid, with no FFA approximation. Phases are integer plus float32 fraction. ΣN, ΣD
+  and the count come from one `index_add`. Dominance is two-pass (a bin is invalid if any of its samples has
+  SES² > 0.8·MES²), which is identical to the max test. Refinement, masking and iteration are the same CPU float64
+  code.
+- **Validation, tolerance fixed before comparing** (|ΔP/P| < 1e-3 or the same alias, and |ΔMES|/MES < 2%), on 4
+  controls and 4 injections (`validate_gpu.py`):
+  - The per-period coarse MES on the same grid agrees to median 0 and p99 < 1e-6 relative.
+  - 1-6 of 15-30k periods flip validity at the float32 dominance tie.
+  - 7 of 8 full searches agree within tolerance. All 4 injections give identical match outcomes.
+  - The exception is control TIC 278078111. CPU top: 53.877 d, MES 6.17. GPU top: 37.661 d, MES 6.48. Both
+    final MES values come from the same CPU refinement, so the GPU found a higher, real noise peak that the CPU's
+    approximate FFA coarse grid ranked lower. Both are far below τ.
+  - The nulls that set τ (P < 1.4 d) lie in the CPU's exact-brute region, so τ is unaffected by the engine.
+- **Speed:** one GPU process is 5-7× faster per search than one CPU worker.
+- **Injection run:** to finish in budget, the GPU ran the 240 injections from the largest stars down while 3 niced
+  CPU workers ran from the smallest up. Each row records its engine (`inj_gpu.jsonl`, `inj_cpu.jsonl`), and rows
+  are de-duplicated by id. Hosts, nulls and real controls are all CPU.
+- **GPU load:** utilisation was ~97% during GPU jobs, not short bursts. Peak 54 C, 2.2 GB VRAM in total
+  including the desktop. No CUDA errors and no `nvidia-smi` failures.
+
 ## Results log
 (Filled in after the runs.)

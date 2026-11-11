@@ -27,11 +27,26 @@ TARGETS = ("LHS 1140 b", "TOI-700 d", "Gliese 12 b")
 TESS_ORBIT = 13.7
 
 
-def rd(name):
+def _rd(name):
     p = OUT / name
     if not p.exists():
         return []
     return [json.loads(x) for x in open(p) if x.strip()]
+
+
+def rd(name):
+    """hosts.jsonl / inj.jsonl also come from the combined hostinj.jsonl run (split by id)."""
+    out = _rd(name)
+    prefix = {"hosts.jsonl": "host-", "inj.jsonl": "inj"}.get(name)
+    if prefix:
+        out += [r for r in _rd("hostinj.jsonl") if r["id"].startswith(prefix)]
+    if name == "inj.jsonl":  # GPU engine (validated) from the big-star end, CPU from the small end
+        seen = {r["id"] for r in out}
+        for r in _rd("inj_gpu.jsonl") + _rd("inj_cpu.jsonl"):
+            if r["id"] not in seen and "error" not in r:
+                out.append(r)
+                seen.add(r["id"])
+    return out
 
 
 def stat(r):
@@ -94,6 +109,16 @@ def threshold(summary):
                    tau_cons=tau_cons, tau_flagged=flagged,
                    null_top=[float(x) for x in st[:10]])
     print(f"threshold flagged as under-calibrated: {flagged}; tau_cons = {tau_cons:.2f}")
+    # POST-HOC diagnostic (not pre-registered): nulls restricted to signals with P >= 10 d.
+    # Biased low: a realisation's 3 signal slots may be used up by short-period rotation.
+    sl = np.sort([max([s["mes"] for s in r["signals"] if s["P"] >= 10] or [0.0])
+                  for r in nulls])[::-1]
+    real_l = sorted(((max([s["mes"] for s in r["signals"] if s["P"] >= 10] or [0.0]), r["tic"])
+                     for r in real), reverse=True)
+    print(f"POST-HOC P>=10 d: top null stats {np.round(sl[:5], 2).tolist()}, tau_long (2nd) = "
+          f"{sl[1]:.2f}; real controls top P>=10 d: "
+          f"{[(round(v, 2), t) for v, t in real_l[:4]]}")
+    summary.update(tau_long_posthoc=float(sl[1]), null_long_top=[float(x) for x in sl[:5]])
     return tau
 
 
@@ -150,9 +175,10 @@ def bucket(n):
     return "1-5" if n <= 5 else "6-12" if n <= 12 else "13-25" if n <= 25 else "26+"
 
 
-def inj_report(summary, tau):
+def inj_report(summary, tau, label="pre-registered tau"):
     res = [r for r in rd("inj.jsonl") if "error" not in r]
     errs = sum(1 for r in rd("inj.jsonl") if "error" in r)
+    print(f"\n### Injection recovery at {label}")
     cells = {0: "1.0-1.5 Re, 15-30 d", 1: "1.0-1.5 Re, 30-50 d", 2: "1.5-2.0 Re, 15-30 d",
              3: "1.5-2.0 Re, 30-50 d"}
     rec = []
@@ -182,31 +208,47 @@ def inj_report(summary, tau):
         print(f"| {name} | " + " | ".join(cols) + " |")
         out[name] = {"all": wilson(int(d["rec"].sum()), len(d)),
                      "six": wilson(int(six["rec"].sum()), len(six)), "n_six": len(six)}
-    summary["inj"] = out
+    # matched at all (any MES >= floor 6): where the misses go
+    anym = [any(m[0] for m in r["inj_match"]) for r in res]
+    print(f"matched by any signal (MES>=6 floor, no threshold): {np.mean(anym):.2f}; "
+          f"with >=2 transits in data: {np.mean([r['inj']['n_tr_data'] >= 2 for r in res]):.2f}")
+    summary["inj" if label.startswith("pre") else "inj_posthoc"] = out
 
 
-def cost_report(summary):
-    runs = [r for f in ("controls_real.jsonl", "nulls.jsonl", "hosts.jsonl", "inj.jsonl")
-            for r in rd(f) if "error" not in r]
-    df = pd.DataFrame([{"cpu": r["cpu_s"], "pre": r["cpu_pre"], "it": r["n_iter"],
-                        "bins": r["n_bins"], "T": r["T_base"], "nsec": r["n_sectors"],
-                        "kind": r["id"].split("-")[0]} for r in runs])
-    if df.empty:
-        return
-    df["per_it"] = (df["cpu"] - df["pre"]) / df["it"]
+def _fit(df, col):
+    df = df.assign(per_it=(df[col] - df["pre"]).clip(lower=1e-3) / df["it"])
     x = np.log(df["bins"] * df["T"])
     A = np.vstack([np.ones(len(x)), x]).T
     coef, *_ = np.linalg.lstsq(A, np.log(df["per_it"]), rcond=None)
-    resid = np.log(df["per_it"]) - A @ coef
-    print(f"\n## Cost: {len(df)} searches; per-iteration CPU s = exp({coef[0]:.2f}) * "
-          f"(bins*T_base)^{coef[1]:.3f}; log scatter {resid.std():.2f}")
-    print(df.groupby(pd.cut(df["nsec"], [0, 5, 12, 25, 100]), observed=True)[
-        ["cpu", "per_it", "it", "pre"]].median().round(1).to_string())
-    real = df[df["kind"] == "real"]
-    mean_it = float(real["it"].mean()) if len(real) else float(df["it"].mean())
+    return coef, float((np.log(df["per_it"]) - A @ coef).std()), df
+
+
+def cost_report(summary):
+    files = ("controls_real.jsonl", "nulls.jsonl", "hosts.jsonl", "inj.jsonl", "val_cpu.jsonl",
+             "val_gpu.jsonl")
+    runs = [r for f in files for r in (rd(f) if f.endswith("inj.jsonl") else _rd(f))
+            if "error" not in r]
+    df = pd.DataFrame([{"cpu": r["cpu_s"], "wall": r["wall_s"], "pre": r["cpu_pre"],
+                        "it": r["n_iter"], "bins": r["n_bins"], "T": r["T_base"],
+                        "nsec": r["n_sectors"], "kind": r["id"].split("-")[0],
+                        "engine": r.get("engine", "cpu")} for r in runs])
+    if df.empty:
+        return
+    dc, dg = df[df["engine"] == "cpu"], df[df["engine"] == "gpu"]
+    real = dc[dc["kind"] == "real"]
+    mean_it = float(real["it"].mean())
     bins_per_sec = float((df["bins"] / df["nsec"]).median())
     pre_per_sec = float((df["pre"] / df["nsec"]).median())
-    # survey sample
+    models = {}
+    for name, d, col in (("CPU", dc, "cpu"), ("GPU", dg, "wall")):
+        if len(d) < 5:
+            continue
+        coef, sc, d2 = _fit(d, col)
+        models[name] = coef
+        print(f"\n## {name} cost ({len(d)} searches; {col} s): per-iteration = "
+              f"exp({coef[0]:.2f}) * (bins*T_base)^{coef[1]:.3f}; log scatter {sc:.2f}")
+        print(d2.groupby(pd.cut(d2["nsec"], [0, 5, 12, 25, 100]), observed=True)[
+            [col, "per_it", "it"]].median().round(1).to_string())
     from select_controls import sectors_for
 
     s = pd.read_csv(CAT_DIR / "tic_mdwarfs_50pc.csv").drop_duplicates("ID")
@@ -217,29 +259,32 @@ def cost_report(summary):
         if not ss:
             continue
         n = len(ss)
-        T = (max(ss) - min(ss) + 1) * 27.4  # sector length; first-to-last baseline
+        T = (max(ss) - min(ss) + 1) * 27.4  # first-to-last baseline
         bins = n * bins_per_sec
-        per_it = math.exp(coef[0]) * (bins * T) ** coef[1]
-        rows.append({"nsec": n, "T": T, "cpu": pre_per_sec * n + mean_it * per_it})
+        row = {"nsec": n, "T": T}
+        for name, coef in models.items():
+            row[name] = pre_per_sec * n + mean_it * math.exp(coef[0]) * (bins * T) ** coef[1]
+        rows.append(row)
     sv = pd.DataFrame(rows)
-    rng = np.random.default_rng(1)
-    res = {}
-    for N in (3000, 8000):
-        draws = [sv["cpu"].to_numpy()[rng.integers(0, len(sv), N)].sum() / 3600
-                 for _ in range(200)]
-        res[N] = (float(np.mean(draws)), float(np.percentile(draws, 2.5)),
-                  float(np.percentile(draws, 97.5)))
-    print(f"survey sample: {len(s)} TIC stars, {len(sv)} with >=1 sector; median sectors "
+    print(f"survey sample: {len(s)} TIC stars (Teff 2700-3400 K, d<50 pc, T<15), {len(sv)} with "
+          f">=1 sector (tess-point, all pointings known to tess-point); median sectors "
           f"{sv['nsec'].median():.0f}, 90th pct {sv['nsec'].quantile(0.9):.0f}; mean signals "
-          f"per star {mean_it:.2f}; bins/sector {bins_per_sec:.0f}")
-    print(f"CPU-h per star: median {sv['cpu'].median() / 3600:.3f}, mean "
-          f"{sv['cpu'].mean() / 3600:.3f}, max {sv['cpu'].max() / 3600:.2f}")
-    for N, (m, lo, hi) in res.items():
-        print(f"extrapolated CPU-h for {N} stars: {m:.0f} [{lo:.0f}, {hi:.0f}]")
-    summary.update(cost_coef=[float(c) for c in coef], cost_scatter=float(resid.std()),
-                   mean_iter=mean_it, cost_3000=res[3000], cost_8000=res[8000],
-                   cpu_h_per_star_median=float(sv["cpu"].median() / 3600),
-                   cpu_h_per_star_mean=float(sv["cpu"].mean() / 3600))
+          f"per star (real controls) {mean_it:.2f}; bins/sector {bins_per_sec:.0f}")
+    rng = np.random.default_rng(1)
+    out = {"mean_iter": mean_it}
+    for name in models:
+        v = sv[name].to_numpy()
+        print(f"{name}-h per star: median {np.median(v) / 3600:.4f}, mean {v.mean() / 3600:.4f}, "
+              f"max {v.max() / 3600:.3f}")
+        for N in (3000, 8000):
+            draws = [v[rng.integers(0, len(v), N)].sum() / 3600 for _ in range(200)]
+            m, lo, hi = np.mean(draws), np.percentile(draws, 2.5), np.percentile(draws, 97.5)
+            wall = m / (3 if name == "CPU" else 1) / 24
+            print(f"  {N} stars: {m:.0f} {name}-h [{lo:.0f}, {hi:.0f}]; wall on "
+                  f"{'3 CPU workers' if name == 'CPU' else '1 GPU'}: {wall:.1f} days")
+            out[f"{name}_{N}"] = [float(m), float(lo), float(hi), float(wall)]
+        out[f"{name}_per_star_mean_h"] = float(v.mean() / 3600)
+    summary["cost"] = out
 
 
 def main():
@@ -253,6 +298,8 @@ def main():
         host_report(summary, tau)
     if what in ("inj", "all"):
         inj_report(summary, tau)
+        if "tau_long_posthoc" in summary:
+            inj_report(summary, summary["tau_long_posthoc"], "POST-HOC tau_long (not pre-reg)")
     if what in ("cost", "all"):
         cost_report(summary)
     sp.write_text(json.dumps(summary, indent=1, default=str))
