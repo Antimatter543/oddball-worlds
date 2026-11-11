@@ -1890,6 +1890,10 @@ ml = [
     { name = "torch" },
     { name = "umap-learn" },
 ]
+planets = [
+    { name = "numba" },
+    { name = "wotan" },
+]
 rubin = [
     { name = "alerce" },
 ]
@@ -1919,6 +1923,10 @@ ml = [
     { name = "tensorboard", specifier = ">=2.21.0" },
     { name = "torch", specifier = ">=2.15.0" },
     { name = "umap-learn", specifier = ">=0.5.12" },
+]
+planets = [
+    { name = "numba", specifier = ">=0.68.1" },
+    { name = "wotan", specifier = ">=2.1" },
 ]
 rubin = [{ name = "alerce", specifier = ">=2.4.0" }]
 
@@ -3010,6 +3018,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a4/34/4dd12fc8bb7d61c91467ec3efe415ffa7d5456f799954b40c5bbaeae470e/werkzeug-3.1.9.tar.gz", hash = "sha256:55ca7c70a75689be937aa27f8ff4b018f06ff4838fc73045560bf0f5a1291060", size = 940188, upload-time = "2026-09-27T18:33:41.637Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a1/38/df03f564f43cec2684823f3cccae1a652ee7face1cbaa76fb223096e64d7/werkzeug-3.1.9-py3-none-any.whl", hash = "sha256:6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab", size = 228700, upload-time = "2026-09-27T18:33:39.685Z" },
+]
+
+[[package]]
+name = "wotan"
+version = "2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numba" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d8/bc/9792467c6763b35bc125e06c97464ed1dd69ee340987587a420ab5227f9b/wotan-2.1.tar.gz", hash = "sha256:269bae2460e1f7efc9a30b1e676ee9e5548f1802e3a74d19611b27507d2b253d", size = 70966, upload-time = "2026-11-06T16:57:33.292Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/2a/dc32979c959daa1ee055e7c2dfcc8bb2f969b2e3e052e009d6f53e6283e3/wotan-2.1-py3-none-any.whl", hash = "sha256:be1949a2fce4fde768e64e1885e31086d643bcfd26d4a28d378b546157dc383d", size = 42115, upload-time = "2026-11-06T16:57:31.921Z" },
 ]
 
 [[package]]
