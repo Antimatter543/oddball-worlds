@@ -321,26 +321,29 @@ entry). It is 0 if fewer than 2 transits are in the data. **Predicted detectable
   change that could plausibly fix it. Nothing is adjusted after a TEST or host result is seen.
 
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
-**State at 2026-11-11 ~12:10 AEST.** The GPU fell off the bus at 11:55:21 (Xid 79, reset required) during the
-control downloads, before any gate-2 search touched it. Gate 2 runs on CPU only (the validated gate-1 CPU engine:
-exact brute fold below P_sw, FFA above), at most 3 workers under `nice -n 19 ionice -c3`.
+**State at 2026-11-11 12:10 AEST.** The GPU fell off the bus at 11:55:21 (Xid 79, reset required) during the control
+downloads, before any gate-2 search used it. Gate 2 runs CPU only (the gate-1 CPU engine), at most 3 workers under
+`nice -n 19 ionice -c3`. The pre-registration above is committed (8798f55). **No TEST star and no host has been
+searched.** The frozen-method entry (`outputs/planets_spike/gate2/frozen.json` plus a doc entry) is not written yet.
 
-Done:
-- Control set enlarged to 120 (`gate2/select_g2.py`, seeds 20261121 draw / 20261122 split): 24/32/32/32 per
-  sector stratum. DEV = the 30 gate-1 controls plus 30 new; TEST = 60 new. Written to
-  `data/planets_spike/catalogs/controls_g2.csv`. No TEST star has been searched.
-- Hold-out list built (`gate2/holdout.py build`) from the cached exoplanet.eu and ExoFOP TOI tables (the NASA
-  Exoplanet Archive TAP returned a maintenance page): `data/planets_spike/catalogs/holdout_g2.csv`, 84 planets with
-  10 < P <= 60 d on 68 hosts. No hold-out host has been searched.
-- `search.py`: `search_star(..., prange=)` for separate short (1-10 d) and long (10-60 d) searches (None = gate 1).
-- `gate2/search2.py`: rotation removal (per-sector Lomb-Scargle, harmonic fit with spline amplitudes), being
-  tested on DEV fast rotators only.
+Done and cached:
+- Controls: `data/planets_spike/catalogs/controls_g2.csv` (120; DEV 60, TEST 60). Light curves: one NPZ per star in
+  `data/planets_spike/lc/`. All 60 DEV stars are in; TEST stars are still downloading (`outputs/planets_spike/gate2/
+  fetch_controls.log`).
+- Hold-out: `data/planets_spike/catalogs/holdout_g2.csv` (83 planets with 10 < P <= 60 d on 68 hosts); hosts are
+  downloading (`fetch_holdout.log`). Re-running a fetch command skips stars already present.
+- Job files: `outputs/planets_spike/gate2/jobs/dev_paired.jsonl` (paired none/harm injections plus DEV real
+  controls), `dev_nulls_long_harm.jsonl` (420), `dev_nulls_short_harm.jsonl` (300 nulls plus 60 real). Results are
+  in `gate2/<name>.out.jsonl` and are resumable per job (finished ids are skipped).
 
-Running / cached:
-- Downloads of the 90 new controls (`outputs/planets_spike/gate2/fetch_controls.log`) and the 68 hold-out hosts
-  (`fetch_holdout.log`) into `data/planets_spike/lc/` (one NPZ per star; `fetch.py` skips stars already present, so
-  re-running the same command resumes).
-
-Next commands (from the worktree; Python = a venv with wotan, e.g. the gate-1 worktree's `.venv`):
-`nice -n 19 ionice -c3 python -I spikes/mdwarf_stack/fetch.py $(cat data/planets_spike/catalogs/g2_fetch_order.txt)`
-and the same with `holdout_fetch.txt`; then the DEV rotation tests (next commit).
+Next commands, from the worktree, with `PY` = a venv that has wotan (the gate-1 worktree's
+`.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`):
+1. Downloads, if they were killed: `nice -n 19 ionice -c3 $PY -I spikes/mdwarf_stack/fetch.py $(cat
+   data/planets_spike/catalogs/g2_fetch_order.txt)`, and the same with `holdout_fetch.txt` (the paths are under the
+   main checkout).
+2. DEV stage, resumable: `spikes/mdwarf_stack/gate2/run_stage.sh dev_paired dev_nulls_long_harm
+   dev_nulls_short_harm > outputs/planets_spike/gate2/run_dev.log 2>&1`
+3. `$PY -I spikes/mdwarf_stack/gate2/analyze2.py dev`. Apply the pre-registered arm rule, fix fast/slow and eff,
+   and write `frozen.json` (tau_long, tau_short, rot, fast_min_frac, fast_min_amp, pred_eff). Then run `analyze2.py
+   tau`, commit the frozen entry, and only after that run `make_jobs2.py test`, `make_jobs2.py hosts`, `holdout.py
+   predict`, and `run_stage.sh test_real test_inj test_inj_none hosts`.

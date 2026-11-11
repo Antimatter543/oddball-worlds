@@ -244,6 +244,10 @@ def test(S):
         print(f"| {nm} | " + " | ".join(cols) + " |")
         S["inj"][nm] = [int(d["rec"].sum()), len(d), *wilson(int(d["rec"].sum()), len(d))]
     h = df[df["cell"] == 0]
+    S["bucket_rec"] = {b: float(h[h["b"] == b]["rec"].mean()) for b in ("6-12", "13-25", "26+")
+                       if (h["b"] == b).any()}
+    if (df["cell"] == 4).any():
+        S["bucket_rec"]["2-5"] = float(df[df["cell"] == 4]["rec"].mean())
     p, lo, hi = wilson(int(h["rec"].sum()), len(h))
     S["b"] = {"k": int(h["rec"].sum()), "n": len(h), "p": p, "lo": lo, "hi": hi,
               "pass": bool(lo >= 0.20 and len(h) >= 200)}
@@ -387,7 +391,8 @@ def cost(S):
     m = float(np.mean(draws))
     S["cost"] = {"cpu_h_8000": m, "cpu_wall_days_3w": m / 3 / 24, "gpu_days": m / 5 / 24,
                  "per_star_mean_h": float(v.mean() / 3600), "iters": it,
-                 "pre_per_sector_s": pre_per_sec}
+                 "pre_per_sector_s": pre_per_sec, "bins_per_sector": bins_per_sec,
+                 "model": {k: [float(x) for x in v] for k, v in models.items()}}
     print(f"8,000 stars: {m:.0f} CPU-h [{np.percentile(draws, 2.5):.0f}, "
           f"{np.percentile(draws, 97.5):.0f}]; 3 niced workers: {m / 3 / 24:.1f} days; GPU at 5x: "
           f"{m / 5 / 24:.1f} days -> {'PASS' if m / 5 / 24 < 14 else 'FAIL'}; mean iterations per "
