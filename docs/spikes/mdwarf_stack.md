@@ -102,5 +102,23 @@ so our number is an upper bound on theirs at the same stage. This is stated next
 - **Extrapolation:** applied to tess-point sector coverage for a TIC sample of Teff 2700-3400 K, d < 50 pc stars,
   with random draws of 3,000 and 8,000. The mean number of signals per star comes from the real-control runs.
 
+## Amendments (made before any null or host search was run)
+All three are compute changes. They were made after timing searches on two real **control** stars,
+TIC 441721594 (40 sectors) and TIC 278078111 (10 sectors).
+
+1. **Search engine.** Brute-force folding cost about 1,500 CPU-s per iteration for the 40-sector control. The coarse
+   search now uses a **Fast Folding Algorithm (FFA)**. Its tree carries ΣN, ΣD and the epoch count (added) and the
+   max SES² (max-combined), so the valid-peak statistic is unchanged. The cyclic-shift FFA mis-aligns epochs by
+   about T·binw/P² samples once the drift exceeds a period. Below P_sw = √(T·binw), where that error would exceed
+   1 sample, the exact brute fold is used. A unit test (`test_ffa.py`) checks FFA against brute force at integer
+   periods and checks blind recovery of a synthetic transit across non-consecutive chunks.
+   The **0.5 h and 0.67 h boxes are dropped**: at stride 1 they cost two-thirds of the search. Grazing transits of
+   the latest M dwarfs lose some SNR in a 1 h box; the injections (b up to 0.9) measure that.
+2. **Coarser coarse-grid.** 5 durations (1, 1.5, 2.17, 3, 4 h), spaced about 1.4× apart (was 7). Coarse stride and
+   phase bin are D/2 (was D/3). The period step follows the same rule, ΔP/P = s·Δt/T_base. Refinement is unchanged:
+   ±3 coarse steps, 5× finer, stride 1. This cut the 10-sector control from 39 s to 13 s of CPU per iteration.
+3. **Injection count.** 100 per cell (400 total) instead of 200, to fit the time budget. The criteria are unchanged,
+   and Wilson intervals are reported.
+
 ## Results log
-(Filled in after the runs. Amendments made before any host result is seen are listed here with their reason.)
+(Filled in after the runs.)
