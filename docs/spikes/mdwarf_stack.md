@@ -365,7 +365,10 @@ exists. A copy is in `outputs/planets_spike/gate2/frozen.json`. Nothing below ch
 8798f55. The frozen method above is committed (see `git log` for the commit after 2cf9049). Output files are under
 `/home/antiraedus/Projects/oddball-worlds/outputs/planets_spike/gate2/` (abbreviated `G2`).
 
-Done: `dev_paired` 360/360, `dev_nulls_long_harm` 420/420, `rot_census_DEV.csv`, `frozen.json`.
+Done: `dev_paired` 360/360, `dev_nulls_long_harm` 420/420, `rot_census_DEV.csv`, `frozen.json` (frozen commit
+8ab1117, 15:52:58). After the freeze: `rot_census_{TEST,HOSTS}.csv`, job files (`test_inj` 436, `test_inj_none`
+436, `test_real` 58, `test_real_short` 58, `hosts` 71, `hosts_short` 71), `holdout_pred.csv` (15:54-15:55, no
+search output used). **First TEST search: step 2 started 15:55:5x** (`G2/test_stage_start.txt`).
 
 Next commands, from the worktree, `PY` as below, every heavy one niced (all job runs are resumable per id):
 1. `$PY -I spikes/mdwarf_stack/gate2/census.py TEST`, `census.py HOSTS`, `make_jobs2.py test`,
