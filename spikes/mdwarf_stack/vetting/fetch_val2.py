@@ -116,9 +116,8 @@ def fetch_one(dl, tic, pool):
 
 
 def fetch():
-    import pandas as pd
-
     import download as D
+    import pandas as pd
 
     V2.mkdir(parents=True, exist_ok=True)
     log = V2 / "fetch_errors.jsonl"

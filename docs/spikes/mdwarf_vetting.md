@@ -442,6 +442,26 @@ Wilson for single proportions.
 - Candidate summaries quote the fresh-set false-alarm survival and the projected false-alarm count for the
   candidate's own tier and transit-count bin.
 
+## Vetting v2: frozen thresholds (DEV only; before any validation vetting run)
+(The pre-registration header says "~12:10"; its commit 85d4831 is timed 12:00:18. The text is unchanged.)
+`$PY -I vetting/run_vet2.py dev` (v2-only statistics for the 374 v1 DEV signals, 0 errors, 320 s, one niced
+process) then `$PY -I vetting/freeze_vet2.py` -> `vetting/frozen_vet2.json`. **No new threshold was loosened**;
+all three keep their defaults. Kept v1 tests carry v1's frozen thresholds.
+
+| statistic | frozen soft / fail | DEV true soft+ (n) | DEV FA >= 6 soft+ / fail (n) | DEV FA >= 7 soft+ / fail (n) |
+|---|---|---|---|---|
+| gap_edge.share | 0.5 / 0.8 | 0.011 (180) | 0.067 / 0.015 (194) | 0.21 / 0.04 (24) |
+| red_noise.neg_ratio | -0.8 / -0.6 | 0.000 (180) | 0.010 / 0 (194) | 0 / 0 (24) |
+| low_margin.neg_excess | -1.0 / - | 0.000 (166 at MES >= tau_long) | 0.19 (194, tau_det 6) | 0.375 (24, tau_det 7) |
+
+DEV tiers, v1 vs v2 (information only; thresholds were already fixed by the rule): DEV true signals at MES >=
+tau_long (166) v1 A/B/C 134/26/6, v2 140/23/3 (dropping the chi^2 tests recovers 3); DEV false alarms at MES >= 7
+(24) in C: v1 10, v2 14; DEV real-control signals >= 6 (39, the only real-star check): v1 C 12, v2 C 13; DEV
+nulls >= 6 (155): v1 C 32, v2 C 49. red_noise has almost no DEV power; it is kept as pre-registered (no test is
+dropped after seeing its DEV power, because that would be a tightening-by-selection on DEV false alarms).
+DEV holds only a few true signals in the few-transit class, so low_margin's cost on planets is measured on the
+fresh set (40 d+ injections), not here.
+
 ## Cut / known limitations (stated in advance)
 - No injection into pixels, so the pixel test cannot be calibrated on injections; it is run on real stars only
   (hold-out planets, real-control false alarms) and is the first thing dropped if time runs short.
