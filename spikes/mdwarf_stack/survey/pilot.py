@@ -128,6 +128,53 @@ def check(tag: str = "survey_pilot_hosts") -> None:
           f"{int(df.get('exact', pd.Series(dtype=bool)).fillna(False).sum())}; written {out}")
 
 
+def routecheck() -> None:
+    """The survey's product listing (observation dataURL) against the URIs gate 2 downloaded
+    (stored per sector in every gate-2 NPZ). One request at a time."""
+    import time
+
+    sys.path.insert(0, str(HERE))
+    import download
+
+    download.ERRLOG = lambda r: print("LOG", r)
+    download._set_astroquery_ua()
+    rows = []
+    for p in sorted(LC_DIR.glob("tic*.npz")):
+        tic = int(p.stem[3:])
+        with np.load(p, allow_pickle=False) as z:
+            m = json.loads(str(z["meta"]))
+        old = {int(s["sector"]): (s["product"], s["uri"]) for s in m["sectors"]}
+        old_fail = {int(f["sector"]) for f in m.get("failures", [])}
+        t0 = time.time()
+        try:
+            new = download.list_products_obs(tic)
+        except Exception as e:  # noqa: BLE001
+            rows.append({"tic": tic, "error": repr(e)[:120]})
+            continue
+        same = {s for s in old if s in new and new[s] == old[s]}
+        rows.append({"tic": tic, "n_old": len(old), "n_new": len(new), "same": len(same),
+                     "old_not_new": sorted(set(old) - set(new)),
+                     "uri_differs": sorted(s for s in old if s in new and new[s] != old[s]),
+                     "new_not_old": sorted(set(new) - set(old)),
+                     "new_was_failure": sorted((set(new) - set(old)) & old_fail),
+                     "q_s": round(time.time() - t0, 2)})
+    d = pd.DataFrame(rows)
+    d.to_csv(PILOT / "routecheck.csv", index=False)
+    bad = d[(d["old_not_new"].map(len) > 0) | (d["uri_differs"].map(len) > 0)] \
+        if "old_not_new" in d else d
+    print(f"{len(d)} gate-2 stars; sectors old {int(d['n_old'].sum())}, identical "
+          f"{int(d['same'].sum())}; stars with a gate-2 sector missing or a different URI: "
+          f"{len(bad)}; stars with extra sectors now: "
+          f"{int((d['new_not_old'].map(len) > 0).sum())}; errors "
+          f"{int(d['error'].notna().sum()) if 'error' in d else 0}; median query "
+          f"{d['q_s'].median():.2f} s")
+    if len(bad):
+        print(bad.to_string(index=False))
+    ex = d[d["new_not_old"].map(len) > 0]
+    if len(ex):
+        print(ex[["tic", "n_old", "n_new", "new_not_old", "new_was_failure"]].to_string(index=False))
+
+
 def perf(tags: list[str]) -> None:
     rows = []
     for tag in tags:
@@ -166,5 +213,7 @@ if __name__ == "__main__":
         targets()
     elif cmd == "check":
         check(*sys.argv[2:3])
+    elif cmd == "routecheck":
+        routecheck()
     elif cmd == "perf":
         perf(sys.argv[2:])

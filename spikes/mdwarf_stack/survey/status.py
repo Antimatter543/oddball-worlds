@@ -58,11 +58,30 @@ def main() -> None:
     ap.add_argument("--window-h", type=float, default=2.0, help="window for the recent rate")
     ap.add_argument("--unit", default="oddball-survey")
     a = ap.parse_args()
-    out, data = OUT / a.tag, DATA / a.tag
+    base_o, base_d = OUT / a.tag, DATA / a.tag
+    dirs = [(base_o, base_d)] if (base_o / "manifest.json").exists() else []
+    if (base_o / "shards").exists():
+        dirs += [(p, base_d / "shards" / p.name) for p in sorted((base_o / "shards").glob("shard*"))]
+    if not dirs:
+        print(f"no survey at {base_o} (manifest.json missing)")
+        return
+    tot_done = tot_n = 0
+    for out, data in dirs:
+        if len(dirs) > 1:
+            print(f"---- {out.name}")
+        d, n = report(out, data, a)
+        tot_done += d
+        tot_n += n
+    if len(dirs) > 1:
+        print(f"==== all shards: done {tot_done} of {tot_n} "
+              f"({100 * tot_done / max(tot_n, 1):.1f}%)")
+
+
+def report(out: Path, data: Path, a) -> tuple[int, int]:
     mp = out / "manifest.json"
     if not mp.exists():
-        print(f"no survey at {out} (manifest.json missing)")
-        return
+        print(f"  no manifest in {out}")
+        return 0, 0
     man = json.loads(mp.read_text())
     n_targets = man["n_targets"]
     done_files = {int(p.stem[3:]) for p in (out / "results").glob("tic*.json")}
@@ -84,8 +103,9 @@ def main() -> None:
                                 text=True, timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         active = "unknown"
-    print(f"survey '{a.tag}'  unit {a.unit}: {active}   first start {man.get('first_start')}  "
-          f"starts {len(man.get('starts', []))}  frozen {man['frozen_sha256'][:12]}")
+    print(f"survey '{a.tag}' shard {man.get('shard', 0)}/{man.get('of', 1)}  unit {a.unit}: "
+          f"{active}  first start {man.get('first_start')}  starts {len(man.get('starts', []))}"
+          f"  frozen {man['frozen_sha256'][:12]}")
     print(f"targets {n_targets}   done {done} ({100 * done / max(n_targets, 1):.1f}%)   "
           f"remaining {remaining}")
     print(f"  ok {st.get('ok', 0)}   no_data {st.get('no_data', 0)}   failed {st.get('failed', 0)}"
@@ -107,7 +127,7 @@ def main() -> None:
         rate_all = (len(times) - 1) / span if span > 0 else float("nan")
         rate_rec = len(recent) / a.window_h
         rate = rate_rec if len(recent) >= 5 else rate_all
-        eta = remaining / rate if rate and rate == rate and rate > 0 else float("nan")
+        eta = remaining / rate if rate > 0 else float("nan")
         print(f"rate: {rate_rec:.1f} stars/h over the last {a.window_h:g} h, {rate_all:.1f} "
               f"stars/h overall;  ETA {eta:.1f} h  (last finish {times[-1].isoformat()})")
         ok = [r for r in prog.values() if r["status"] == "ok"]
@@ -134,6 +154,7 @@ def main() -> None:
         print(f"  last error at {last}")
     else:
         print("errors logged: 0")
+    return done, n_targets
 
 
 if __name__ == "__main__":

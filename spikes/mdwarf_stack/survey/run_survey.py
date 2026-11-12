@@ -126,6 +126,12 @@ class Log:
         self.lock = threading.Lock()
         self.err = open(out / "errors.jsonl", "a")
         self.prog = open(out / "progress.jsonl", "a")
+        self.dl = open(out / "downloads.jsonl", "a")
+
+    def download(self, rec: dict):
+        with self.lock:
+            self.dl.write(json.dumps(rec, default=_jdefault) + "\n")
+            self.dl.flush()
 
     def say(self, msg: str):
         with self.lock:
@@ -169,14 +175,30 @@ def mass_radius(row) -> tuple[float, float, str]:
             float(r) if np.isfinite(r) else FALLBACK_R, "TIC" if ok else "fallback_0.3")
 
 
+def shard_of(targets: pd.DataFrame, shard: int, of: int) -> pd.DataFrame:
+    """Deterministic split of the ORDERED list: position p goes to shard p % of. Every shard
+    gets the same mix of 45-sector and 6-sector stars, so shards finish at similar times."""
+    if of == 1:
+        return targets
+    return targets.iloc[shard::of].reset_index(drop=True)
+
+
+def shard_dir(base: Path, shard: int, of: int) -> Path:
+    return base if of == 1 else base / "shards" / f"shard{shard:03d}of{of:03d}"
+
+
 # ------------------------------------------------------------------------------------- runner
 
 
 class Runner:
     def __init__(self, a):
         self.a = a
-        self.out = OUT / a.tag
-        self.data = DATA / a.tag
+        self.out = shard_dir(OUT / a.tag, a.shard, a.of)
+        self.data = shard_dir(DATA / a.tag, a.shard, a.of)
+        self.t_start = time.time()
+        self.deadline = self.t_start + a.max_hours * 3600 if a.max_hours else None
+        self.hard_deadline = (self.deadline + a.grace_min * 60) if self.deadline else None
+        self.stopped_for_time = False
         self.res_dir = self.out / "results"
         for d in (self.out, self.res_dir, self.data):
             d.mkdir(parents=True, exist_ok=True)
@@ -214,12 +236,16 @@ class Runner:
              "rot": cfg["rot"], "max_sig": __import__("searchjob").MAX_SIG,
              "targets": str(tpath), "targets_sha256": sha256(tpath),
              "min_sectors": self.a.min_sectors, "n_targets": int(len(targets)),
+             "shard": self.a.shard, "of": self.a.of, "route": self.a.route,
+             "shard_tics_sha256": hashlib.sha256(
+                 ",".join(map(str, targets["_tic"])).encode()).hexdigest(),
              "out_dir": str(self.out), "data_dir": str(self.data)}
         mp = self.out / "manifest.json"
         if mp.exists():
             old = json.loads(mp.read_text())
             diff = [k for k in ("frozen_sha256", "code_sha256", "rot", "max_sig",
-                                "targets_sha256", "min_sectors") if old.get(k) != m.get(k)]
+                                "targets_sha256", "min_sectors", "shard", "of",
+                                "shard_tics_sha256") if old.get(k) != m.get(k)]
             if diff and not self.a.allow_code_change:
                 raise SystemExit(f"manifest mismatch on {diff}: the search path or targets "
                                  "changed since this survey started; refusing to mix results "
@@ -290,6 +316,9 @@ class Runner:
         try:
             while (pending or deferred) and not self.stop.is_set():
                 now = time.time()
+                if self.deadline and now >= self.deadline:
+                    self.log.say("downloader: --max-hours reached, no new downloads")
+                    break
                 if pending:
                     star = pending.pop(0)
                 else:
@@ -306,7 +335,7 @@ class Runner:
                     continue
                 star["attempt"] = star.get("attempt", 0) + 1
                 try:
-                    prods, queried = dl.products(tic)
+                    prods, queried = dl.products(tic, star["sectors_pred"])
                 except Exception as e:  # noqa: BLE001
                     self.log.error({"tic": tic, "kind": "star_query_failed", "final": True,
                                     "attempt": star["attempt"], "msg": repr(e)[:200]})
@@ -334,9 +363,18 @@ class Runner:
                                       "every sector failed", fails)
                     continue
                 npz = dl.write_npz(tic, recs, metas, fails)
+                self.log.download({"tic": tic, "utc": utc(), "dl_wall_s": time.time() - w0,
+                                   "n_sectors": len(metas), "n_failed": len(fails),
+                                   "n_s3": sum(m.get("source") == "s3" for m in metas),
+                                   "n_mast": sum(m.get("source") == "mast" for m in metas),
+                                   "list_source": dl.list_source, "route": self.a.route,
+                                   "npz_bytes": npz.stat().st_size})
+                if self.a.download_only:
+                    continue
                 self._push(star, {"npz": npz, "dl_wall_s": time.time() - w0,
                                   "cached_npz": False, "products_queried_utc": queried,
-                                  "n_listed": len(prods)})
+                                  "n_listed": len(prods), "list_source": dl.list_source,
+                                  "list_undecided": list(getattr(dl, "undecided", []))})
         except Exception as e:  # noqa: BLE001 - the downloader must never take the run down
             self.log.say(f"DOWNLOADER CRASH {classify(e)} {e!r:.300}")
             self.log.error({"kind": "downloader_crash", "final": True, "msg": repr(e)[:300]})
@@ -404,8 +442,13 @@ class Runner:
                  n_sectors_found=len(found), sectors_found=found,
                  products={str(s["sector"]): s.get("product") for s in meta["sectors"]},
                  provenance=[{k: s.get(k) for k in ("sector", "product", "procver", "data_rel",
-                                                     "cadence_s", "uri", "downloaded_utc")}
+                                                     "cadence_s", "uri", "downloaded_utc",
+                                                     "source")}
                              for s in meta["sectors"]],
+                 n_from_s3=sum(1 for s in meta["sectors"] if s.get("source") == "s3"),
+                 n_from_mast=sum(1 for s in meta["sectors"] if s.get("source") == "mast"),
+                 list_source=info.get("list_source"),
+                 list_undecided=info.get("list_undecided"),
                  sector_failures=fails, n_sector_failures=len(fails), incomplete=bool(fails))
         tags = []
         if fails:
@@ -414,6 +457,10 @@ class Runner:
             tags.append("lt6_real_sectors")
         if star["mr_source"] != "TIC":
             tags.append("fallback_mass_radius")
+        if info.get("list_source") == "s3_listing":
+            tags.append("sector_list_from_s3")
+        if info.get("list_undecided"):
+            tags.append("sectors_undecided")
         missing = sorted(set(star["sectors_pred"]) - set(found))
         extra = sorted(set(found) - set(star["sectors_pred"]))
         r.update(sectors_missing_vs_pred=missing, sectors_extra_vs_pred=extra)
@@ -435,7 +482,7 @@ class Runner:
         a = self.a
         cfg = self.check_frozen()
         tpath = Path(a.targets)
-        targets = load_targets(tpath, a.min_sectors)
+        targets = shard_of(load_targets(tpath, a.min_sectors), a.shard, a.of)
         m = self.manifest(cfg, targets, tpath)
         self.frozen_sha, self.code_sha, self.git = (m["frozen_sha256"], m["code_sha256"],
                                                     m["starts"][-1]["git"])
@@ -455,7 +502,8 @@ class Runner:
         if a.max_stars is not None:
             todo = todo[: a.max_stars]
         self.n_todo, self.n_done = len(todo), 0
-        self.log.say(f"start run_id={self.run_id} tag={a.tag} targets={len(targets)} "
+        self.log.say(f"start run_id={self.run_id} tag={a.tag} shard={a.shard}/{a.of} "
+                     f"route={a.route} max_hours={a.max_hours} targets={len(targets)} "
                      f"todo={len(todo)} procs={a.procs} frozen={self.frozen_sha[:12]} "
                      f"git={self.git} removed_tmp={nt} resynced={nr}")
         if not todo:
@@ -468,7 +516,19 @@ class Runner:
         pool = self._pool()
         try:
             while not self.stop.is_set():
-                while len(inflight) < a.procs:
+                now = time.time()
+                if self.deadline and now >= self.deadline and not self.stopped_for_time:
+                    self.stopped_for_time = True
+                    self.log.say(f"--max-hours {a.max_hours} reached: no new searches; "
+                                 f"{len(inflight)} running finish (grace {a.grace_min} min)")
+                if self.stopped_for_time:
+                    if not inflight:
+                        break
+                    if now >= self.hard_deadline:
+                        self.log.say(f"grace over: abandoning {len(inflight)} searches "
+                                     "(redone on the next start)")
+                        break
+                while len(inflight) < a.procs and not self.stopped_for_time:
                     if self.retry:
                         star = self.retry.pop(0)
                     else:
@@ -493,6 +553,7 @@ class Runner:
                     try:
                         res = f.result()
                         self._write(self._search_record(star, info, res, None))
+                        self._drop_npz(info)
                     except BrokenProcessPool:
                         broken = True
                         self._crash(star, info, crashes)
@@ -501,6 +562,7 @@ class Runner:
                                         "final": True, "msg": repr(e)[:300]})
                         self._write(self._search_record(star, info, None,
                                                         f"search_error: {e!r:.300}"))
+                        self._drop_npz(info)
                 if broken:
                     for f, (star, info) in list(inflight.items()):
                         self._crash(star, info, crashes)
@@ -514,8 +576,16 @@ class Runner:
         if self.dl_crashed:
             self.log.say("exiting with status 1 after a downloader crash (systemd restarts)")
             return 1
-        self.log.say(f"finished run_id={self.run_id} done={self.n_done}/{self.n_todo}")
+        why = "stopped at --max-hours" if self.stopped_for_time else "finished"
+        self.log.say(f"{why} run_id={self.run_id} done={self.n_done}/{self.n_todo} "
+                     f"wall={(time.time() - self.t_start) / 3600:.2f} h")
         return 0
+
+    def _drop_npz(self, info):
+        """Default: the light curve is deleted once its star is searched (disk budget);
+        get_lightcurve.py re-fetches it on demand. --keep-npz keeps it."""
+        if not self.a.keep_npz:
+            Path(info["npz"]).unlink(missing_ok=True)
 
     def _crash(self, star, info, crashes):
         tic = star["tic"]
@@ -555,8 +625,24 @@ def main() -> int:
     ap.add_argument("--max-stars", type=int, default=None)
     ap.add_argument("--retry-failed", action="store_true")
     ap.add_argument("--allow-code-change", action="store_true")
+    ap.add_argument("--shard", type=int, default=0, help="this shard, 0 <= shard < of")
+    ap.add_argument("--of", type=int, default=1, help="number of shards")
+    ap.add_argument("--max-hours", type=float, default=None,
+                    help="wall-clock budget: no new star starts after it")
+    ap.add_argument("--grace-min", type=float, default=20.0,
+                    help="after --max-hours, minutes running searches may take to finish")
+    ap.add_argument("--route", choices=("s3", "mast"), default="s3",
+                    help="s3: FITS bytes from the public AWS bucket (MAST fallback)")
+    ap.add_argument("--keep-npz", action="store_true", help="keep light-curve NPZs")
+    ap.add_argument("--download-only", action="store_true",
+                    help="timing/route checks: download and keep NPZs, no search, no results")
     a = ap.parse_args()
     a.procs = max(1, min(a.procs, MAX_PROCS))  # machine rule: at most 3 CPU workers
+    if not (a.of >= 1 and 0 <= a.shard < a.of):
+        ap.error("need 0 <= --shard < --of")
+    import download
+
+    download.ROUTE = a.route
     r = Runner(a)
 
     def _term(signum, frame):
