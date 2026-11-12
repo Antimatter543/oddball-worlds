@@ -1,12 +1,21 @@
 """Track C survey runner: the frozen gate-2 search over every target star, resumable.
 
 Pipeline (one process, two stages that never wait on each other):
-  downloader thread  stars in order (most predicted sectors first) -> product list (cached)
-                     -> every sector, at most 2 MAST requests at a time (download.py)
+  downloader thread  stars in order (most predicted sectors first) -> product list (MAST
+                     observation query, cached; frozen product rule) -> every sector's FITS
+                     bytes from the public AWS bucket (--route s3, default; MAST fallback, at
+                     most 2 MAST requests at a time) or from MAST only (--route mast)
                      -> compact NPZ in DATA/<tag>/lc/ -> ready queue
   search pool        <= 3 spawn processes (numba 1 thread each) take ready NPZs and run
                      searchjob.search_one (frozen method, long + short range)
-  main thread        writes one result JSON per star (write-then-rename) and a progress line.
+  main thread        writes one result JSON per star (write-then-rename) and a progress line,
+                     then deletes the star's NPZ (--keep-npz keeps it; get_lightcurve.py
+                     rebuilds it on demand).
+
+Shards: --shard i --of N takes positions i, i+N, ... of the ordered list (deterministic), into
+OUT/<tag>/shards/shardIIIofNNN/ with its own manifest, results, progress and lock; merge.py
+joins them and checks duplicates and gaps. --max-hours stops starting stars after that wall
+time; running searches get --grace-min to finish, then are abandoned (redone next start).
 
 State and resumability:
   * done      = OUT/<tag>/results/tic<T>.json exists (written atomically, last step for a star).
@@ -30,6 +39,7 @@ signals are only in the per-star result files, for the pre-registered vetting.
 Usage (from the main checkout; launch.sh does this under systemd):
   python -I spikes/mdwarf_stack/survey/run_survey.py [--tag survey] [--procs 3]
          [--targets CSV] [--min-sectors 6] [--max-stars N] [--retry-failed]
+         [--shard I --of N] [--max-hours H] [--route s3|mast] [--keep-npz]
 """
 
 from __future__ import annotations
@@ -72,7 +82,9 @@ from make_jobs import FALLBACK_M, FALLBACK_R  # noqa: E402
 MAX_PROCS = 3
 STAR_ATTEMPTS = 3
 RETRY_GAP_S = 900.0
-READY_MAX = 200  # downloaded-but-unsearched stars the downloader may run ahead by
+# downloaded-but-unsearched stars the downloader may run ahead by (S3 downloads are ~10x faster
+# than searches, so this bounds the NPZs on disk: 50 x <= 1 MB)
+READY_MAX = 50
 FROZEN = SPIKE / "gate2" / "frozen.json"
 FROZEN_OUT_COPY = OUT / "gate2" / "frozen.json"
 DEFAULT_TARGETS = OUT / "gate2" / "survey_targets.csv"

@@ -1,7 +1,9 @@
 """Survey downloader: every TESS sector of one star, exactly as gate 2 fetched it, politely.
 
 What is reused unchanged from gate 2 (`spikes/mdwarf_stack/fetch.py`):
-  * `fetch.list_products`: the SPOC 2-min > TESS-SPOC product choice per sector.
+  * The product rule of `fetch.list_products` (SPOC 2-min > TESS-SPOC per sector), applied by
+    `list_products_obs` to the same observation query's `dataURL`s instead of a
+    get_product_list call (that MAST service hung for minutes on 2026-11-12).
   * `fetch._one`: FITS bytes -> 10-min binned record (`convert_fits_bytes`), TIC check, and the
     per-sector metadata. FITS bytes stay in memory and are never written to disk.
   * The NPZ layout of `fetch.fetch` (sectors concatenated in sector order, stable sort by bin
@@ -9,12 +11,16 @@ What is reused unchanged from gate 2 (`spikes/mdwarf_stack/fetch.py`):
     `searchjob.load_npz` reads exactly what `fetch.load` read in gate 2.
 
 What is wrapped (behaviour of the conversion is untouched):
-  * `fetch._get` is replaced by `polite_get`: anonymous User-Agent (`oddball.common.http`),
-    a process-wide semaphore of MAX_CONCURRENT (2) requests, bounded retries with exponential
-    backoff + jitter (Retry-After honoured), no retry on permanent 4xx, error classification,
-    and a circuit breaker that pauses all requests after a run of exhausted retries (MAST down).
-    Gate 2 used 4 threads per star and 4 tries with 2-16 s backoff.
-  * The astroquery product query runs under the same semaphore with the anonymous User-Agent.
+  * `fetch._get` is replaced by `polite_get`. ROUTE "s3" (default) reads the same file name
+    from the public STScI bucket (s3://stpubdata over anonymous HTTPS: SPOC 2-min for every
+    sector, TESS-SPOC HLSP up to s0081) and falls back to MAST when the bucket lacks it.
+    MAST requests: anonymous User-Agent (`oddball.common.http`), a process-wide semaphore of
+    MAX_CONCURRENT (2), bounded retries with exponential backoff + jitter (Retry-After
+    honoured), no retry on permanent 4xx, error classification, and a circuit breaker that
+    pauses all MAST requests after a run of exhausted retries. Gate 2 used 4 threads per star
+    and 4 tries with 2-16 s backoff. Each sector's source ("s3"/"mast") is recorded.
+  * The astroquery product query runs under the same semaphore with the anonymous User-Agent
+    and a socket timeout (astroquery sends timeout=None).
   * Per-sector partial cache (`partial/tic<T>/sNNNN.npz`, write-then-rename), so a killed
     40-sector star does not re-download the sectors it already has.
 """

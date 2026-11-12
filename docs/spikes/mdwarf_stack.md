@@ -479,9 +479,83 @@ top signal only. The rotation census uses LS power only (the harm `amp` field is
 ephemerides come from catalogues (K2-3 b's is wrong). The survey sector counts are predictions. TIC 17307715 has
 a TESS-SPOC product labelled sector 1751 (6 days at BTJD 4056-4062), kept as a separate sector.
 
+## Track C survey runner (2026-11-12; built and piloted, survey NOT started)
+Code: `spikes/mdwarf_stack/survey/`. The frozen gate-2 search is called unchanged (`search2.preprocess2` with
+rot from `frozen.json`, then `search.search_star` with `run2.RANGES` long and short, 6 signals per range, the
+host/hold-out setting). Its first 3 signals are what a 3-slot run returns, since the iteration is greedy.
+Blinded: logs, `status.py`, `merge.py` and the Kaggle logs print counts only; signals are only in the per-star
+result JSON, for the pre-registered vetting.
+
+**What changed in the data path (the method did not).**
+- Product list: same observation query and same SPOC 2-min > TESS-SPOC rule as `fetch.list_products`, but
+  read from each observation's `dataURL`. MAST's product-list service (`get_product_list`) hung for > 6 min per
+  call on 2026-11-12 while the observation query answered in ~0.35 s. Check (`pilot.py routecheck`): over all
+  189 gate-2 stars, the 2,308 sector URIs gate 2 downloaded are found again, 0 missing, 0 different. 7 stars
+  gain a sector: 2 are sectors whose gate-2 download failed, 5 gain S86 (new release or listing difference;
+  not checked further). Astroquery sends portal requests with `timeout=None`; a socket timeout is now added.
+- FITS bytes: the public STScI bucket `s3://stpubdata` (anonymous HTTPS). SPOC 2-min `*-s_lc.fits` is under
+  `tess/public/tid/sSSSS/<tic split>/` for S1-S108 (and the S1751 oddity). TESS-SPOC HLSP light curves are under
+  `mast/hlsp/tess-spoc/sSSSS/target/<tic split>/` but **only to S81**; later TESS-SPOC sectors come from MAST
+  (14 of 669 sectors on the pilot stars). The bucket listing alone finds 655 of the 669 MAST-listed sectors
+  with identical URIs (all 14 misses are TESS-SPOC > S81), so the MAST observation query stays as the sector
+  list and the bucket listing is only its fallback (`sector_list_from_s3` tag).
+- Identity: 22 of 22 sampled sector files (16 SPOC, 6 TESS-SPOC, 11 hosts) have identical SHA-256 from S3 and
+  MAST (`bytecheck.csv`); the S3-route NPZ of all 11 hosts is bitwise equal to gate 2's.
+- Speed (same 11 hosts, 192 sectors, download only, one runner): MAST 1.72 s per sector (30 s per star),
+  S3 0.36 s per sector (6.3 s per star; 15% of that is the MAST query). On Kaggle 1-10 s per star.
+
+**Pilot (worktree, 2 niced workers).** Reproduction tolerance fixed before the run: the gate-2 recovered planet
+signal in the same slot with |dP/P| < 1e-5 and |dMES|/MES < 1%; exact equality expected when the sectors match.
+Result: **13 of 13 planets on 11 hold-out hosts (4-43 sectors) PASS and are exact**: same sectors and products,
+NPZ bitwise equal, every signal (both ranges, all slots) equal to < 1e-15 (`survey_pilot/reproduction.csv`).
+
+| 30 survey stars, by real sectors | n | mean real / predicted sectors | search CPU-s mean (max) | NPZ MB |
+|---|---|---|---|---|
+| < 6 | 6 | 3.3 / 7.3 | 9.6 (23) | 0.08 |
+| 6-12 | 11 | 7.7 / 12.4 | 22.8 (77) | 0.17 |
+| 13-25 | 5 | 19.4 / 22.0 | 27.9 (35) | 0.45 |
+| 26+ | 7 | 39.3 / 40.7 | 94.0 (297) | 0.89 |
+
+One star had no product (`no_data`); real/predicted sectors 0.83. Measured/model search cost on these stars is
+0.43 (6-12), 0.71 (13-25) and 1.01 (26+), which gives **24-33 CPU-h** for the 4,681 stars (bucket ratios vs one
+global ratio), 8-11 h on 3 local workers. Downloads: 41,800 real sectors, **4.2 h via S3 vs 20 h via MAST** for
+one runner, overlapped with the search. Peak RAM of the whole process group 0.93 GB with 2 workers (worker
+VmHWM <= 368 MB, Kaggle 479 MB). Disk: result records 16.6 kB per star (78 MB for 4,681), NPZs deleted after
+search (at most 50 waiting, <= 1 MB each), so the local footprint stays well under 2 GB.
+Kill tests: SIGKILL of the whole process group at 12 of 30 stars (18 NPZs downloaded, 2 searches running);
+the restart did the other 18, giving 30 results, 30 progress lines, no temp files. A 40-sector star killed after
+12 sectors resumed from its partial cache and gave the gate-2 NPZ bitwise. `--max-hours` stopped new searches
+and let the two running ones finish. A 2-shard run merged cleanly; an injected duplicate and gap were reported
+and the merge refused.
+
+**Kaggle.** Measured in the smoke kernel: 4 vCPU (cgroup `cpu.max 400000 100000`), 32.9 GB RAM, 20.9 GB free
+in `/kaggle/working`, internet on. Not measurable from inside: the 12 h session limit and the 20 GB output limit
+come from Kaggle's notebook docs as quoted by secondary sources; the account's limit of 5 concurrent batch CPU
+sessions is from earlier use of this account (a refused push is reported in the response text, not the exit
+code). Weekly quotas apply to GPU/TPU only. Smoke kernel (private, embedded `git archive` of e365ea6, uv venv
+Python 3.13.2 with the gate-2 pins): 5 hold-out hosts, 6 min, results **identical to the local pilot** (all 18
+signals, both ranges). CPU per star is 3.5x the local machine, so the survey is ~116 worker-hours on Kaggle:
+**10 shards** of ~3.9 h each at 3 workers, in two waves of <= 5, about 8 h of wall time, with the guard at
+`--budget-hours 11`. Only result records leave Kaggle; light curves are re-fetched on demand
+(`get_lightcurve.py`, 300 MB LRU cache).
+
+**Commands** (main checkout, after merging; `PY=.venv/bin/python`, which needs
+`uv sync --inexact --group planets` first because the main venv lacks wotan):
+- Local: `spikes/mdwarf_stack/survey/launch.sh` (systemd user unit `oddball-survey`), `$PY -I
+  spikes/mdwarf_stack/survey/status.py`, `spikes/mdwarf_stack/survey/stop.sh`. Launch again to resume.
+- Kaggle (after `git push`): `$PY -I spikes/mdwarf_stack/survey/kaggle/build_kernel.py --of 10`, then
+  `spikes/mdwarf_stack/survey/kaggle/shards.sh push 10 0 1 2 3 4`, `shards.sh status 10`, `shards.sh push 10 5 6 7
+  8 9` when slots free, `KPY=~/miniconda3/bin/python shards.sh fetch 10` (pulls and runs `merge.py --of 10`). A shard
+  stopped by the guard is rebuilt with `build_kernel.py --of 10 --shards I --skip-from-local` and pushed again.
+
+**Unverified / stubbed.** The S86 extra sectors above. The bucket-listing fallback is exercised only by the
+listing comparison, not by a real MAST outage. `Restart=on-failure` and `MemoryMax` were not exercised under
+systemd (launch.sh was not started). The Kaggle git mode (clone at a pushed commit) is not tested; the smoke
+used embed mode because the survey branch is not on the remote yet. The Kaggle CPU factor comes from 5 stars.
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
-**State at 2026-11-11 17:50 AEST: gate 2 complete.** Every stage finished (no errors); results are above. Nothing is
-running. The survey has not been started; that is the owner's decision. Re-running `analyze2.py all` and
+**State at 2026-11-12 11:00 AEST:** gate 2 complete; the survey runner is built and piloted (section above), and the
+survey has not been started; that is the owner's decision. Re-running `analyze2.py all` and
 `survey_targets.py` regenerates every table from the cached outputs.
 
 `PY` = `/home/antiraedus/Projects/oddball-worlds/.claude/worktrees/agent-a666696a20e0e7529/.venv/bin/python`.
