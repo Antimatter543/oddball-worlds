@@ -340,7 +340,9 @@ class Runner:
                     continue
                 star["attempt"] = star.get("attempt", 0) + 1
                 try:
+                    q0 = time.time()
                     prods, queried = dl.products(tic, star["sectors_pred"])
+                    q_s = time.time() - q0
                 except Exception as e:  # noqa: BLE001
                     self.log.error({"tic": tic, "kind": "star_query_failed", "final": True,
                                     "attempt": star["attempt"], "msg": repr(e)[:200]})
@@ -373,6 +375,7 @@ class Runner:
                                    "n_s3": sum(m.get("source") == "s3" for m in metas),
                                    "n_mast": sum(m.get("source") == "mast" for m in metas),
                                    "list_source": dl.list_source, "route": self.a.route,
+                                   "query_s": q_s,
                                    "npz_bytes": npz.stat().st_size})
                 if self.a.download_only:
                     continue
