@@ -30,6 +30,8 @@ VERDICT_APLUS = ("Tier A+, the strongest grade: it passed every check, has 3 or 
 def load_odds(path=None):
     p = Path(path) if path else OUT / "vetting" / "v2" / "analyze_val.json"
     if not p.exists():
+        p = HERE / "analyze_val2.json"  # committed copy of the frozen validation result
+    if not p.exists():
         return None
     return json.loads(p.read_text())
 

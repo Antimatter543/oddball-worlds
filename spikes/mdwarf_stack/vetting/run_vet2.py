@@ -139,7 +139,8 @@ def main():
     a = ap.parse_args()
     shard = tuple(int(x) for x in a.shard.split("/"))
     V2.mkdir(parents=True, exist_ok=True)
-    if a.stage in ("val", "survey") and not (V2 / "frozen_vet2.json").exists():
+    if a.stage in ("val", "survey") and not ((V2 / "frozen_vet2.json").exists()
+                                             or (HERE / "frozen_vet2.json").exists()):
         sys.exit("refusing: validation / survey vetting needs frozen_vet2.json first")
     if a.stage == "dev":
         tasks, extra = tasks_dev(), True
