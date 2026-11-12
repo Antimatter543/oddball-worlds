@@ -1,0 +1,205 @@
+# Vetting analysis (all); thresholds: frozen; tau_long = 8.054
+
+rows with a measurement error (not graded): {'dev': 0, 'test': 0, 'holdout': 0}
+pixel results merged: 41 (rows without one have pixel = n/a)
+## DEV: per-test outcome
+
+| test | DEV true (MES>=7) (pass / soft / fail of n) | DEV true, MES 7-12 (pass / soft / fail of n) | DEV FA (MES>=6) (pass / soft / fail of n) | DEV FA MES>=7 (pass / soft / fail of n) | DEV FA >= tau (pass / soft / fail of n) |
+|---|---|---|---|---|---|
+| odd_even | 0.98 / 0.02 / 0.01 (177) | 1.00 / 0.00 / 0.00 (70) | 0.97 / 0.03 / 0.00 (184) | 0.87 / 0.13 / 0.00 (23) | 1.00 / 0.00 / 0.00 (2) |
+| per_transit | 0.94 / 0.05 / 0.01 (180) | 0.91 / 0.07 / 0.01 (70) | 0.78 / 0.22 / 0.00 (194) | 0.67 / 0.33 / 0.00 (24) | 0.00 / 1.00 / 0.00 (3) |
+| sector_consistency | 0.97 / 0.02 / 0.01 (180) | 1.00 / 0.00 / 0.00 (70) | 0.99 / 0.01 / 0.00 (194) | 1.00 / 0.00 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| duration_density | 0.97 / 0.03 / 0.00 (180) | 0.97 / 0.03 / 0.00 (70) | 0.84 / 0.11 / 0.05 (194) | 0.62 / 0.17 / 0.21 (24) | 1.00 / 0.00 / 0.00 (3) |
+| secondary | 0.97 / 0.03 / 0.00 (180) | 0.99 / 0.01 / 0.00 (70) | 0.97 / 0.03 / 0.00 (194) | 0.96 / 0.04 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| model_compare | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.97 / 0.03 / 0.01 (194) | 0.83 / 0.12 / 0.04 (24) | 1.00 / 0.00 / 0.00 (3) |
+| uniqueness | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.88 / 0.12 / 0.00 (194) | 1.00 / 0.00 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| sap | 0.97 / 0.02 / 0.01 (180) | 1.00 / 0.00 / 0.00 (70) | 0.95 / 0.03 / 0.02 (58) | 0.83 / 0.17 / 0.00 (6) | n/a |
+| systematics_window | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.91 / 0.07 / 0.02 (58) | 0.83 / 0.17 / 0.00 (6) | n/a |
+| orbit_alias | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.98 / 0.02 / 0.00 (58) | 1.00 / 0.00 / 0.00 (6) | n/a |
+| rotation_residual | 0.99 / 0.01 / 0.00 (180) | 0.99 / 0.01 / 0.00 (70) | 0.98 / 0.02 / 0.00 (58) | 1.00 / 0.00 / 0.00 (6) | n/a |
+| pixel | n/a | n/a | n/a | n/a | n/a |
+| contamination | 0.99 / 0.01 / 0.00 (180) | 0.97 / 0.03 / 0.00 (70) | 0.95 / 0.05 / 0.00 (39) | 0.80 / 0.20 / 0.00 (5) | n/a |
+| catalogue | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 1.00 / 0.00 / 0.00 (39) | 1.00 / 0.00 / 0.00 (5) | n/a |
+
+## DEV: tiers
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| DEV true (MES>=7) | 180 | 146 | 28 | 6 | 0 | 0.97 [0.93, 0.98] (174/180) |
+| DEV true, MES 7-12 | 70 | 58 | 11 | 1 | 0 | 0.99 [0.92, 1.00] (69/70) |
+| DEV FA (MES>=6) | 194 | 107 | 43 | 44 | 0 | 0.77 [0.71, 0.83] (150/194) |
+| DEV FA MES>=7 | 24 | 8 | 6 | 10 | 0 | 0.58 [0.39, 0.76] (14/24) |
+| DEV FA >= tau | 3 | 0 | 0 | 3 | 0 | 0.00 [0.00, 0.56] (0/3) |
+
+DEV true, what costs strikes: soft:per_transit 9, soft:secondary 5, soft:duration_density 5, soft:sap 4, soft:sector_consistency 4, soft:odd_even 3, soft:contamination 2, duo 2, fail:per_transit 2, soft:rotation_residual 1
+DEV FA, what rejects: soft:per_transit 42, soft:uniqueness 23, soft:duration_density 22, fail:duration_density 9, duo 9, soft:secondary 5, soft:model_compare 5, soft:odd_even 5, soft:systematics_window 4, soft:contamination 2
+
+## TEST and hold-out: per-test outcome (pass / soft / fail of applicable n)
+
+| test | TEST headline detected (pass / soft / fail of n) | headline MES<12 (pass / soft / fail of n) | TEST all detected (pass / soft / fail of n) | TEST FA >=6 (pass / soft / fail of n) | TEST FA >=7 (pass / soft / fail of n) | TEST FA >=tau (pass / soft / fail of n) | hold-out planets (pass / soft / fail of n) |
+|---|---|---|---|---|---|---|---|
+| odd_even | 0.99 / 0.01 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 0.98 / 0.02 / 0.00 (225) | 0.98 / 0.02 / 0.00 (130) | 0.96 / 0.04 / 0.00 (25) | 1.00 / 0.00 / 0.00 (2) | 1.00 / 0.00 / 0.00 (30) |
+| per_transit | 0.92 / 0.07 / 0.01 (108) | 0.92 / 0.08 / 0.00 (48) | 0.91 / 0.07 / 0.01 (228) | 0.72 / 0.28 / 0.00 (139) | 0.55 / 0.45 / 0.00 (29) | 0.33 / 0.67 / 0.00 (3) | 0.87 / 0.13 / 0.00 (30) |
+| sector_consistency | 0.97 / 0.03 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 0.95 / 0.04 / 0.01 (228) | 0.96 / 0.04 / 0.00 (139) | 1.00 / 0.00 / 0.00 (29) | 1.00 / 0.00 / 0.00 (3) | 0.97 / 0.03 / 0.00 (29) |
+| duration_density | 0.96 / 0.03 / 0.01 (108) | 0.96 / 0.04 / 0.00 (48) | 0.96 / 0.03 / 0.01 (228) | 0.88 / 0.09 / 0.03 (139) | 0.93 / 0.03 / 0.03 (29) | 1.00 / 0.00 / 0.00 (3) | 0.97 / 0.03 / 0.00 (30) |
+| secondary | 0.98 / 0.02 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 0.98 / 0.02 / 0.00 (228) | 0.99 / 0.01 / 0.01 (139) | 0.97 / 0.03 / 0.00 (29) | 1.00 / 0.00 / 0.00 (3) | 0.97 / 0.03 / 0.00 (30) |
+| model_compare | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 0.94 / 0.04 / 0.01 (139) | 0.97 / 0.00 / 0.03 (29) | 0.67 / 0.00 / 0.33 (3) | 1.00 / 0.00 / 0.00 (30) |
+| uniqueness | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 0.88 / 0.09 / 0.02 (139) | 0.93 / 0.03 / 0.03 (29) | 1.00 / 0.00 / 0.00 (3) | 1.00 / 0.00 / 0.00 (30) |
+| sap | 0.94 / 0.06 / 0.01 (108) | 0.96 / 0.04 / 0.00 (48) | 0.90 / 0.10 / 0.00 (228) | 0.84 / 0.16 / 0.00 (63) | 0.69 / 0.31 / 0.00 (13) | 1.00 / 0.00 / 0.00 (2) | 1.00 / 0.00 / 0.00 (30) |
+| systematics_window | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 0.87 / 0.11 / 0.02 (63) | 0.85 / 0.15 / 0.00 (13) | 0.50 / 0.50 / 0.00 (2) | 1.00 / 0.00 / 0.00 (30) |
+| orbit_alias | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 0.98 / 0.00 / 0.02 (63) | 0.92 / 0.00 / 0.08 (13) | 1.00 / 0.00 / 0.00 (2) | 1.00 / 0.00 / 0.00 (30) |
+| rotation_residual | 0.98 / 0.02 / 0.00 (108) | 0.98 / 0.02 / 0.00 (48) | 0.99 / 0.01 / 0.00 (228) | 1.00 / 0.00 / 0.00 (63) | 1.00 / 0.00 / 0.00 (13) | 1.00 / 0.00 / 0.00 (2) | 0.97 / 0.03 / 0.00 (30) |
+| pixel | n/a | n/a | n/a | 0.67 / 0.00 / 0.33 (6) | 0.67 / 0.00 / 0.33 (6) | 0.00 / 0.00 / 1.00 (1) | 0.80 / 0.20 / 0.00 (30) |
+| contamination | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 0.96 / 0.04 / 0.00 (48) | 1.00 / 0.00 / 0.00 (10) | 1.00 / 0.00 / 0.00 (1) | 0.93 / 0.07 / 0.00 (30) |
+| catalogue | 1.00 / 0.00 / 0.00 (108) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (228) | 1.00 / 0.00 / 0.00 (48) | 1.00 / 0.00 / 0.00 (10) | 1.00 / 0.00 / 0.00 (1) | n/a |
+
+## TEST and hold-out: tiers
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| TEST headline detected | 108 | 86 | 17 | 5 | 0 | 0.95 [0.90, 0.98] (103/108) |
+| headline MES<12 | 48 | 39 | 9 | 0 | 0 | 1.00 [0.93, 1.00] (48/48) |
+| TEST all detected | 228 | 169 | 45 | 14 | 0 | 0.94 [0.90, 0.96] (214/228) |
+| TEST FA >=6 | 139 | 65 | 38 | 36 | 0 | 0.74 [0.66, 0.81] (103/139) |
+| TEST FA >=7 | 29 | 11 | 7 | 11 | 0 | 0.62 [0.44, 0.77] (18/29) |
+| TEST FA >=tau | 3 | 1 | 0 | 2 | 0 | 0.33 [0.06, 0.79] (1/3) |
+| hold-out planets | 30 | 0 | 0 | 0 | 30 | 0.00 [0.00, 0.11] (0/30) |
+| TEST FA real >=6 | 48 | 17 | 12 | 19 | 0 | 0.60 [0.46, 0.73] (29/48) |
+| TEST FA null >=6 | 91 | 48 | 26 | 17 | 0 | 0.81 [0.72, 0.88] (74/91) |
+| gate-1 host signals >= tau | 10 | 0 | 0 | 0 | 10 | 0.00 [0.00, 0.28] (0/10) |
+
+hold-out planets, blind tier (catalogue test off):
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| hold-out planets (blind) | 30 | 17 | 8 | 5 | 0 | 0.83 [0.66, 0.93] (25/30) |
+
+hold-out pixel statuses: {'pass': 24, 'soft': 6}
+
+POST-HOC (not pre-registered): blind tier with the pixel test also off:
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| hold-out planets (blind, no pixel) | 30 | 21 | 6 | 3 | 0 | 0.90 [0.74, 0.97] (27/30) |
+
+headline, what costs strikes: soft:per_transit 8, soft:sap 6, soft:sector_consistency 3, soft:duration_density 3, soft:rotation_residual 2, soft:secondary 2, fail:per_transit 1, fail:duration_density 1, fail:sap 1, soft:odd_even 1
+TEST FA >=6, what rejects: soft:per_transit 39, soft:uniqueness 13, duo 13, soft:duration_density 12, soft:sap 10, soft:systematics_window 7, soft:model_compare 6, soft:sector_consistency 5, fail:duration_density 4, fail:uniqueness 3
+hold-out planets (blind), strikes: soft:pixel 6, soft:per_transit 4, soft:contamination 2, duo 2, soft:duration_density 1, soft:rotation_residual 1, soft:secondary 1, soft:sector_consistency 1
+
+### headline-cell detected injections by MES
+
+| MES | n | A+B | A |
+|---|---|---|---|
+| 8.1-10 | 32 | 1.00 [0.89, 1.00] (32/32) | 27 |
+| 10.0-12 | 16 | 1.00 [0.81, 1.00] (16/16) | 12 |
+| 12.0-15 | 14 | 1.00 [0.78, 1.00] (14/14) | 11 |
+| 15.0-20 | 22 | 0.91 [0.72, 0.97] (20/22) | 19 |
+| 20.0-1e+09 | 24 | 0.88 [0.69, 0.96] (21/24) | 17 |
+
+## Targets
+
+1. headline detected in A or B: 0.95 [0.90, 0.98] (103/108) (goal >= 0.80)
+2. FA >= tau_long in C: 0.67 [0.21, 0.94] (2/3); at MES >= 7.0: 0.38 [0.23, 0.56] (11/29); at MES >= 6: 0.26 [0.19, 0.34] (36/139) (goal >= 0.90)
+3. hold-out planets in A, B or K: 1.00 [0.89, 1.00] (30/30); blind (A or B): 0.83 [0.66, 0.93] (25/30) (goal >= 0.90)
+
+## P >= 40 d with 2-4 transits (the false-alarm pile-up region)
+
+(true = TEST detected injections plus DEV true >= tau_long; FA = TEST FA >= 6)
+
+| test | true, P>=40, 2-4 tr (pass / soft / fail of n) | FA, P>=40, 2-4 tr (pass / soft / fail of n) |
+|---|---|---|
+| odd_even | 1.00 / 0.00 / 0.00 (12) | 0.97 / 0.03 / 0.00 (30) |
+| per_transit | 0.88 / 0.12 / 0.00 (16) | 0.60 / 0.40 / 0.00 (35) |
+| sector_consistency | 1.00 / 0.00 / 0.00 (16) | 1.00 / 0.00 / 0.00 (35) |
+| duration_density | 1.00 / 0.00 / 0.00 (16) | 0.89 / 0.09 / 0.03 (35) |
+| secondary | 1.00 / 0.00 / 0.00 (16) | 0.97 / 0.00 / 0.03 (35) |
+| model_compare | 1.00 / 0.00 / 0.00 (16) | 0.91 / 0.06 / 0.03 (35) |
+| uniqueness | 1.00 / 0.00 / 0.00 (16) | 0.91 / 0.03 / 0.06 (35) |
+| sap | 0.88 / 0.12 / 0.00 (16) | 0.76 / 0.24 / 0.00 (17) |
+| systematics_window | 1.00 / 0.00 / 0.00 (16) | 0.71 / 0.24 / 0.06 (17) |
+| orbit_alias | 1.00 / 0.00 / 0.00 (16) | 0.94 / 0.00 / 0.06 (17) |
+| rotation_residual | 1.00 / 0.00 / 0.00 (16) | 1.00 / 0.00 / 0.00 (17) |
+| pixel | n/a | 0.00 / 0.00 / 1.00 (2) |
+| contamination | 1.00 / 0.00 / 0.00 (16) | 1.00 / 0.00 / 0.00 (11) |
+| catalogue | 1.00 / 0.00 / 0.00 (16) | 1.00 / 0.00 / 0.00 (11) |
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| true, P>=40, 2-4 tr | 16 | 11 | 5 | 0 | 0 | 1.00 [0.81, 1.00] (16/16) |
+| FA, P>=40, 2-4 tr | 35 | 11 | 12 | 12 | 0 | 0.66 [0.49, 0.79] (23/35) |
+
+## Projection: surviving false alarms per 4,700 survey stars
+
+- survival measured on TEST FA >= 7.0: survival s = 18/29 not tier C; r = 1/118 real stars with a long signal >= tau_long. Before vetting: 47 [4, 183] false alarms per 4700; after: **28.6 [2.6, 115.0]**.
+- survival on TEST FA >= tau_long: survival s = 1/3 not tier C; r = 1/118 real stars with a long signal >= tau_long. Before vetting: 47 [4, 183] false alarms per 4700; after: **14.2 [0.7, 89.4]**.
+- survival on TEST FA >= 6: survival s = 103/139 not tier C; r = 1/118 real stars with a long signal >= tau_long. Before vetting: 47 [4, 183] false alarms per 4700; after: **34.6 [3.2, 135.5]**.
+- real-control FA signals at MES >= 6 vetted: 48
+
+### TEST false alarms at MES >= 7.0
+
+| id | MES | P | n_tr | tier | reasons |
+|---|---|---|---|---|---|
+| tnullL-roll22-358899721#0 | 9.27 | 52.082 | 2 | C | per_transit: dom = 0.785 (soft > 0.65); model_compare: neg_dbic = 0.279 (soft > -6, fail > 0); only 2 transits: the period could be P/2, P/3, ... (strike) |
+| testreal-long-340487632#1 | 8.76 | 52.879 | 4 | C | per_transit: dom = 0.77 (soft > 0.65); systematics_window: share = 0.613 (soft > 0.5, fail > 0.8); pixel: the dip is stronger on a neighbour 37" away (SNR 23.3  |
+| tnullL-inv0-141621885#0 | 8.51 | 11.851 | 68 | A |  |
+| testreal-long-302444623#0 | 8.03 | 43.145 | 4 | C | per_transit: dom = 0.78 (soft > 0.65); sap: z_neg = 4.87 (soft > 3.39, fail > 6.72); systematics_window: share = 0.63 (soft > 0.5, fail > 0.8) |
+| tnullL-roll21-238034112#0 | 7.95 | 56.473 | 4 | C | odd_even: z = 3.68 (soft > 3, fail > 4.38); per_transit: dom = 0.77 (soft > 0.65) |
+| tnullL-roll21-340487632#0 | 7.84 | 58.204 | 3 | A |  |
+| testreal-long-267320484#0 | 7.82 | 52.917 | 3 | C | pixel: the dip is stronger on a neighbour 44" away (SNR 8.5 vs -3.4 on target) |
+| tnullL-roll22-235564220#0 | 7.66 | 48.912 | 3 | C | duration_density: ratio = 1.41 (soft > 1.38, fail > 2); uniqueness: neg_margin = -0.89 (soft > -2, fail > -1) |
+| testreal-long-377030976#0 | 7.51 | 32.087 | 2 | B | only 2 transits: the period could be P/2, P/3, ... (strike) |
+| tnullL-roll21-167651836#0 | 7.50 | 47.730 | 14 | A |  |
+| testreal-long-141621885#1 | 7.49 | 10.666 | 78 | C | per_transit: minses_neg = 1.48 (soft > 1.11, fail > 2.49); uniqueness: neg_margin = -1.03 (soft > -2, fail > -1) |
+| testreal-long-141621885#0 | 7.44 | 19.555 | 44 | A |  |
+| tnullL-roll22-267320484#0 | 7.37 | 57.194 | 3 | B | per_transit: dom = 0.682 (soft > 0.65) |
+| tnullL-roll21-422429539#0 | 7.36 | 45.222 | 4 | C | per_transit: dom = 0.797 (soft > 0.65); duration_density: ratio = 2.97 (soft > 1.38, fail > 2) |
+| testreal-long-154924886#2 | 7.26 | 32.787 | 8 | A |  |
+| tnullL-roll22-41358832#0 | 7.22 | 23.172 | 34 | A |  |
+| tnullL-roll22-48194292#0 | 7.20 | 39.773 | 7 | A |  |
+| tnullL-inv0-235564220#0 | 7.20 | 48.301 | 3 | B | per_transit: dom = 0.673 (soft > 0.65) |
+| tnullL-inv0-229535299#0 | 7.19 | 55.860 | 2 | C | sap: z_neg = 4.15 (soft > 3.39, fail > 6.72); orbit_alias: neg_spread = -0.354 (soft > -0.5); only 2 transits: the period could be P/2, P/3, ... (strike) |
+| tnullL-roll21-377030976#0 | 7.16 | 34.725 | 3 | B | secondary: excess = 1.19 (soft > 1, fail > 2) |
+| testreal-long-422429539#0 | 7.15 | 31.229 | 3 | C | per_transit: dom = 0.781 (soft > 0.65); sap: bkg_stat = 13.7 (soft > 4) |
+| tnullL-roll22-258629564#0 | 7.11 | 57.248 | 3 | B | per_transit: dom = 0.749 (soft > 0.65) |
+| tnullL-invroll11-454506085#0 | 7.09 | 39.238 | 3 | A |  |
+| testreal-long-260972843#0 | 7.08 | 56.411 | 10 | A |  |
+| tnullL-roll22-154924886#0 | 7.06 | 48.115 | 4 | B | per_transit: dom = 0.699 (soft > 0.65) |
+| tnullL-roll22-198512076#0 | 7.06 | 30.331 | 5 | B | per_transit: dom = 0.679 (soft > 0.65) |
+| tnullL-roll21-454506085#0 | 7.05 | 49.344 | 4 | A |  |
+| tnullL-roll21-451530352#0 | 7.05 | 11.910 | 10 | A |  |
+| testreal-long-154924886#0 | 7.03 | 48.529 | 4 | C | per_transit: dom = 0.674 (soft > 0.65); sap: z_neg = 5.03 (soft > 3.39, fail > 6.72) |
+
+### hold-out planets
+
+| planet | MES | P | n_tr | tier | blind | reasons (blind) |
+|---|---|---|---|---|---|---|
+| TOI-5713 b | 8.1 | 10.442 | 7 | K | A |  |
+| K2-133 d | 8.2 | 11.025 | 7 | K | A |  |
+| TOI-1752 c | 8.4 | 32.712 | 27 | K | A |  |
+| TIC 231080232 b | 9.4 | 12.554 | 24 | K | B | pixel: difference centroid > 1 px off target in 1 of 1 strong epochs |
+| TOI-6002 b | 10.2 | 10.905 | 17 | K | C | duration_density: ratio = 1.84 (soft > 1.38, fail > 2); pixel: difference centroid > 1 px off target in 1 of 1 strong epochs |
+| TOI-5799 c | 10.7 | 14.011 | 4 | K | A |  |
+| TOI-7166 b | 10.9 | 12.911 | 2 | K | B | only 2 transits: the period could be P/2, P/3, ... (strike) |
+| TOI-1470 c | 11.6 | 18.088 | 5 | K | A |  |
+| TOI-5728 b | 12.6 | 11.498 | 69 | K | C | per_transit: minses_neg = 1.33 (soft > 1.11, fail > 2.49); pixel: difference centroid > 1 px off target in 1 of 1 strong epochs |
+| TOI-4567 b | 13.3 | 23.542 | 14 | K | B | secondary: excess = 1.31 (soft > 1, fail > 2) |
+| K2-18 b | 13.7 | 32.931 | 2 | K | C | per_transit: dom = 0.675 (soft > 0.65); only 2 transits: the period could be P/2, P/3, ... (strike) |
+| TOI-2257 b | 14.7 | 35.190 | 6 | K | A |  |
+| TOI-1801 Ab | 15.0 | 10.644 | 4 | K | B | pixel: difference centroid > 1 px off target in 1 of 1 strong epochs |
+| TOI-789 d | 16.3 | 12.971 | 60 | K | B | pixel: difference centroid > 1 px off target in 1 of 1 strong epochs |
+| TOI-2094 Ab | 16.6 | 18.793 | 44 | K | B | pixel: difference centroid > 1 px off target in 1 of 2 strong epochs |
+| TOI-4342.02 | 17.1 | 10.689 | 19 | K | A |  |
+| TOI-1266 c | 18.1 | 18.802 | 11 | K | A |  |
+| GJ 7 b | 18.2 | 10.215 | 10 | K | A |  |
+| TOI-2095 b | 18.5 | 17.665 | 47 | K | A |  |
+| TOI-2095 c | 19.2 | 28.173 | 31 | K | A |  |
+| TOI-4336 Ab | 19.5 | 16.336 | 4 | K | C | rotation_residual: neg_logp = 1.99 (soft > 1.69897); contamination: a Gaia neighbour could make the dip with a 0.24% eclipse |
+| TOI-2081 b | 22.9 | 10.505 | 53 | K | A |  |
+| TOI-715 b | 24.4 | 19.288 | 54 | K | A |  |
+| TOI-1468 c | 27.0 | 15.533 | 8 | K | A |  |
+| TOI-776 c | 27.6 | 15.665 | 10 | K | A |  |
+| TOI-406 c | 28.0 | 13.176 | 15 | K | A |  |
+| TOI-1452 Ab | 28.4 | 11.062 | 74 | K | B | contamination: a Gaia neighbour could make the dip with a 0.2% eclipse |
+| TOI-904 b | 32.0 | 10.877 | 24 | K | A |  |
+| TOI-1266.01 | 46.0 | 10.895 | 19 | K | C | per_transit: neg_logp = 6.47 (soft > 4.04, fail > 10.4); sector_consistency: neg_logp = 6.01 (soft > 3.82, fail > 10.4) |
+| TOI-270 d | 63.7 | 11.380 | 16 | K | B | per_transit: neg_logp = 7.81 (soft > 4.04, fail > 10.4) |
