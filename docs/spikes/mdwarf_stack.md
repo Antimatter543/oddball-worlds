@@ -553,6 +553,52 @@ listing comparison, not by a real MAST outage. `Restart=on-failure` and `MemoryM
 systemd (launch.sh was not started). The Kaggle git mode (clone at a pushed commit) is not tested; the smoke
 used embed mode because the survey branch is not on the remote yet. The Kaggle CPU factor comes from 5 stars.
 
+### 2026-11-12: survey results, vetted with frozen v2. No planets; consistent with noise after vetting
+Full write-up: `docs/shortlist_planets_v1.md`. Code: `spikes/mdwarf_stack/survey/{vet_rows,prep_vet,
+survey_tables,known_check,research_candidates,physics,dossier,phone_plot}.py`. Outputs:
+`<OUT>/survey/vet/` and `<OUT>/vetting/v2/vet2_survey.s{0,1}of2.jsonl`; cards in
+`<OUT>/vetting/v2/cards/survey/`. No vetting code, threshold or tier was changed: `frozen_vet2.json` is
+sha256 d5076c08.
+
+**Health.** 4,681 targets: 4,350 searched and 331 with no SPOC/TESS-SPOC product. Real sectors per searched
+star: median 6, and 1,970 searched stars (45%) have fewer than 6. Real/predicted sectors 0.78. 10 Kaggle shards,
+89.9 CPU-h, all at git 88a2a31 / frozen.json 4194793b, no outlier shard. 10 stars each lost one sector to
+unusable PDCSAP. Weighting the v2-validation recovery by these real sector counts gives ~0.19 per searched star,
+not 0.54.
+
+**Vetting.** There were 510 long signals ≥ tau_long on 252 stars. The light curves were rebuilt (every star
+got the survey's exact sectors) and the search re-run on 3 stars: 11 of 11 signals were identical. All 510
+were vetted with 0 errors, and every A/B signal got the pixel check. Tiers: K 48, A+ 0, A 3, B 10, C 449.
+One B became C after the pixel check (TIC 102764828; 8 of 8 epochs off target, Prsa EB).
+
+| not C (A+/A/B) | observed | noise, r = 1/118 | fat tail (16/600) |
+|---|---|---|---|
+| all | 13 | 26.3 [1.8, 83.2] | 57.2 [30.3, 93.9] |
+| 2 / 3 / 4 / 5+ transits | 3 / 3 / 2 / 5 | 2.8 / 5.0 / 7.3 / 12.9 | 6.1 / 11.0 / 15.8 / 28.0 |
+| 10-30 / 30-40 / 40+ d | 5 / 1 / 7 | 9.5 / 9.5 / 8.4 | 20.7 / 20.7 / 18.3 |
+| before vetting (stars) | 252 | 54.9 [4, 169] | 119 [69, 182] |
+
+**Verdict: no excess after vetting in any bin.** The raw excess before vetting is made of EBs, known planets at
+multiples of their period, and PDC artefacts (49 signals with MES > 100).
+
+**Known planets.** All six known transiting objects in 10-60 d that were predicted detectable were recovered
+blind as K: TOI-6002 b, TOI-1452 b, TOI-406 c, TOI-1224 c, TOI-715 b and TOI-6508.01. 14 short-period
+planets/TOIs were found at integer aliases. CTOI 278661431.01 was found with a refined period (17.6776 d).
+Missed:
+- TOI-715 c candidate: predicted MES 8.2, below the 10.1 detectable cut.
+- TOI-203.01: TFOP false alarm, 8.1 h duration, longer than the longest box.
+- TOI-6981 b (60.78 d): found at the 2/3 alias, which the integer-only catalogue match missed, so it went to C.
+
+**Survivors.** 3 A and 10 B signals on 12 stars. The best is TIC 2102868 (G 86-37): 39.40 d, 1.44 ppt,
+3 transits, ~2 R_e, S 0.85. But its Gaia RUWE is 2.94 with RV scatter, and the centroid is off target in its one
+strong epoch. Next is TIC 234295610 (49.16 d), with a lopsided, non-transit shape on a noisy star. Then
+TIC 146636926 (54.65 d), at threshold with its transits next to data gaps. The rest are likely false or known
+EBs. Nothing goes to ExoFOP. Phone images: `<OUT>/visuals/survey_candidate{1,2,3}_tic*.png`.
+
+**POST-HOC (v3 ideas, not applied):** catalogue match by epochs (p/q aliases); a per-star uniqueness test
+(several near-equal signals on one star); a transit-symmetry test; a single-strong-epoch centroid strike; a
+Gaia binarity info line; pixel-level injections.
+
 ## Gate 2: resume point (updated after each stage; a reboot may kill the run without warning)
 **State at 2026-11-12 11:00 AEST:** gate 2 complete; the survey runner is built and piloted (section above), and the
 survey has not been started; that is the owner's decision. Re-running `analyze2.py all` and
