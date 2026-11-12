@@ -22,8 +22,8 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "gate2"))
-from common import BIN_D  # noqa: E402
-from search import build_ses, central_duration, preprocess, robust_sigma  # noqa: E402
+from common import BIN_D
+from search import build_ses, central_duration, preprocess, robust_sigma
 
 GAP_D = 0.5
 ORBIT_D = 13.70
@@ -203,7 +203,7 @@ def measure(ctx: Ctx, sig: dict) -> dict:
     d_e, s_e = N / Dw, 1 / np.sqrt(Dw)
     ses_e = N / np.sqrt(Dw)
     mes_e = float(N.sum() / math.sqrt(Dw.sum())) if len(N) else 0.0
-    st.update(n_transits=int(len(wi)), mes_vet=mes_e, depth=float(N.sum() / Dw.sum()) if len(N)
+    st.update(n_transits=len(wi), mes_vet=mes_e, depth=float(N.sum() / Dw.sum()) if len(N)
               else float("nan"), epochs=[float(x) for x in ses.t[wi]],
               epoch_ses=[float(x) for x in ses_e], epoch_n=[int(x) for x in ep],
               epoch_sector=[int(x) for x in ses.sector[wi]])
@@ -234,7 +234,7 @@ def measure(ctx: Ctx, sig: dict) -> dict:
         dd = np.array([N[secs == s].sum() / Dw[secs == s].sum() for s in us])
         ss = np.array([1 / math.sqrt(Dw[secs == s].sum()) for s in us])
         _, p = _chi2_p(dd, ss)
-        st["sector_consistency"] = {"neg_logp": _neglog(p), "n_sec": int(len(us))}
+        st["sector_consistency"] = {"neg_logp": _neglog(p), "n_sec": len(us)}
     else:
         st["sector_consistency"] = None
 

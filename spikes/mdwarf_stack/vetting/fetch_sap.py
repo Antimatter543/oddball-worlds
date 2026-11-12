@@ -24,8 +24,8 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parents[2] / "src"))
-from common import BIN_MIN, CAT_DIR, LC_DIR, OUT  # noqa: E402
-from fetch import _get, load  # noqa: E402
+from common import BIN_MIN, CAT_DIR, LC_DIR, OUT
+from fetch import _get, load
 
 SAP_DIR = OUT / "vetting" / "sap"
 
@@ -59,9 +59,16 @@ def fetch_sap(tic: int, threads: int = 2) -> str:
     out = sap_path(tic)
     if out.exists():
         return "cached"
-    if not (LC_DIR / f"tic{tic}.npz").exists():
+    import os
+
+    lc_dir = Path(os.environ.get("VET_LC_DIR", LC_DIR))  # survey light curves may live elsewhere
+    p = lc_dir / f"tic{tic}.npz"
+    if not p.exists():
         return "no-npz"
-    _, meta = load(tic)
+    if lc_dir == LC_DIR:
+        _, meta = load(tic)
+    else:
+        meta = json.loads(str(np.load(p, allow_pickle=False)["meta"]))
     recs, metas, fails = [], [], []
     with ThreadPoolExecutor(threads) as ex:
         futs = {s["sector"]: ex.submit(_one, tic, int(s["sector"]), s["uri"])

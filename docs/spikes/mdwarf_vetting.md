@@ -168,6 +168,20 @@ Found while building the star-level inputs and a 13-signal debug run. No DEV sta
 - Pixel check on an injection (DEV, TIC 454682563, 2 sectors): S_t = 0.7, i.e. *uninformative*, as it must be,
   since the injection is not in the pixels. The pixel test therefore cannot be scored on injections at all.
 
+## Running the vetting on survey output (once the survey has finished)
+`PY` = any repo venv python with wotan/numba (e.g. the gate-2 one). From `spikes/mdwarf_stack/`, ONE process:
+1. `$PY -I -c "import json,sys; tau=json.load(open('<OUT>/gate2/frozen.json'))['tau_long']; print('\n'.join(sorted({str(r['tic']) for r in map(json.loads, open(sys.argv[1])) if r.get('range','long')=='long' and any(s['mes']>=tau for s in r.get('signals',[]))})))" SURVEY_ROWS.jsonl > tics.txt`
+   (the survey runner's long-search rows, same format as `gate2/run2.py` output).
+2. `VET_LC_DIR=<survey lc dir, if not data/planets_spike/lc> $PY -I vetting/fetch_sap.py list --file tics.txt`
+3. `$PY -I vetting/catalog.py tics=tics.txt` (Gaia, EB catalogues, TOI, CTOI; any failure is recorded and
+   blocks tier A, never read as "not known"; refresh `data/planets_spike/catalogs/toi.csv` first if it is old).
+4. `VET_LC_DIR=... nice -n 19 ionice -c3 $PY -I vetting/run_vet.py survey --rows SURVEY_ROWS.jsonl [--jobs JOBS.jsonl]`
+   -> `<OUT>/vetting/vet_survey.jsonl` (mass/radius from the job file, else `gate2/survey_targets.csv`).
+5. Pixel check for every tier A/B signal (network, ~10-40 s per sector):
+   `$PY -I vetting/pixel_check.py <OUT>/vetting/vet_survey.jsonl KEY ...`
+6. `$PY -I vetting/cards.py survey --tiers A,B,K` -> `<OUT>/vetting/cards/survey/` (one PNG + `cards.md` with the
+   plain-English summaries, graded with `frozen_vet.json`). Use `--tiers C` to look at what was rejected and why.
+
 ## Cut / known limitations (stated in advance)
 - No injection into pixels, so the pixel test cannot be calibrated on injections; it is run on real stars only
   (hold-out planets, real-control false alarms) and is the first thing dropped if time runs short.

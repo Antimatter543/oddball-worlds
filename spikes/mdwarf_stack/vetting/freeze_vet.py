@@ -22,8 +22,8 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
-from common import OUT  # noqa: E402
-from vet import DEFAULT_THR, applicable, stat_value  # noqa: E402
+from common import OUT
+from vet import DEFAULT_THR, applicable, stat_value
 
 V = OUT / "vetting"
 
@@ -63,10 +63,10 @@ def main():
                                    if applicable(test, r["stats"]["mode"])) if x is not None])
         report[key] = {
             "default": [soft, fail], "frozen": [s_new, f_new], "why": why,
-            "dev_true_n": int(len(v)),
+            "dev_true_n": len(v),
             "dev_true_soft_or_worse": float(np.mean(v > s_new)) if len(v) else None,
             "dev_true_fail": float(np.mean(v > f_new)) if len(v) and f_new is not None else None,
-            "dev_fa_n": int(len(vf)),
+            "dev_fa_n": len(vf),
             "dev_fa_soft_or_worse": float(np.mean(vf > s_new)) if len(vf) else None,
             "dev_fa_fail": float(np.mean(vf > f_new)) if len(vf) and f_new is not None else None,
         }

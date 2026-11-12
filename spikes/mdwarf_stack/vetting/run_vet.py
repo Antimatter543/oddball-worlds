@@ -19,20 +19,20 @@ import os
 for _v in ("NUMBA_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
 
-import argparse  # noqa: E402
-import json  # noqa: E402
-import sys  # noqa: E402
-import time  # noqa: E402
-import traceback  # noqa: E402
-from pathlib import Path  # noqa: E402
+import argparse
+import json
+import sys
+import time
+import traceback
+from pathlib import Path
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "gate2"))
 sys.path.insert(0, str(HERE))
-from common import OUT  # noqa: E402
+from common import OUT
 
 G2 = OUT / "gate2"
 V = OUT / "vetting"
@@ -110,16 +110,32 @@ def tasks_holdout():
     return out
 
 
-def tasks_survey(rows_file, jobs_file):
-    jobs = _jobs(jobs_file)
+def tasks_survey(rows_file, jobs_file=None):
+    """Long-search rows of the survey runner (same row format as gate2/run2.py). mass/radius
+    from the job file if given, else from gate2/survey_targets.csv (TIC values, gate-1
+    fallback 0.3 / 0.3)."""
+    import pandas as pd
+    from make_jobs import FALLBACK_M, FALLBACK_R
+
+    jobs = _jobs(jobs_file) if jobs_file else {}
+    tg = pd.read_csv(G2 / "survey_targets.csv").set_index("tic")
     tau = tau_long()
     out = []
     for r in _rows(rows_file):
-        if r.get("range", "long") != "long" or "error" in r:
+        if r.get("range", "long") != "long" or "error" in r or r.get("mode", "real") != "real":
             continue
         ks = [i for i, s in enumerate(r.get("signals", [])) if s["mes"] >= tau]
-        if ks:
-            out.append(("survey", r, jobs[r["id"]], ks))
+        if not ks:
+            continue
+        job = jobs.get(r["id"])
+        if job is None:
+            row = tg.loc[r["tic"]] if r["tic"] in tg.index else None
+            m = float(row["mass"]) if row is not None and np.isfinite(row["mass"]) else FALLBACK_M
+            rr = float(row["rad"]) if row is not None and np.isfinite(row["rad"]) else FALLBACK_R
+            job = {"mass": m, "radius": rr}
+        r.setdefault("mode", "real")
+        r.setdefault("seed", 0)
+        out.append(("survey", r, job, ks))
     return out
 
 
@@ -128,7 +144,12 @@ def _load_star(tic):
     from fetch import load
     from fetch_sap import load_sap
 
-    lc, meta = load(tic)
+    lc_dir = os.environ.get("VET_LC_DIR")  # survey light curves, if stored elsewhere
+    if lc_dir:
+        z = np.load(Path(lc_dir) / f"tic{tic}.npz", allow_pickle=False)
+        lc, meta = {k: z[k] for k in z.files if k != "meta"}, json.loads(str(z["meta"]))
+    else:
+        lc, meta = load(tic)
     sap, smeta = load_sap(tic)
     crowd = {int(s["sector"]): s.get("crowdsap") for s in (smeta or {}).get("sectors", [])}
     return lc, meta, sap, crowd, load_info().get(str(tic))
@@ -161,9 +182,8 @@ def run(stage, tasks, out_path):
                 base = base_series(lc, sap, crowd, inj=items[0][1].get("inj") if inj_id else None,
                                    mass=job["mass"], radius=job["radius"])
             except Exception as e:  # noqa: BLE001
-                for k in keys:
-                    fh.write(json.dumps({"key": k, "stage": stage, "tic": tic,
-                                         "error": f"prepare: {e!r}"[:300]}) + "\n")
+                fh.writelines(json.dumps({"key": k, "stage": stage, "tic": tic,
+                                         "error": f"prepare: {e!r}"[:300]}) + "\n" for k in keys)
                 fh.flush()
                 continue
             for pop, r, job, ks in items:
@@ -176,7 +196,8 @@ def run(stage, tasks, out_path):
                     sig = r["signals"][k]
                     row = {"key": key, "stage": stage, "pop": pop, "id": r["id"], "tic": tic,
                            "sig_index": k, "n_sectors": r.get("n_sectors"),
-                           "mode": r["mode"], "seed": r["seed"]}
+                           "mode": r["mode"], "seed": r["seed"], "mass": job["mass"],
+                           "radius": job["radius"]}
                     if r.get("inj"):
                         row["inj"] = r["inj"]
                         row["inj_match"] = r["inj_match"][k]

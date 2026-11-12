@@ -23,8 +23,8 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "gate2"))
-from common import CAT_DIR, LC_DIR, OUT  # noqa: E402
-from make_jobs2 import _inj, _mr, _nsec  # noqa: E402
+from common import CAT_DIR, LC_DIR, OUT
+from make_jobs2 import _inj, _mr, _nsec
 
 V = OUT / "vetting"
 JOBS = V / "jobs"

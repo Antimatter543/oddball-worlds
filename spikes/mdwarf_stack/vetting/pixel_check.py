@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parents[2] / "src"))
 sys.path.insert(0, str(HERE))
-from common import OUT  # noqa: E402
+from common import OUT
 
 V = OUT / "vetting"
 PX = 21.0

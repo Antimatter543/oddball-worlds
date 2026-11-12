@@ -29,7 +29,7 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parents[2] / "src"))
-from common import CAT_DIR, OUT  # noqa: E402
+from common import CAT_DIR, OUT
 
 V = OUT / "vetting"
 CACHE = V / "cache"
@@ -71,6 +71,11 @@ def stars_for(which: str) -> pd.DataFrame:
                               "dec": float(r["Dec"]) if not isinstance(r["Dec"], str)
                               else _sexa(r["RA"], r["Dec"])[1], "tmag": float(r["TESS Mag"])})
         return pd.concat([out, pd.DataFrame(extra)], ignore_index=True) if extra else out
+    if which.startswith("tics="):  # survey: tics=FILE (one TIC per line), coords from targets
+        tics = {int(x) for x in open(which[5:]).read().split()}
+        c = pd.read_csv(OUT / "gate2" / "survey_targets.csv")
+        c = c[c.tic.isin(tics)]
+        return pd.DataFrame({"tic": c.tic.astype(int), "ra": c.ra, "dec": c.dec, "tmag": c.Tmag})
     raise ValueError(which)
 
 

@@ -17,8 +17,8 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
-from common import CAT_DIR, OUT  # noqa: E402
-from vet import ALL_TESTS, DEFAULT_THR, grade  # noqa: E402
+from common import CAT_DIR, OUT
+from vet import ALL_TESTS, DEFAULT_THR, grade
 
 V = OUT / "vetting"
 TAU = json.loads((OUT / "gate2" / "frozen.json").read_text())["tau_long"]
@@ -55,7 +55,7 @@ def thresholds():
 def label_holdout(rows):
     """Mark which hold-out signals are the recovered planets (gate-2 holdout_result, rec)."""
     hr = pd.read_csv(OUT / "gate2" / "holdout_result.csv")
-    hr = hr[hr["rec"] == True]  # noqa: E712
+    hr = hr[hr["rec"] == True]
     for r in rows:
         r["label"] = "other"
         if "stats" not in r:

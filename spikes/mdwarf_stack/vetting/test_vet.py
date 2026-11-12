@@ -17,10 +17,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "gate2"))
 sys.path.insert(0, str(HERE))
-from common import BIN_D  # noqa: E402
-from inject import binned_model  # noqa: E402
-
-from vet import attach_star, base_series, grade, make_ctx, measure  # noqa: E402
+from common import BIN_D
+from inject import binned_model
+from vet import attach_star, base_series, grade, make_ctx, measure
 
 M = R = 0.3
 SIG = 1e-3

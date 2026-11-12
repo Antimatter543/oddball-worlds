@@ -16,7 +16,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
-from common import BIN_D  # noqa: E402
+from common import BIN_D
 
 REARTH_RSUN = 0.0091577
 BTJD_NOW = 4356.5  # 2026-11-12 00:00 UTC (JD 2461356.5 - 2457000)
@@ -85,21 +85,34 @@ def summary(stats, g, rstar=None, name=None, blind=False):
     }[tier]
     parts = [head, verdict]
     st = g["status"]
-    checks = []
+    by = {"pass": [], "open": [], "untested": []}
     for t, q in QUESTION.items():
         s = st.get(t, "n/a")
-        if s == "n/a" and t in ("pixel",):
-            checks.append(f"{q}: not checked (the pixel test was not run or is uninformative "
-                          f"for a dip this shallow)")
-            continue
-        checks.append(f"{q}: {OUTCOME.get(s, s)}")
-    parts.append("False-alarm explanations tested: " + "; ".join(checks) + ".")
+        if s == "pass":
+            by["pass"].append(q)
+        elif s in ("soft", "fail"):
+            by["open"].append(f"{q} ({'favoured' if s == 'fail' else 'not excluded'})")
+        elif s == "error":
+            by["untested"].append(f"{q} (the check failed to run)")
+        elif s == "n/a":
+            by["untested"].append(q)
+    if by["pass"]:
+        parts.append("Checks that found no sign of a false alarm (a pass is evidence, not "
+                     "proof): " + "; ".join(by["pass"]) + ".")
+    if by["open"]:
+        parts.append("Explanations still open: " + "; ".join(by["open"]) + ".")
     if g["reasons"]:
-        parts.append("Details of the problems: " + "; ".join(g["reasons"]) + ".")
+        parts.append("Numbers: " + "; ".join(g["reasons"]) + ".")
+    if by["untested"]:
+        parts.append("Not tested: " + "; ".join(by["untested"]) + ".")
     if tier in ("A", "B"):
         tn, sig = next_transit(stats)
-        unproven = list(LACKS[tier])
-        if st.get("pixel") in ("n/a", "error"):
+        unproven = list(LACKS["A"])
+        if tier == "B":
+            unproven.append("the open explanation listed above")
+        if stats["n_transits"] == 2:
+            unproven.append("the true period: with two dips it may be P/2, P/3, ...")
+        if st.get("pixel") != "pass":
             unproven.insert(0, "that the dip is on this star at all (the pixel check is "
                                "missing or uninformative)")
         parts.append("Still unproven: " + "; ".join(unproven) + ".")
@@ -112,7 +125,8 @@ def summary(stats, g, rstar=None, name=None, blind=False):
         how += "; more TESS sectors would also add dips and sharpen every test."
         parts.append(how)
     elif tier == "C":
-        parts.append("Nothing to follow up unless the failed test is shown to be wrong.")
+        parts.append("Nothing to follow up unless the problems listed above are shown to be "
+                     "wrong.")
     else:
         parts.append("Its value is an independent recovery of a known object, not a discovery.")
     return " ".join(parts)
@@ -124,7 +138,6 @@ def render(ctx, stats, g, path, title=""):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from search import build_ses
-
     from vet import fold_phases
 
     pp = ctx.pp
@@ -225,7 +238,7 @@ def render(ctx, stats, g, path, title=""):
     cont = star.get("contamination") or {}
     txt = ["pixel check: " + (px.get("why", px.get("status", "")) if px else "not run"),
            f"Gaia neighbours <= 21\": {cont.get('n_nb_1px', '?')}",
-           f"min eclipse a neighbour needs: "
+           "min eclipse a neighbour needs: "
            + (f"{100 * cont['min_need']:.0f}%" if cont.get("min_need") else "none nearby")]
     ax.text(0, 1, "\n".join(txt), va="top", fontsize=8, family="monospace")
 
