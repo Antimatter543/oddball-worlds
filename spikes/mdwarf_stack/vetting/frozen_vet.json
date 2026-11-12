@@ -1,0 +1,364 @@
+{
+ "thresholds": {
+  "odd_even.z": [
+   3.0,
+   4.38
+  ],
+  "per_transit.dom": [
+   0.65,
+   null
+  ],
+  "per_transit.neg_logp": [
+   4.04,
+   10.4
+  ],
+  "per_transit.minses_neg": [
+   1.11,
+   2.49
+  ],
+  "sector_consistency.neg_logp": [
+   3.8200000000000003,
+   10.4
+  ],
+  "duration_density.ratio": [
+   1.3800000000000001,
+   2.0
+  ],
+  "secondary.excess": [
+   1.0,
+   2.0
+  ],
+  "model_compare.neg_dbic": [
+   -6.0,
+   0.0
+  ],
+  "uniqueness.neg_margin": [
+   -2.0,
+   -1.0
+  ],
+  "uniqueness.p_scr": [
+   0.01,
+   0.05
+  ],
+  "sap.z_neg": [
+   3.39,
+   6.72
+  ],
+  "sap.bkg_stat": [
+   4.0,
+   null
+  ],
+  "systematics_window.share": [
+   0.5,
+   0.8
+  ],
+  "orbit_alias.neg_spread": [
+   -0.5,
+   null
+  ],
+  "rotation_residual.neg_logp": [
+   1.69897,
+   null
+  ],
+  "contamination.need_neg": [
+   -0.0031000000000000003,
+   null
+  ]
+ },
+ "report": {
+  "odd_even.z": {
+   "default": [
+    3.0,
+    4.0
+   ],
+   "frozen": [
+    3.0,
+    4.38
+   ],
+   "why": [
+    "fail loosened: 0.011 of DEV true > default"
+   ],
+   "dev_true_n": 177,
+   "dev_true_soft_or_worse": 0.022598870056497175,
+   "dev_true_fail": 0.005649717514124294,
+   "dev_fa_n": 184,
+   "dev_fa_soft_or_worse": 0.02717391304347826,
+   "dev_fa_fail": 0.0
+  },
+  "per_transit.dom": {
+   "default": [
+    0.65,
+    null
+   ],
+   "frozen": [
+    0.65,
+    null
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.005555555555555556,
+   "dev_true_fail": null,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.16494845360824742,
+   "dev_fa_fail": null
+  },
+  "per_transit.neg_logp": {
+   "default": [
+    2.0,
+    3.0
+   ],
+   "frozen": [
+    4.04,
+    10.4
+   ],
+   "why": [
+    "soft loosened: 0.156 of DEV true > default",
+    "fail loosened: 0.050 of DEV true > default"
+   ],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.005555555555555556,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.005154639175257732,
+   "dev_fa_fail": 0.0
+  },
+  "per_transit.minses_neg": {
+   "default": [
+    1.0,
+    2.0
+   ],
+   "frozen": [
+    1.11,
+    2.49
+   ],
+   "why": [
+    "soft loosened: 0.050 of DEV true > default",
+    "fail loosened: 0.011 of DEV true > default"
+   ],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.005555555555555556,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.08247422680412371,
+   "dev_fa_fail": 0.0
+  },
+  "sector_consistency.neg_logp": {
+   "default": [
+    2.0,
+    3.0
+   ],
+   "frozen": [
+    3.8200000000000003,
+    10.4
+   ],
+   "why": [
+    "soft loosened: 0.117 of DEV true > default",
+    "fail loosened: 0.039 of DEV true > default"
+   ],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.005555555555555556,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.005154639175257732,
+   "dev_fa_fail": 0.0
+  },
+  "duration_density.ratio": {
+   "default": [
+    1.3,
+    2.0
+   ],
+   "frozen": [
+    1.3800000000000001,
+    2.0
+   ],
+   "why": [
+    "soft loosened: 0.050 of DEV true > default"
+   ],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.15979381443298968,
+   "dev_fa_fail": 0.04639175257731959
+  },
+  "secondary.excess": {
+   "default": [
+    1.0,
+    2.0
+   ],
+   "frozen": [
+    1.0,
+    2.0
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.02577319587628866,
+   "dev_fa_fail": 0.0
+  },
+  "model_compare.neg_dbic": {
+   "default": [
+    -6.0,
+    0.0
+   ],
+   "frozen": [
+    -6.0,
+    0.0
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.030927835051546393,
+   "dev_fa_fail": 0.005154639175257732
+  },
+  "uniqueness.neg_margin": {
+   "default": [
+    -2.0,
+    -1.0
+   ],
+   "frozen": [
+    -2.0,
+    -1.0
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.11855670103092783,
+   "dev_fa_fail": 0.0
+  },
+  "uniqueness.p_scr": {
+   "default": [
+    0.01,
+    0.05
+   ],
+   "frozen": [
+    0.01,
+    0.05
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 194,
+   "dev_fa_soft_or_worse": 0.0,
+   "dev_fa_fail": 0.0
+  },
+  "sap.z_neg": {
+   "default": [
+    3.0,
+    4.0
+   ],
+   "frozen": [
+    3.39,
+    6.72
+   ],
+   "why": [
+    "soft loosened: 0.056 of DEV true > default",
+    "fail loosened: 0.022 of DEV true > default"
+   ],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.027777777777777776,
+   "dev_true_fail": 0.005555555555555556,
+   "dev_fa_n": 58,
+   "dev_fa_soft_or_worse": 0.05172413793103448,
+   "dev_fa_fail": 0.017241379310344827
+  },
+  "sap.bkg_stat": {
+   "default": [
+    4.0,
+    null
+   ],
+   "frozen": [
+    4.0,
+    null
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": null,
+   "dev_fa_n": 58,
+   "dev_fa_soft_or_worse": 0.0,
+   "dev_fa_fail": null
+  },
+  "systematics_window.share": {
+   "default": [
+    0.5,
+    0.8
+   ],
+   "frozen": [
+    0.5,
+    0.8
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": 0.0,
+   "dev_fa_n": 58,
+   "dev_fa_soft_or_worse": 0.08620689655172414,
+   "dev_fa_fail": 0.017241379310344827
+  },
+  "orbit_alias.neg_spread": {
+   "default": [
+    -0.5,
+    null
+   ],
+   "frozen": [
+    -0.5,
+    null
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.0,
+   "dev_true_fail": null,
+   "dev_fa_n": 58,
+   "dev_fa_soft_or_worse": 0.017241379310344827,
+   "dev_fa_fail": null
+  },
+  "rotation_residual.neg_logp": {
+   "default": [
+    1.69897,
+    null
+   ],
+   "frozen": [
+    1.69897,
+    null
+   ],
+   "why": [],
+   "dev_true_n": 180,
+   "dev_true_soft_or_worse": 0.005555555555555556,
+   "dev_true_fail": null,
+   "dev_fa_n": 58,
+   "dev_fa_soft_or_worse": 0.017241379310344827,
+   "dev_fa_fail": null
+  },
+  "contamination.need_neg": {
+   "default": [
+    -0.5,
+    null
+   ],
+   "frozen": [
+    -0.0031000000000000003,
+    null
+   ],
+   "why": [
+    "soft loosened: 0.886 of DEV true > default"
+   ],
+   "dev_true_n": 88,
+   "dev_true_soft_or_worse": 0.022727272727272728,
+   "dev_true_fail": null,
+   "dev_fa_n": 23,
+   "dev_fa_soft_or_worse": 0.08695652173913043,
+   "dev_fa_fail": null
+  }
+ },
+ "n_dev_true": 180,
+ "n_dev_fa": 194,
+ "frozen_utc": "2026-11-12T00:41:44+00:00",
+ "rule": "loosen-only: soft to the 97% value if >3% of DEV true exceed it; fail to max(99% value, soft) if >1% exceed it"
+}

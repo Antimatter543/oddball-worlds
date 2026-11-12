@@ -339,22 +339,31 @@ def _model_compare(pp, P, t0, Dd, centres, prot):
     eid = np.concatenate(eid)
     dt = np.concatenate(dt)
     y, w, tt = y[j], w[j], t[j]
+    inn = np.abs(dt) < Dd / 2
+    # DEV fix (2026-11-12): lone extreme points outside the transit (up to 1e11 in chi^2 on
+    # some stars) dominated every fit; out-of-transit points are winsorised at 8 sigma.
+    s = 1 / np.sqrt(w)
+    y = np.where(inn, y, np.clip(y, -8 * s, 8 * s))
     ue = np.unique(eid)
     off = [(eid == e).astype(float) for e in ue]
     n = len(y)
     ln = math.log(n)
-    inn = np.abs(dt) < Dd / 2
-    bic = {}
-    bic["null"] = _wls(off, y, w) + len(off) * ln
-    bic["box"] = _wls(off + [-inn.astype(float)], y, w) + (len(off) + 1) * ln
-    # step: per-epoch amplitude, location common among {-D/2, 0, +D/2}
-    best = np.inf
+    box = [-inn.astype(float)]
+    # DEV fix (2026-11-12): NESTED comparison. For each alternative X the statistic is how much
+    # the box still improves the fit once X is in: dBIC_X = BIC(X) - BIC(X + box). The first
+    # version compared X and box separately, so a per-epoch sinusoid absorbing unrelated
+    # rotation residue "beat" a real transit by 1e5 on a fast rotator.
+    alts = {}
+    # step: per-epoch amplitude, location common among {-D/2, 0, +D/2} (best for the step)
+    best = None
     for loc in (-Dd / 2, 0.0, Dd / 2):
         cols = off + [((eid == e) & (dt > loc)).astype(float) for e in ue]
-        best = min(best, _wls(cols, y, w))
-    bic["step"] = best + 2 * len(off) * ln
+        c2 = _wls(cols, y, w)
+        if best is None or c2 < best[0]:
+            best = (c2, cols)
+    alts["step"] = best[1]
     # sinusoid at P_rot/h, phase free per epoch
-    best = np.inf
+    best = None
     if prot:
         for h in (1, 2, 3):
             Ph = prot / h
@@ -364,25 +373,30 @@ def _model_compare(pp, P, t0, Dd, centres, prot):
             for e in ue:
                 m = (eid == e).astype(float)
                 cols += [m * np.cos(2 * np.pi * tt / Ph), m * np.sin(2 * np.pi * tt / Ph)]
-            best = min(best, _wls(cols, y, w))
-    if np.isfinite(best):
-        bic["sine"] = best + 3 * len(off) * ln
+            c2 = _wls(cols, y, w)
+            if best is None or c2 < best[0]:
+                best = (c2, cols)
+    if best is not None:
+        alts["sine"] = best[1]
     # single outlier: the most negative in-transit point vs per-epoch offsets
+    pen = {}
     if inn.any():
-        c0 = _wls(off, y, w)  # noqa: F841 - kept for clarity of the comparison
-        # residual from offsets only
         mu = np.array([np.sum(w[eid == e] * y[eid == e]) / np.sum(w[eid == e]) for e in ue])
         res = y - mu[np.searchsorted(ue, eid)]
         cand = np.flatnonzero(inn)
         jj = cand[np.argmin(res[cand] * np.sqrt(w[cand]))]
         col = np.zeros(n)
         col[jj] = 1.0
-        bic["outlier"] = _wls(off + [col], y, w) + (len(off) + 1) * ln + math.log(len(cand))
-    alts = {k: v for k, v in bic.items() if k not in ("box", "null")}
-    kbest = min(alts, key=alts.get)
-    dbic = alts[kbest] - bic["box"]
-    return {"neg_dbic": float(-dbic), "dbic": float(dbic), "best_alt": kbest,
-            "dbic_null": float(bic["null"] - bic["box"])}
+        alts["outlier"] = off + [col]
+    d = {}
+    for k_, cols in alts.items():
+        d[k_] = _wls(cols, y, w) - _wls(cols + box, y, w) - ln - pen.get(k_, 0.0)
+    c_null = _wls(off, y, w)
+    c_box = _wls(off + box, y, w)
+    kbest = min(d, key=d.get)
+    return {"neg_dbic": float(-d[kbest]), "dbic": float(d[kbest]), "best_alt": kbest,
+            "dbic_null": float(c_null - c_box - ln),
+            "dbic_each": {k_: float(v) for k_, v in d.items()}}
 
 
 def _sap_test(ctx, k, P, t0, centres, d_pdc):

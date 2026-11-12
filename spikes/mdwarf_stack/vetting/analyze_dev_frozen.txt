@@ -1,0 +1,35 @@
+# Vetting analysis (dev); thresholds: frozen; tau_long = 8.054
+
+rows with a measurement error (not graded): {'dev': 0}
+## DEV: per-test outcome
+
+| test | DEV true (MES>=7) (pass / soft / fail of n) | DEV true, MES 7-12 (pass / soft / fail of n) | DEV FA (MES>=6) (pass / soft / fail of n) | DEV FA MES>=7 (pass / soft / fail of n) | DEV FA >= tau (pass / soft / fail of n) |
+|---|---|---|---|---|---|
+| odd_even | 0.98 / 0.02 / 0.01 (177) | 1.00 / 0.00 / 0.00 (70) | 0.97 / 0.03 / 0.00 (184) | 0.87 / 0.13 / 0.00 (23) | 1.00 / 0.00 / 0.00 (2) |
+| per_transit | 0.94 / 0.05 / 0.01 (180) | 0.91 / 0.07 / 0.01 (70) | 0.78 / 0.22 / 0.00 (194) | 0.67 / 0.33 / 0.00 (24) | 0.00 / 1.00 / 0.00 (3) |
+| sector_consistency | 0.97 / 0.02 / 0.01 (180) | 1.00 / 0.00 / 0.00 (70) | 0.99 / 0.01 / 0.00 (194) | 1.00 / 0.00 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| duration_density | 0.97 / 0.03 / 0.00 (180) | 0.97 / 0.03 / 0.00 (70) | 0.84 / 0.11 / 0.05 (194) | 0.62 / 0.17 / 0.21 (24) | 1.00 / 0.00 / 0.00 (3) |
+| secondary | 0.97 / 0.03 / 0.00 (180) | 0.99 / 0.01 / 0.00 (70) | 0.97 / 0.03 / 0.00 (194) | 0.96 / 0.04 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| model_compare | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.97 / 0.03 / 0.01 (194) | 0.83 / 0.12 / 0.04 (24) | 1.00 / 0.00 / 0.00 (3) |
+| uniqueness | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.88 / 0.12 / 0.00 (194) | 1.00 / 0.00 / 0.00 (24) | 1.00 / 0.00 / 0.00 (3) |
+| sap | 0.97 / 0.02 / 0.01 (180) | 1.00 / 0.00 / 0.00 (70) | 0.95 / 0.03 / 0.02 (58) | 0.83 / 0.17 / 0.00 (6) | n/a |
+| systematics_window | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.91 / 0.07 / 0.02 (58) | 0.83 / 0.17 / 0.00 (6) | n/a |
+| orbit_alias | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 0.98 / 0.02 / 0.00 (58) | 1.00 / 0.00 / 0.00 (6) | n/a |
+| rotation_residual | 0.99 / 0.01 / 0.00 (180) | 0.99 / 0.01 / 0.00 (70) | 0.98 / 0.02 / 0.00 (58) | 1.00 / 0.00 / 0.00 (6) | n/a |
+| pixel | n/a | n/a | n/a | n/a | n/a |
+| contamination | 0.99 / 0.01 / 0.00 (180) | 0.97 / 0.03 / 0.00 (70) | 0.95 / 0.05 / 0.00 (39) | 0.80 / 0.20 / 0.00 (5) | n/a |
+| catalogue | 1.00 / 0.00 / 0.00 (180) | 1.00 / 0.00 / 0.00 (70) | 1.00 / 0.00 / 0.00 (39) | 1.00 / 0.00 / 0.00 (5) | n/a |
+
+## DEV: tiers
+
+| set | n | A | B | C | K | A+B |
+|---|---|---|---|---|---|---|
+| DEV true (MES>=7) | 180 | 146 | 28 | 6 | 0 | 0.97 [0.93, 0.98] (174/180) |
+| DEV true, MES 7-12 | 70 | 58 | 11 | 1 | 0 | 0.99 [0.92, 1.00] (69/70) |
+| DEV FA (MES>=6) | 194 | 107 | 43 | 44 | 0 | 0.77 [0.71, 0.83] (150/194) |
+| DEV FA MES>=7 | 24 | 8 | 6 | 10 | 0 | 0.58 [0.39, 0.76] (14/24) |
+| DEV FA >= tau | 3 | 0 | 0 | 3 | 0 | 0.00 [0.00, 0.56] (0/3) |
+
+DEV true, what costs strikes: soft:per_transit 9, soft:secondary 5, soft:duration_density 5, soft:sap 4, soft:sector_consistency 4, soft:odd_even 3, soft:contamination 2, duo 2, fail:per_transit 2, soft:rotation_residual 1
+DEV FA, what rejects: soft:per_transit 42, soft:uniqueness 23, soft:duration_density 22, fail:duration_density 9, duo 9, soft:secondary 5, soft:model_compare 5, soft:odd_even 5, soft:systematics_window 4, soft:contamination 2
+

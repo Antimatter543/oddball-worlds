@@ -168,6 +168,26 @@ Found while building the star-level inputs and a 13-signal debug run. No DEV sta
 - Pixel check on an injection (DEV, TIC 454682563, 2 sectors): S_t = 0.7, i.e. *uninformative*, as it must be,
   since the injection is not in the pixels. The pixel test therefore cannot be scored on injections at all.
 
+## DEV-stage notes (2026-11-12 10:30, DEV only; no TEST or hold-out vetting run yet)
+First DEV pass (`vet_dev_v1_unnested.jsonl`, 374 signals: 180 true, 194 false alarms, 0 errors), default thresholds:
+- **model_compare was wrong as built and is changed (a test-definition change made on DEV).** Box and alternatives
+  were fitted separately. On a fast rotator (TIC 233570240) a per-epoch sinusoid absorbing unrelated rotation residue
+  "beat" a true injection by dBIC = 2.3e5, and lone extreme out-of-transit points gave dBIC up to 4e13 on nulls.
+  The statistic is now **nested**: for each alternative X, dBIC_X = BIC(X) - BIC(X + box), i.e. how much the box
+  still improves the fit once X is in (fail if < 0: X explains the dip; soft if < 6). Out-of-transit points are
+  winsorised at 8 sigma. Thresholds unchanged. DEV is re-run in full with this version (`vet_dev.jsonl`).
+- **No power, kept and reported:** the phase-scramble p-value is 0.00 for every DEV signal, true and false. A
+  false alarm is a maximum over ~10^5-10^6 periods; at its own fixed period the scrambled folds are ordinary noise,
+  so the test cannot see it. The uniqueness *margin* scales with MES the same way for true and false signals.
+- **Too strict for true signals (the loosen-only rule will act):** per-transit chi^2 (97% of true signals reach
+  -log10 p = 4.0; real per-epoch depths scatter more than white noise, and long-baseline period error moves the box
+  off some epochs), sector consistency, SAP z, and contamination (43% of true injections sit on a star with a Gaia
+  neighbour within 21" bright enough to fake the dip with a <= 50% eclipse; the rule will in effect switch it off,
+  which is noted as a pre-registration weakness: contamination describes the star, not the noise, and should have
+  been exempt from the rule).
+- **Where the separation is:** duration vs density (true 97% at ratio 1.37; false alarms at MES >= 7 median 1.21,
+  90% 2.46), single-event dominance (true 99% 0.54; false alarms at MES >= 7 median 0.60), and odd/even.
+
 ## Running the vetting on survey output (once the survey has finished)
 `PY` = any repo venv python with wotan/numba (e.g. the gate-2 one). From `spikes/mdwarf_stack/`, ONE process:
 1. `$PY -I -c "import json,sys; tau=json.load(open('<OUT>/gate2/frozen.json'))['tau_long']; print('\n'.join(sorted({str(r['tic']) for r in map(json.loads, open(sys.argv[1])) if r.get('range','long')=='long' and any(s['mes']>=tau for s in r.get('signals',[]))})))" SURVEY_ROWS.jsonl > tics.txt`
