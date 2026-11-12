@@ -323,7 +323,7 @@ fail), testreal-long-340487632#1 (C, dominance + systematics + pixel fail), each
 Display only: the contamination reason printed the needed eclipse depth with `.0f`, so 0.24% showed as "0%"; it now
 uses `.2g`. No threshold, test or tier rule changed; the tier tables are identical before and after.
 
-## Running the vetting on survey output (once the survey has finished)
+## Running the vetting on survey output (v1 procedure; superseded, see "Running the vetting on survey output (v2 decision)" at the end)
 `PY` = any repo venv python with wotan/numba (e.g. the gate-2 one). From `spikes/mdwarf_stack/`, ONE process:
 1. `$PY -I -c "import json,sys; tau=json.load(open('<OUT>/gate2/frozen.json'))['tau_long']; print('\n'.join(sorted({str(r['tic']) for r in map(json.loads, open(sys.argv[1])) if r.get('range','long')=='long' and any(s['mes']>=tau for s in r.get('signals',[]))})))" SURVEY_ROWS.jsonl > tics.txt`
    (the survey runner's long-search rows, same format as `gate2/run2.py` output).
@@ -336,6 +336,281 @@ uses `.2g`. No threshold, test or tier rule changed; the tier tables are identic
    `$PY -I vetting/pixel_check.py <OUT>/vetting/vet_survey.jsonl KEY ...`
 6. `$PY -I vetting/cards.py survey --tiers A,B,K` -> `<OUT>/vetting/cards/survey/` (one PNG + `cards.md` with the
    plain-English summaries, graded with `frozen_vet.json`). Use `--tiers C` to look at what was rejected and why.
+
+## Vetting v2: pre-registration (2026-11-12 ~12:10 AEST, before any v2 statistic on any signal)
+Why: v1 (frozen, TEST) keeps 95% of detected headline injections but sends only 38% of long-period false alarms
+at MES >= 7 to tier C (goal 90%), and two thirds of 40-55 d, 2-4 transit false alarms grade A/B. v1 stays frozen
+and unchanged (`vet.py`, `frozen_vet.json`); v2 is new code (`vet2.py`, `frozen_vet2.json`) that calls v1's
+`measure` and adds statistics. TEST is used up: v2 is chosen on DEV and validated on a **fresh** set of survey stars.
+
+What v2 knows from TEST (written in the v1 results above, and nothing else): the per-test TEST table, the
+40-55 d pile-up, the dead tests, the pixel soft-rule misfire on single-strong-epoch planets, and the post-hoc gap
+idea (0/228 injections vs 4/13 time-anchored false alarms). No other TEST number is opened for v2.
+
+### v2 tests
+Kept from v1 with **v1's frozen thresholds, unchanged**: odd_even, per_transit (dominance and min-SES only),
+duration_density, secondary, model_compare, uniqueness (margin only), sap (z and background),
+systematics_window, orbit_alias, rotation_residual, pixel (rule revised below), catalogue.
+
+Dropped (v1 DEV report in `frozen_vet.json`, after its loosening; soft-or-worse rate on DEV true vs DEV false
+alarms): **uniqueness scramble p** (0 of 180 vs 0 of 194: no power, and it is the most expensive statistic);
+**per-transit chi^2** (2.8% vs 0.5%: it strikes planets more often than false alarms); **sector consistency**
+(2.8% vs 0.5%, same). Kept although DEV shows no power: odd_even and secondary, because they target eclipsing
+binaries, which the DEV false-alarm material (noise nulls and controls without known EBs) does not contain.
+
+**Contamination becomes info only** (printed in every A+/A/B summary, never a strike, its error does not block A).
+v1 DEV: at the 50% default, 88.6% of DEV true signals (n = 88) would be struck, so exempting it from the
+loosen-only rule makes it fire on almost every planet; it describes the star, not the signal, so it cannot tell
+a noise false alarm from a planet on the same star. The question it asks (a blended EB on a neighbour) is
+answered by the pixel test, which A+ requires.
+
+New statistics (all computed on the search input series, the same scale as MES):
+1. **gap_edge.share**. A gap is >= 20 min without data in the search input (consecutive present bins >= 3 bins
+   apart; segment edges, momentum-dump gaps, downlinks and flare-clip holes all count). An epoch is flagged if its
+   box window [c - D/2, c + D/2] lies within 1 h of a gap. share = sum of max(SES_e, 0)^2 over flagged epochs /
+   sum over all. Default soft > 0.5, fail > 0.8. It uses only the time sampling, which every null keeps, so it
+   applies to **every** mode (real, inv, roll, invroll).
+2. **red_noise.neg_ratio**. For each epoch, sigma_e = 1.4826 x MAD of the stride-1 SES (same width) with
+   D < |t - c| <= 1.5 d (>= 30 values, else sigma_e = 1, the per-sector scale). MES_red = sum_e (SES_e / sigma_e)
+   sqrt(D_e) / sqrt(sum D_e); statistic -MES_red / MES_vet. Default soft > -0.8 (local noise makes the signal 20%
+   weaker), fail > -0.6. Every mode.
+3. **low_margin.neg_excess** (the transit-count-dependent cut, as a vetting-stage strike). The few-transit class
+   is F = {n_tr <= 3} or {P >= 40 d and n_tr <= 4} (n_tr = the vetting's epoch count). For a signal in F,
+   excess = MES - tau_det, where tau_det is the detection threshold that selected the signal (tau_long = 8.054
+   for the survey and for injections); statistic -excess, default soft > -1.0 (an F signal needs MES >= tau_det
+   + 1). Signals not in F pass. **Proxy rule:** the false-alarm populations selected at MES >= 7 (or >= 6) are
+   stand-ins for the >= tau_long tail, so for them tau_det = 7.0 (or 6.0). Reason: a cut at a fixed MES above
+   tau_long would "reject" every 7-8 MES false alarm trivially, although those are below the detection threshold
+   and never reach vetting in the survey; measuring the margin above the selecting threshold is fair if the tail
+   is roughly exponential, which DEV nulls show (155 at >= 6, 19 at >= 7, 3 at >= 8). The >= tau_long rows are
+   also reported with tau_det = tau_long. A fixed per-bucket MES threshold from the DEV nulls alone was
+   considered and rejected: the DEV tail by transit count is 3 / 3 / 4 / 3 / 6 nulls at MES >= 7 for 2 / 3 / 4 /
+   5-6 / 7+ transits, too few to set a threshold per bucket.
+4. **pixel (revised rule)**: the soft rule (difference centroid > 1 px off target in at least half of the strong
+   epochs) needs **>= 3 strong epochs** (peak SNR >= 4); with fewer it is not applied. Fail and uninformative
+   rules unchanged.
+
+Calibration (DEV only, the v1 rule, mechanical, `vetting/freeze_vet2.py`): for each new statistic, on the 180 DEV
+true signals, soft is loosened to the 97% value if > 3% exceed the default, fail to max(99% value, soft) if > 1%
+exceed it; never tightened. For low_margin the denominator is the DEV true signals with MES >= tau_long (the
+signals it is applied to in the survey), non-F signals counting as passes. The DEV false-alarm rate of every
+statistic is reported but not used. `freeze_vet2.py` refuses to run once any validation vetting output exists.
+The frozen file is committed before the first validation vetting run.
+
+### v2 tiers
+strikes = soft fails (v2 tests, including low_margin) + 1 if n_tr = 2. **K** catalogue match (as v1). **C** any hard
+fail or strikes >= 2. **A** strikes = 0, n_tr >= 3, no required test returned `error` (pixel and contamination
+not required). **A+** = A and the pixel test passed on target with >= 3 strong epochs (informative). **B** the rest.
+
+### Fresh validation set (`vetting/select_val2.py`, seeds 20261212 stars / 20261213 injections)
+- Pool: `gate2/survey_targets.csv` with >= 6 predicted sectors (4,681), minus every gate-2 DEV/TEST control,
+  hold-out host and gate-1 host (101), TOI hosts of any disposition (34) and exoplanet.eu hosts within 30" (31):
+  4,515 stars. Strata 6-12 / 13-25 / 26+ predicted sectors, proportional: **150 stars = 130 / 8 / 12**. Each
+  stratum in a seeded random order; a star with no TESS product (or a failed download) is replaced by the next
+  in that order.
+- Per star: 4 long-range nulls (inv0, invroll11, roll21, roll22, the v1 TEST-null set) = 600 nulls. v1 TEST had
+  19 of 232 nulls at MES >= 7 (8.2%; DEV 4.5%), so ~49 are expected (~27 at the DEV rate). 2 headline injections
+  (1.0-1.5 R_e, 15-30 d) and 1 long injection (1.0-2.0 R_e, 30-55 d): 450 injections; at the TEST detection rates
+  (~0.4 headline on 6-12 sector stars, ~0.5-0.7 elsewhere) ~120 headline and ~70 long detected are expected.
+- Frozen gate-2 search (`gate2/run2.py`, rot = harm, long range, top signal), 2 niced workers, light curves
+  from the survey's S3 route (`vetting/fetch_val2.py`; PDCSAP and SAP from the same bytes). Deleted afterwards.
+- **Detected injection** = top signal matched by the gate-2 rule with MES >= tau_long; headline = 1.0-1.5 R_e,
+  15-30 d. **Null false alarm** = a null's top signal with MES >= 7 (primary), also >= tau_long and >= 6.
+- If compute runs short the set is the first N stars in the draw order (strata interleaved) whose jobs all
+  finished; the rule is not changed, the intervals widen.
+- **Blinding.** These are survey stars. Only null realisations and injected copies are searched; the job maker
+  refuses a real unaltered job. The real survey search output and `outputs/planets_spike/survey/` are never
+  read. For injected copies only the matched top signal is used: an unmatched top signal on an injected copy may
+  be a real signal of the star and is neither vetted nor printed. **Limitation:** null false alarms may differ in
+  structure from real-star false alarms (no pixel, SAP or catalogue view on rolled nulls; no real EBs); the
+  gate-2 DEV real-control signals are the only real-star check, and they are DEV.
+
+### Paired comparison and decision rule (fixed now)
+v1 (frozen `vet.grade`, unchanged) and v2 are graded on the same rows. Injections are graded with the catalogue
+on; K counts as kept. Intervals: cluster bootstrap over stars (10,000 resamples, seed 20261214), 2.5-97.5%;
+Wilson for single proportions.
+- **Adopt v2 for the survey only if** (i) on the fresh nulls at MES >= 7, v2 sends more false alarms to tier C
+  than v1 (paired difference > 0; if its interval spans zero the report says the set cannot tell them apart),
+  and (ii) v2 keeps >= 85% of detected headline injections in A+/A/B, and (iii) v2's headline retention is no
+  more than 5 points below v1's. Otherwise v1 stays.
+- Reported for both: tier tables, paired differences by transit count (2, 3, 4, 5+) and period range (10-30,
+  30-40, 40+ d), the per-test power table (fresh injections vs fresh nulls), the headline cost, and the 40 d+
+  2-4 transit injections.
+- Projection for the winner: N_surv = 4,700 x r x s, r = 1/118 (v1's real-control rate, Jeffreys), s = fresh null
+  false alarms at MES >= 7 not in C; split by tier (A+, A, B) and by transit count, and for 40 d+ with 2-4 transits;
+  Monte Carlo over Jeffreys posteriors, 2.5-97.5%.
+- Candidate summaries quote the fresh-set false-alarm survival and the projected false-alarm count for the
+  candidate's own tier and transit-count bin.
+
+## Vetting v2: frozen thresholds (DEV only; before any validation vetting run)
+(The pre-registration header says "~12:10"; its commit 85d4831 is timed 12:00:18. The text is unchanged.)
+`$PY -I vetting/run_vet2.py dev` (v2-only statistics for the 374 v1 DEV signals, 0 errors, 320 s, one niced
+process) then `$PY -I vetting/freeze_vet2.py` -> `vetting/frozen_vet2.json`. **No new threshold was loosened**;
+all three keep their defaults. Kept v1 tests carry v1's frozen thresholds.
+
+| statistic | frozen soft / fail | DEV true soft+ (n) | DEV FA >= 6 soft+ / fail (n) | DEV FA >= 7 soft+ / fail (n) |
+|---|---|---|---|---|
+| gap_edge.share | 0.5 / 0.8 | 0.011 (180) | 0.067 / 0.015 (194) | 0.21 / 0.04 (24) |
+| red_noise.neg_ratio | -0.8 / -0.6 | 0.000 (180) | 0.010 / 0 (194) | 0 / 0 (24) |
+| low_margin.neg_excess | -1.0 / - | 0.000 (166 at MES >= tau_long) | 0.19 (194, tau_det 6) | 0.375 (24, tau_det 7) |
+
+DEV tiers, v1 vs v2 (information only; thresholds were already fixed by the rule): DEV true signals at MES >=
+tau_long (166) v1 A/B/C 134/26/6, v2 140/23/3 (dropping the chi^2 tests recovers 3); DEV false alarms at MES >= 7
+(24) in C: v1 10, v2 14; DEV real-control signals >= 6 (39, the only real-star check): v1 C 12, v2 C 13; DEV
+nulls >= 6 (155): v1 C 32, v2 C 49. red_noise has almost no DEV power; it is kept as pre-registered (no test is
+dropped after seeing its DEV power, because that would be a tightening-by-selection on DEV false alarms).
+DEV holds only a few true signals in the few-transit class, so low_margin's cost on planets is measured on the
+fresh set (40 d+ injections), not here.
+
+## Vetting v2: validation results on the fresh set (2026-11-12; v1 and v2 frozen, paired)
+**Order of events.** Pre-registration 85d4831 (12:00:18). Light curves of the 150 stars downloaded 11:56-12:10
+(S3 route; 160 drawn, 10 had no SPOC/TESS-SPOC product and were replaced in draw order; 59 MB). Frozen v2
+thresholds d58780e (12:08:46). Frozen gate-2 search on the 1,050 validation jobs 12:13-13:29 (2 niced workers, 0
+errors, 0 real unaltered jobs). Validation vetting (v1 + v2 statistics, 282 signals, 2 niced shards, 0 errors)
+13:30-13:35, then `analyze_vet2.py` once. Catalogue / Gaia info for the 150 stars: `catalog.py tics=...`, all
+sources ok. Text: `vetting/analyze_val2_frozen.txt` (copy of `<OUT>/vetting/v2/analyze_val.txt`).
+
+**Set.** 150 stars (130 / 8 / 12 by predicted-sector stratum; real sectors median 6, 10-90% 3-18), 600 nulls, 450
+injections. All 150 completed, so no shrinking. **Shortfall against the pre-registered size:** only 81 injections
+were detected (55 headline, 26 others) against >= 150 (>= 75 headline) planned, because survey stars detect far
+fewer injections than the gate-2 controls did (headline 0.18 [0.14, 0.23] vs 0.54 on TEST; post-hoc below).
+Null false alarms at MES >= 7: 48 (planned >= ~40). The rule was not changed; the intervals are wider.
+
+### Paired v1 vs v2
+| population | n | v1 in C (or kept) | v2 in C (or kept) | v2 - v1, cluster bootstrap 95% |
+|---|---|---|---|---|
+| null false alarms, MES >= 7 (to C) | 48 | 15 (0.31 [0.20, 0.45]) | **25 (0.52 [0.38, 0.66])** | **+0.21 [+0.09, +0.35]** (11 only v2, 1 only v1) |
+| null false alarms, MES >= tau_long (to C) | 16 | 10 (0.62) | 10 (0.62) | +0.00 [-0.18, +0.20] (1 / 1) |
+| null false alarms, MES >= 6 (to C) | 201 | 39 (0.19) | 66 (0.33) | +0.13 [+0.09, +0.18] |
+| detected headline injections (kept A+/A/B/K) | 55 | 47 (0.85 [0.74, 0.92]) | **52 (0.95 [0.85, 0.98])** | **+0.09 [+0.02, +0.17]** |
+| all detected injections (kept) | 81 | 69 (0.85) | 78 (0.96) | +0.11 [+0.05, +0.18] |
+| 40 d+ injections with 2-4 transits (kept) | 5 | 5 | 5 | 0 |
+
+Tiers. Nulls >= 7: v1 A/B/C 14/19/15, v2 8/15/25. Headline injections: v1 44/3/8, v2 48/4/3. No A+ anywhere (the
+pixel test cannot run on nulls or injections), no K.
+
+| bin | nulls >= 7: n | v1 C | v2 C | detected injections: n | v1 kept | v2 kept |
+|---|---|---|---|---|---|---|
+| 2 transits | 13 | 7 | 11 | 1 | 1 | 1 |
+| 3 transits | 15 | 5 | 11 | 2 | 2 | 2 |
+| 4 transits | 9 | 3 | 3 | 11 | 10 | 11 |
+| 5+ transits | 11 | 0 | 0 | 67 | 56 | 64 |
+| P 10-30 d | 15 | 2 | 7 | 55 | 47 | 52 |
+| P 30-40 d | 15 | 4 | 7 | 14 | 12 | 14 |
+| P 40+ d | 18 | 9 | 11 | 12 | 10 | 12 |
+
+### Decision (pre-registered rule): **ADOPT v2 for the survey**
+(i) v2 sends more null false alarms at MES >= 7 to C: +0.21 [+0.09, +0.35], the interval excludes zero; (ii) v2
+keeps 0.95 of detected headline injections (>= 0.85); (iii) v2 is 9 points *above* v1 on the headline cell, not
+below. What the win is made of, stated plainly:
+- **The rejection gain is the few-transit margin strike.** Of the 11 nulls only v2 rejects, 10 carry low_margin
+  (4 of them duos). That strike is measured above the selecting threshold (7.0 for this population, the
+  pre-registered proxy rule). On the 16 nulls that actually pass tau_long, v1 and v2 reject the same number (10),
+  and the interval spans zero: **at the real detection threshold this fresh set cannot tell v1 and v2 apart.**
+- **The retention gain is from dropping the chi^2 tests**, a DEV decision: on the fresh set v1's per-transit test
+  struck 13% and sector consistency 9% of headline injections (TEST had shown 5% losses). No injection is
+  rejected by v2 that v1 keeps.
+- **The cost of low_margin on true 40 d+ few-transit planets is barely measured:** 5 such injections were
+  detected, all kept by both versions. 3 detected injections had <= 3 transits. The strike's planet cost rests on
+  DEV (0 of 166) and these 5.
+- The surviving false alarms moved to many-transit signals: neither version rejects any of the 11 nulls >= 7 with
+  5+ transits (v2: 5 A, 6 B).
+
+### Per-test outcome on the fresh set (v2 grading; soft-or-worse rate, n applicable)
+| test | headline inj. (55) | all detected inj. (81) | nulls >= 7 (48) | inv nulls >= 7 (8) |
+|---|---|---|---|---|
+| low_margin (new) | 0.00 | 0.00 | **0.38** | 0.50 |
+| per_transit (dominance, min-SES) | 0.05 | 0.04 | **0.35** | 0.12 |
+| odd_even | 0.02 | 0.03 | 0.22 (41) | 0.14 (7) |
+| duration_density | 0.04 | 0.02 | 0.17 | 0.25 |
+| gap_edge (new) | 0.00 | 0.04 | 0.15 | **0.38** |
+| sap | 0.02 | 0.02 | 0.25 (8, inv only) | 0.25 |
+| systematics_window | 0.02 | 0.01 | 0.12 (8, inv only) | 0.12 |
+| red_noise (new) | 0.00 | 0.00 | 0.06 | 0.00 |
+| secondary | 0.00 | 0.00 | 0.04 | 0.00 |
+| model_compare, uniqueness margin, orbit_alias, rotation_residual | 0.00 | 0.00 | 0.00 | 0.00 |
+| catalogue | 0.00 | 0.00 | n/a | n/a |
+| pixel | n/a | n/a | n/a | n/a |
+v1-only tests on the same rows: per-transit (with chi^2) 0.13 headline / 0.38 nulls; sector consistency 0.09 /
+0.06; scramble p 0 / 0; contamination (v1 frozen value) 0 / n/a.
+
+### Projection with v2 (pre-registered: r = 1/118 from gate-2 real controls, s from fresh nulls >= 7)
+| part | k / 48 | false alarms per 4,700 stars [95%] |
+|---|---|---|
+| before vetting | 48 | 59 [4, 181] |
+| **surviving (not C)** | 23 | **28 [2, 90]** |
+| tier A+ / A / B | 0 / 8 / 15 | 0.6 [0, 3.8] / 10 [0.7, 35] / 19 [1.3, 61] |
+| 2 / 3 / 4 / 5+ transits, not C | 2 / 4 / 6 / 11 | 3.0 [0.1, 12] / 5.4 [0.3, 20] / 7.9 [0.5, 28] / 14 [0.9, 46] |
+| 40 d+ with 2-4 transits, not C | 6 | 7.9 [0.5, 28] |
+The point estimate (28) equals v1's TEST projection (28.6): v2 moves which false alarms survive more than how many
+at the real threshold. The A+ row is a placeholder: no false alarm can reach A+ in this test because the pixel
+test never runs on nulls, so its 0.6 is not evidence that A+ is clean.
+
+### Odds quoted by the candidate summaries (v2, fresh nulls >= 7 and detected injections)
+| tier, transits | nulls in this cell (of 48) | injections in this cell (of those with this transit count) | false alarms per 4,700 stars |
+|---|---|---|---|
+| A, 3 | 0 | 1 of 2 | 0.6 [0, 3.8] |
+| A, 4 | 3 | 9 of 11 | 4.2 [0.2, 16] |
+| A, 5+ | 5 | 58 of 67 | 6.6 [0.4, 24] |
+| B, 2 | 2 | 1 of 1 | 3.0 [0.1, 12] |
+| B, 3 | 4 | 1 of 2 | 5.4 [0.3, 20] |
+| B, 4 | 3 | 2 of 11 | 4.2 [0.2, 16] |
+| B, 5+ | 6 | 6 of 67 | 7.9 [0.5, 27] |
+Example (a detected injection, `<OUT>/vetting/v2/cards/val/cards.md`): "Signals like this one were false 5 times out
+of 63 in testing, but the test planted about three planets per star, far more than nature does, so that ratio
+flatters the candidate. Scaled to the survey, about 6.6 [0.4, 23.7] false alarms like this are expected per 4,700
+stars. If that is comparable to the number of real planets the survey can find (a handful is the rough
+expectation, not a measurement), a signal like this one is more likely false than real."
+
+### Weak, cut or unverified
+- **No power on the fresh nulls:** model_compare, uniqueness margin (it struck 12% of DEV false alarms), orbit_alias,
+  rotation_residual; red_noise is weak (0.06, 3 of the 11 v2-only rejections, never alone). secondary 0.04.
+- **A+ and the revised pixel rule are untested here:** no pixels for nulls or injections. Their only evidence is
+  v1's TEST pixel findings (2 of 2 informative 53 d real false alarms failed on a neighbour; the soft rule misfired
+  on single-strong-epoch hold-out planets).
+- **Null false alarms are not real-star false alarms.** 40 of the 48 at MES >= 7 are rolled copies, which have no
+  SAP, systematics-window, orbit or rotation view; real false alarms were rejected more often than nulls in v1
+  TEST. No eclipsing binaries are in the null material, so odd/even and secondary are untested against EBs. The
+  DEV real-control signals (DEV) are the only real-star check: v1 C 12 of 39, v2 C 13 of 39.
+- The proxy rule (margin above 7.0 for the >= 7 population) is what makes low_margin count; it assumes the null
+  tail is roughly exponential above any threshold, which DEV supports only coarsely.
+- Detected injections were half the planned number; few-transit and 40 d+ planets are almost absent from it.
+- Display: the v1 card's "MES at every phase" panel can show a spike at a sparsely covered phase bin (seen at
+  phase -9 d on an injection card); this is the plot, not a statistic.
+
+### POST-HOC findings (after the decision; not credited) - `vetting/posthoc_val2.py`, `vetting/posthoc_val2.txt`
+- **The survey-star null tail is fatter than DEV's above tau_long:** 16 of 600 fresh nulls (0.027 [0.016, 0.043])
+  reach tau_long vs 3 of 420 DEV nulls (0.007), on 9 of 150 stars; 14 of the 16 are rolled (non-inverted) copies,
+  8 are duos, and 12 come from stars with 6-12 real sectors. With r taken from this fresh per-realisation rate
+  instead of 1/118, the surviving count becomes ~50-60 per 4,700 stars. Rolled copies of real stars may produce more
+  false alarms than the real stars do (real controls: 1 of 118), so this is an upper-side scenario, not a
+  measurement of r.
+- **Survey stars detect fewer injections:** headline 0.18 [0.14, 0.23] (55 of 300) vs 0.54 on the TEST controls;
+  by real sectors 1-3: 0.03, 4-5: 0.10, 6-12: 0.20, 13+: 0.58. 58 of 450 injections had < 2 transits in the data.
+  Predicted sectors overstate real ones on the survey list (median 6 real for a list cut at >= 6 predicted). The
+  survey's expected yield should be re-estimated with real sector counts; gate 2's ~0.37 for the 6-12 bucket is
+  optimistic.
+
+## Running the vetting on survey output (v2 decision): run **v2** (`run_vet2.py`, `frozen_vet2.json`)
+`PY` = a repo venv python with wotan/numba (e.g. the gate-2 one); from `spikes/mdwarf_stack/`; at most 2 niced
+processes. Light curves: the survey deletes its NPZs, so first rebuild them with
+`$PY -I survey/get_lightcurve.py TIC ... --max-mb 2000` (into `data/planets_spike/lc_cache/lc/`) and set
+`VET_LC_DIR` to that directory.
+1. Signals to vet: `tics.txt` exactly as in step 1 of the v1 procedure above (every long-search signal >= tau_long).
+2. `VET_LC_DIR=... $PY -I vetting/fetch_sap.py list --file tics.txt` (SAP + background).
+3. `$PY -I vetting/catalog.py tics=tics.txt` (refresh `data/planets_spike/catalogs/toi.csv` first; a failed
+   query blocks A, never reads as "not known").
+4. `VET_LC_DIR=... nice -n 19 ionice -c3 $PY -I vetting/run_vet2.py survey --rows SURVEY_ROWS.jsonl
+   [--jobs JOBS.jsonl] [--shard 0/2 and 1/2 in two processes]` -> `<OUT>/vetting/v2/vet2_survey*.jsonl`. Each row
+   holds the v1 statistics too, so v1 can still be graded from it (`vet.grade` with `frozen_vet.json`).
+5. List the A/B signals: `$PY -I vetting/cards2.py survey --tiers A,B --text-only --max 10000` (prints key and
+   tier), then the pixel check for each: `$PY -I vetting/pixel_check.py <OUT>/vetting/v2/vet2_survey.jsonl KEY ...`
+   (with shards, pass the shard file that holds the key). The v2 pixel rule is applied at grading time.
+6. `$PY -I vetting/cards2.py survey --tiers A+,A,B,K` -> `<OUT>/vetting/v2/cards/survey/` (PNG + `cards.md`;
+   each summary quotes the fresh-set odds for its tier and transit count from `<OUT>/vetting/v2/analyze_val.json`,
+   or its committed copy `vetting/analyze_val2.json`). `--tiers C` shows the rejected ones and why.
+Read every A/B card as "more likely false than real unless shown otherwise": about 28 [2, 90] surviving false
+alarms are projected for 4,700 stars, against a handful of real planets.
 
 ## Cut / known limitations (stated in advance)
 - No injection into pixels, so the pixel test cannot be calibrated on injections; it is run on real stars only
