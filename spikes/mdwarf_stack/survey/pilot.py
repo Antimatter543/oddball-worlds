@@ -175,6 +175,69 @@ def routecheck() -> None:
         print(ex[["tic", "n_old", "n_new", "new_not_old", "new_was_failure"]].to_string(index=False))
 
 
+def bytecheck(per_star: int = 2) -> None:
+    """S3 bytes vs MAST bytes (SHA-256) for `per_star` sectors of every pilot host, preferring
+    a TESS-SPOC sector when there is one. Sequential: one MAST request at a time."""
+    import hashlib
+
+    sys.path.insert(0, str(HERE))
+    import download
+
+    download.ERRLOG = lambda r: None
+    download.BREAKER = download.Breaker(lambda r: None)
+    download._set_astroquery_ua()
+    rows = []
+    for t in HOST_TICS:
+        prods = download.list_products_obs(t)
+        secs = sorted(prods, key=lambda s: (prods[s][0] != "tess-spoc", s))[:per_star]
+        for s in secs:
+            kind, uri = prods[s]
+            key = download.s3_key(uri)
+            try:
+                a = download.s3_get(key)
+            except download.S3Missing:
+                rows.append({"tic": t, "sector": s, "kind": kind, "s3": "missing"})
+                continue
+            b = download.mast_get(uri)
+            rows.append({"tic": t, "sector": s, "kind": kind, "bytes": len(a),
+                         "identical": hashlib.sha256(a).digest() == hashlib.sha256(b).digest()})
+    d = pd.DataFrame(rows)
+    d.to_csv(PILOT / "bytecheck.csv", index=False)
+    print(d.to_string(index=False))
+
+
+def listcheck(csvs: list[str]) -> None:
+    """Sector sets per star: MAST observation listing vs the bucket listing over the tess-point
+    sectors vs tess-point itself (listings only; no light curve or result is read)."""
+    sys.path.insert(0, str(HERE))
+    import download
+
+    download.ERRLOG = lambda r: None
+    download._set_astroquery_ua()
+    rows = []
+    for c in csvs:
+        for _, r in pd.read_csv(c).iterrows():
+            t = int(r["tic"])
+            pred = [int(x) for x in str(r["sectors"]).split()]
+            mast = download.list_products_obs(t)
+            s3, und = download.list_products_s3(t, pred)
+            rows.append({"tic": t, "n_pred": len(pred), "n_mast": len(mast), "n_s3": len(s3),
+                         "same_uri": sum(1 for s in s3 if mast.get(s) == s3[s]),
+                         "mast_not_s3": sorted(set(mast) - set(s3)),
+                         "s3_not_mast": sorted(set(s3) - set(mast)), "undecided": und,
+                         "mast_not_pred": sorted(set(mast) - set(pred)),
+                         "spoc": sum(v[0] == "spoc120" for v in mast.values()),
+                         "tess_spoc": sum(v[0] == "tess-spoc" for v in mast.values())})
+    d = pd.DataFrame(rows)
+    d.to_csv(PILOT / "listcheck.csv", index=False)
+    print(d.to_string(index=False))
+    print(f"stars {len(d)}; MAST sectors {d['n_mast'].sum()}, bucket listing {d['n_s3'].sum()} "
+          f"(same URI {d['same_uri'].sum()}); predicted {d['n_pred'].sum()}; sectors MAST has "
+          f"but the bucket listing lacks {d['mast_not_s3'].map(len).sum()} (undecided "
+          f"{d['undecided'].map(len).sum()}); MAST sectors outside tess-point "
+          f"{d['mast_not_pred'].map(len).sum()}")
+
+
 def perf(tags: list[str]) -> None:
     rows = []
     for tag in tags:
@@ -215,5 +278,9 @@ if __name__ == "__main__":
         check(*sys.argv[2:3])
     elif cmd == "routecheck":
         routecheck()
+    elif cmd == "bytecheck":
+        bytecheck()
+    elif cmd == "listcheck":
+        listcheck(sys.argv[2:])
     elif cmd == "perf":
         perf(sys.argv[2:])

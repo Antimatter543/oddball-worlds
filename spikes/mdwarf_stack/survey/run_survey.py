@@ -199,6 +199,9 @@ class Runner:
         self.deadline = self.t_start + a.max_hours * 3600 if a.max_hours else None
         self.hard_deadline = (self.deadline + a.grace_min * 60) if self.deadline else None
         self.stopped_for_time = False
+        self.skip = set()
+        if a.skip_tics:
+            self.skip = {int(x) for x in Path(a.skip_tics).read_text().split() if x.strip()}
         self.res_dir = self.out / "results"
         for d in (self.out, self.res_dir, self.data):
             d.mkdir(parents=True, exist_ok=True)
@@ -297,6 +300,8 @@ class Runner:
         return self.res_dir / f"tic{tic}.json"
 
     def is_done(self, tic: int) -> bool:
+        if tic in self.skip:  # finished in an earlier session elsewhere (Kaggle resume)
+            return True
         p = self.result_path(tic)
         if not p.exists():
             return False
@@ -464,6 +469,8 @@ class Runner:
         missing = sorted(set(star["sectors_pred"]) - set(found))
         extra = sorted(set(found) - set(star["sectors_pred"]))
         r.update(sectors_missing_vs_pred=missing, sectors_extra_vs_pred=extra)
+        if missing or extra:
+            tags.append("sectors_differ_from_tesspoint")
         if err is not None:
             r.update(status="failed", error_kind=err.split(":", 1)[0], error=err, tags=tags)
             return r
@@ -634,6 +641,8 @@ def main() -> int:
     ap.add_argument("--route", choices=("s3", "mast"), default="s3",
                     help="s3: FITS bytes from the public AWS bucket (MAST fallback)")
     ap.add_argument("--keep-npz", action="store_true", help="keep light-curve NPZs")
+    ap.add_argument("--skip-tics", default=None,
+                    help="file of TICs already finished elsewhere (one per line); not redone")
     ap.add_argument("--download-only", action="store_true",
                     help="timing/route checks: download and keep NPZs, no search, no results")
     a = ap.parse_args()
