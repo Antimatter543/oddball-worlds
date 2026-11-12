@@ -643,7 +643,7 @@ def grade(stats: dict, thr: dict | None = None, blind: bool = False) -> dict:
                 v = -c["min_need"] if c.get("min_need") is not None else None
                 lv = _level(v, soft, None) if v is not None else "pass"
                 put("contamination", lv, f"a Gaia neighbour could make the dip with a "
-                    f"{100 * (c.get('min_need') or 1):.0f}% eclipse")
+                    f"{100 * (c.get('min_need') or 1):.2g}% eclipse")
             if blind:
                 res["catalogue"] = "n/a"
             else:

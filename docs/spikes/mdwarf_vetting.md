@@ -188,6 +188,141 @@ First DEV pass (`vet_dev_v1_unnested.jsonl`, 374 signals: 180 true, 194 false al
 - **Where the separation is:** duration vs density (true 97% at ratio 1.37; false alarms at MES >= 7 median 1.21,
   90% 2.46), single-event dominance (true 99% 0.54; false alarms at MES >= 7 median 0.60), and odd/even.
 
+## Frozen thresholds (commit 81c7bd3, 2026-11-12 10:41:57, before any TEST or hold-out vetting)
+`spikes/mdwarf_stack/vetting/frozen_vet.json` (soft / fail; DEV numbers in `vetting/analyze_dev_frozen.txt`):
+odd/even z 3 / 4.38; single-event dominance 0.65 / -; per-transit -log10 p 4.04 / 10.4; min-SES (negative) 1.11 /
+2.49; sector consistency -log10 p 3.82 / 10.4; duration / density ratio 1.38 / 2.0; secondary excess 1 / 2;
+nested model comparison -dBIC -6 / 0; uniqueness -margin -2 / -1; scramble p 0.01 / 0.05; SAP z (negative) 3.39 /
+6.72; SAP background statistic 4 / -; systematics-window share 0.5 / 0.8; orbit-alias spread soft below 0.5 d;
+rotation residual p < 0.02; contamination need -0.0031 (soft only if a neighbour needs a <= 0.31% eclipse, so in
+effect off). DEV with these: true signals A+B 0.97 [0.93, 0.98] (146 A, 28 B, 6 C of 180); DEV false alarms at
+MES >= 7 in C 10/24, at MES >= 6 44/194.
+
+## Results (TEST and hold-out, frozen thresholds; 2026-11-12)
+Command: `cd spikes/mdwarf_stack && $PY -I vetting/analyze_vet.py all` -> `<OUT>/vetting/analyze_all.txt` (copy:
+`vetting/analyze_all_frozen.txt`). Inputs: `vet_test.jsonl` (387 signals: 228 detected TEST injections, 139 TEST
+false alarms at MES >= 6, the rest lower), `vet_holdout.jsonl` (82 signals, 30 recovered hold-out planets plus the
+gate-1 host signals), `pixel.jsonl` (41 pixel checks: 30 hold-out planets, 10 TEST real false alarms at MES >= 7, 1
+DEV debug row). 0 measurement errors. The pixel test runs on real stars only, so injections never have it.
+
+### Tiers
+| set | n | A | B | C | K | A+B (Wilson 95%) |
+|---|---|---|---|---|---|---|
+| TEST headline-cell detected injections | 108 | 86 | 17 | 5 | 0 | 0.95 [0.90, 0.98] |
+| ... of which MES < 12 | 48 | 39 | 9 | 0 | 0 | 1.00 [0.93, 1.00] |
+| TEST all detected injections | 228 | 169 | 45 | 14 | 0 | 0.94 [0.90, 0.96] |
+| TEST false alarms, MES >= 6 | 139 | 65 | 38 | 36 | 0 | 0.74 [0.66, 0.81] |
+| TEST false alarms, MES >= 7 | 29 | 11 | 7 | 11 | 0 | 0.62 [0.44, 0.77] |
+| TEST false alarms, MES >= tau_long (8.054) | 3 | 1 | 0 | 2 | 0 | 0.33 [0.06, 0.79] |
+| ... real-control false alarms, MES >= 6 | 48 | 17 | 12 | 19 | 0 | 0.60 |
+| ... null (inverted / rolled) false alarms, MES >= 6 | 91 | 48 | 26 | 17 | 0 | 0.81 |
+| hold-out planets (catalogue on) | 30 | 0 | 0 | 0 | 30 | - |
+| hold-out planets, **blind** (catalogue off) | 30 | 17 | 8 | 5 | 0 | 0.83 [0.66, 0.93] |
+| gate-1 host signals >= tau_long | 10 | 0 | 0 | 0 | 10 | - |
+
+Headline injections by MES (A+B): 8.1-10 32/32, 10-12 16/16, 12-15 14/14, 15-20 20/22, > 20 21/24. The losses are at
+high MES, where per-transit chi^2 and SAP z are most sensitive to imperfect injected-depth recovery.
+
+### Per-test outcome (pass / soft / fail)
+| test | headline injections (108) | TEST FA >= 7 (29) | hold-out planets (30) |
+|---|---|---|---|
+| odd_even | 0.99 / 0.01 / 0 | 0.96 / 0.04 / 0 (25) | 1.00 / 0 / 0 |
+| per_transit (dominance, min-SES, chi^2) | 0.92 / 0.07 / 0.01 | **0.55 / 0.45 / 0** | 0.87 / 0.13 / 0 |
+| sector_consistency | 0.97 / 0.03 / 0 | 1.00 / 0 / 0 | 0.97 / 0.03 / 0 |
+| duration_density | 0.96 / 0.03 / 0.01 | 0.93 / 0.03 / 0.03 | 0.97 / 0.03 / 0 |
+| secondary | 0.98 / 0.02 / 0 | 0.97 / 0.03 / 0 | 0.97 / 0.03 / 0 |
+| model_compare (nested) | 1.00 / 0 / 0 | 0.97 / 0 / 0.03 | 1.00 / 0 / 0 |
+| uniqueness | 1.00 / 0 / 0 | 0.93 / 0.03 / 0.03 | 1.00 / 0 / 0 |
+| sap | 0.94 / 0.06 / 0.01 | **0.69 / 0.31 / 0** (13) | 1.00 / 0 / 0 |
+| systematics_window | 1.00 / 0 / 0 | 0.85 / 0.15 / 0 (13) | 1.00 / 0 / 0 |
+| orbit_alias | 1.00 / 0 / 0 | 0.92 / 0 / 0.08 (13) | 1.00 / 0 / 0 |
+| rotation_residual | 0.98 / 0.02 / 0 | 1.00 / 0 / 0 (13) | 0.97 / 0.03 / 0 |
+| pixel | n/a (injections) | **0.67 / 0 / 0.33** (6 informative) | 0.80 / 0.20 / 0 |
+| contamination | 1.00 / 0 / 0 | 1.00 / 0 / 0 (10) | 0.93 / 0.07 / 0 |
+| catalogue | 1.00 / 0 / 0 | 1.00 / 0 / 0 (10) | (K for all 30) |
+(n in brackets where a test does not apply to every row: null false alarms on inverted or rolled light curves have
+no SAP, pixel or star-level counterpart.) Scramble p is not listed: 0.00 for every signal, no power.
+
+What rejects false alarms (TEST FA >= 6, strike counts): per-transit soft 39, uniqueness soft 13, duo strike 13,
+duration soft 12 + fail 4, SAP soft 10, systematics window soft 7, model comparison soft 6.
+What costs true signals (headline): per-transit soft 8, SAP soft 6, sector consistency soft 3, duration soft 3.
+
+### Targets
+1. **Met.** Headline detected injections in A or B: **0.95 [0.90, 0.98]** (103/108); goal >= 0.80.
+2. **Missed, badly.** False alarms >= tau_long in C: **0.67 [0.21, 0.94]** (2/3; goal >= 0.90). At MES >= 7:
+   **0.38 [0.23, 0.56]** (11/29), short of 0.90 by 52 points; at MES >= 6: 0.26 [0.19, 0.34] (36/139). Real-star
+   false alarms are rejected more often (19/48 at >= 6) than nulls (17/91), mainly by SAP, systematics window and
+   pixel, which see the real light curve. The cause is plain: most long-period false alarms are 2-4 epochs of
+   ordinary-looking, box-shaped red noise at a plausible duration. No light-curve test separates them from a
+   planet; dominance (one epoch carrying the detection) does best.
+3. **Met only via the catalogue; blind missed.** Hold-out planets in A, B or K: 1.00 [0.89, 1.00] (30/30, all K).
+   Blind (catalogue off): **0.83 [0.66, 0.93]** (25/30), 7 points short of 0.90. Blind C: TOI-6002 b (duration
+   ratio 1.84 + pixel soft), TOI-5728 b (min-SES + pixel soft), K2-18 b (dominance 0.675 + duo), TOI-4336 Ab
+   (rotation residual + contamination: it is a near-equal binary, a neighbour needs only a 0.24% eclipse),
+   TOI-1266.01 (MES 46; per-transit and sector chi^2 both soft). Three of the five involve the pixel soft rule
+   or contamination, both of which are flawed (below).
+
+POST-HOC, not credited: with the pixel test also off, blind hold-out A+B is 27/30 = 0.90 [0.74, 0.97]. The pixel
+*soft* rule ("difference centroid > 1 px off target in >= half of the strong epochs") fires on 6/30 real planets
+because 5 of them have only one strong epoch (1 of 1), where a single noisy centroid decides it. It should need >= 3
+strong epochs. The pixel *fail* rule (dip stronger on a resolved neighbour) never fired on a hold-out planet.
+
+### The pixel check on TEST real false alarms (MES >= 7, 10 signals)
+- **fail** (dip on a neighbour): testreal-long-267320484#0 (52.917 d, 3 transits; tier A without the pixel test;
+  dip SNR 8.5 on a neighbour 44" away vs -3.4 on target) and testreal-long-340487632#1 (52.879 d, 4 transits;
+  SNR 23.3 on a neighbour 37" away vs -6.9). Both near-53 d false alarms are caught.
+- pass: 141621885#0, 154924886#2, 260972843#0, 377030976#0. Uninformative (n/a): 141621885#1, 154924886#0,
+  302444623#0, 422429539#0.
+- The two 52.9 d signals share no epochs (340487632: BTJD 1526.24, 2055.03, 2266.54, 3958.67, sectors 8/27/35/97;
+  267320484: 1348.17, 3147.34, 3888.17, sectors 1/67/95): a period coincidence, not a common-mode systematic.
+- So when the pixel test is informative it is the strongest test we have, but it was informative for 6 of 10, and
+  it was never calibrated against a planet in the pixels at small depth (only the 30 hold-out planets).
+
+### P >= 40 d with 2-4 transits (the pile-up region)
+| set | n | A | B | C | A+B |
+|---|---|---|---|---|---|
+| true (TEST detected + DEV true >= tau) | 16 | 11 | 5 | 0 | 1.00 [0.81, 1.00] |
+| TEST false alarms >= 6 | 35 | 11 | 12 | 12 | 0.66 [0.49, 0.79] |
+Per test, only dominance (true 0.88 pass, FA 0.60), SAP (0.88 vs 0.76), systematics window (1.00 vs 0.71) and the
+pixel fail (2/2 informative FA) separate them. **The vetting cannot separate most of this population**: two thirds
+of 40-55 d false alarms survive as A or B. Only the pixel check, more sectors (a third or fourth transit that
+must line up) and a ground-based transit at the predicted time can.
+
+### Projection: surviving false alarms per 4,700 survey stars
+r = 1/118 (real controls with a long signal >= tau_long), Jeffreys posteriors, Monte Carlo 2.5-97.5%.
+- before vetting: 47 [4, 183]
+- after, survival s from TEST FA >= 7 (18/29 not C, the pre-registered choice): **28.6 [2.6, 115]**
+- s from TEST FA >= tau_long (1/3): 14.2 [0.7, 89]; s from TEST FA >= 6 (103/139): 34.6 [3.2, 136]
+Read: expect roughly 3-100 false alarms in tier A/B from the survey, against an expected handful of real planets.
+Most surviving A/B candidates will be false. Pixel checks on every A/B candidate will remove some of them (2 of the 6
+informative real-star FA here), which this projection does not include because the pixel test was not run on null
+false alarms.
+
+### Weak or no-power tests
+- Phase-scramble p: no power (0.00 for everything).
+- Uniqueness margin: little (scales with MES for true and false alike).
+- Contamination: switched off by the loosen-only rule (pre-registration weakness: it describes the star, not the
+  noise, and should have been exempt). Where it does fire (TOI-4336 Ab, TOI-1452 Ab) it is a real near-equal binary.
+- Per-transit chi^2 and sector consistency: loosened to near-no power; dominance carries the per-transit test.
+- Rotation residual, orbit alias: rarely fire.
+- Pixel soft rule: unreliable with 1 strong epoch (see above); not calibratable on injections.
+- Duration consistency per half: info only.
+Strongest: dominance, duration vs density, SAP, systematics window, pixel fail.
+
+### POST-HOC finding (found on TEST, not credited; a v2 candidate)
+The share of SES^2 in epochs within 1 h of a data gap >= 20 min exceeds 0.5 for 0/228 detected TEST injections but
+4/13 time-anchored TEST false alarms at MES >= 7 (267320484 0.84, 377030976 1.00, 422429539 0.65, 154924886#0
+0.60). It looks like a useful gap-edge test, but it was found by looking at TEST and must be validated on fresh
+material (e.g. the survey's own null runs) before use.
+
+### Cards
+`<OUT>/vetting/cards/test/`: testinj0-074-41358832#0 (A, a true injection), testreal-long-267320484#0 (C, pixel
+fail), testreal-long-340487632#1 (C, dominance + systematics + pixel fail), each with `cards.md` text.
+
+### Changes after the freeze
+Display only: the contamination reason printed the needed eclipse depth with `.0f`, so 0.24% showed as "0%"; it now
+uses `.2g`. No threshold, test or tier rule changed; the tier tables are identical before and after.
+
 ## Running the vetting on survey output (once the survey has finished)
 `PY` = any repo venv python with wotan/numba (e.g. the gate-2 one). From `spikes/mdwarf_stack/`, ONE process:
 1. `$PY -I -c "import json,sys; tau=json.load(open('<OUT>/gate2/frozen.json'))['tau_long']; print('\n'.join(sorted({str(r['tic']) for r in map(json.loads, open(sys.argv[1])) if r.get('range','long')=='long' and any(s['mes']>=tau for s in r.get('signals',[]))})))" SURVEY_ROWS.jsonl > tics.txt`

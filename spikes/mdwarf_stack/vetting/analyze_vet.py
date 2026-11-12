@@ -139,8 +139,13 @@ def main(stage):
     rows = {s: [r for r in load(s) if "stats" in r] for s in stages}
     errs = {s: sum("error" in r for r in load(s)) for s in stages}
     out.append(f"rows with a measurement error (not graded): {errs}")
+    pp = V / "pixel.jsonl"
+    pix = {json.loads(x)["key"]: json.loads(x)["pixel"] for x in open(pp)} if pp.exists() else {}
+    out.append(f"pixel results merged: {len(pix)} (rows without one have pixel = n/a)")
     for s, rs in rows.items():
         for r in rs:
+            if r["key"] in pix and s != "dev":
+                r["stats"]["pixel"] = pix[r["key"]]
             r["grade"] = grade(r["stats"], thr)
             r["blind"] = grade(r["stats"], thr, blind=True)
         if s == "holdout":
@@ -183,6 +188,13 @@ def main(stage):
                               "gate-1 host signals >= tau": g1}, out)
         out += ["", "hold-out planets, blind tier (catalogue test off):", ""]
         table_tiers({"hold-out planets (blind)": hp}, out, key="blind")
+        for r in hp:  # POST-HOC diagnostic, not pre-registered: pixel test also off
+            s2 = {k: v for k, v in r["stats"].items() if k != "pixel"}
+            r["blind_nopix"] = grade(s2, thr, blind=True)
+        pc = Counter(r["blind"]["status"].get("pixel") for r in hp)
+        out += ["", f"hold-out pixel statuses: {dict(pc)}", "",
+                "POST-HOC (not pre-registered): blind tier with the pixel test also off:", ""]
+        table_tiers({"hold-out planets (blind, no pixel)": hp}, out, key="blind_nopix")
         out += ["", f"headline, what costs strikes: {kill_reasons(head)}",
                 f"TEST FA >=6, what rejects: {kill_reasons(t_fa)}",
                 f"hold-out planets (blind), strikes: "
