@@ -74,6 +74,12 @@ of 1.0-1.5 R_earth planets at 15-30 d, and missed LHS 1140 b.
 - **Survey (prepared, not started):** `outputs/planets_spike/gate2/survey_targets.csv`, 12,959 stars (Teff
   2700-3400 K, < 50 pc, T < 15); scope to the 4,681 with 6+ sectors. About a day of CPU; MAST downloads are the
   long pole (days).
+- **Survey result (2026-11-12): no planets; consistent with noise.** 4,350 of 4,681 stars searched (median 6
+  real sectors; 45% have fewer than 6, so sensitivity is ~0.19 per star, not 0.54). Frozen v2 vetting of 510
+  signals on 252 stars: K 48, A 3, B 10, C 449. The 13 not rejected compare with 26 [2, 83] expected from noise
+  (57 in the fat-tail case), with no excess in any bin. All six predicted-detectable known transiting objects at
+  10-60 d were recovered blind. Best signal: TIC 2102868, 39.4 d, ~2 R_e, but Gaia flags it as a possible
+  binary. Nothing goes to ExoFOP. `docs/shortlist_planets_v1.md`.
 - **Before looking at survey candidates:** pre-register vetting. The long-period false-alarm rate is only bounded
   at under 9% of stars, concentrated at 45-55 d with 2-4 transits; a 27.4 d systematic exists at low signal.
 - **Expected yield:** zero to one marginal candidate. The pipeline should be ready for PLATO public data (~2028).
