@@ -153,6 +153,21 @@ TEST false alarms (real + null; the >= tau_long subset is reported too). Interva
 Beta posteriors for r and s, 2.5-97.5%. The 45-55 d, 2-4 transit subset is reported separately: test pass rates on
 true signals vs false alarms in that region. If the vetting cannot separate it, the report says so.
 
+## Implementation notes (2026-11-12 ~10:15, after the pre-registration commit, before any DEV aggregate)
+Found while building the star-level inputs and a 13-signal debug run. No DEV statistic had been tabulated.
+- **Gaia counterpart.** The 20" / parallax > 10 mas rule found no counterpart for 30 of 191 stars: nearby M dwarfs
+  move tens of arcsec between the TIC epoch (2000) and Gaia (2016), and 13 faint controls have Gaia parallaxes of
+  3-5 mas (TIC put them within 50 pc). The rule is now: within 60" with parallax > 5 mas (or a 2-parameter source
+  within 5"), G within 1.5 mag of Tmag + 1.6, lowest |G - Tmag - 1.6| + sep/30; fallback, the source within 3"
+  with G within 2 mag of Tmag + 1. All 191 stars now have a counterpart. Neighbour separations are measured from
+  the Gaia position.
+- **Kostov+2025 table2 is not an EB list** (it is the 872,720 unvetted neural-network flags). Only table3 / table4
+  count. All 7 Kostov matches in our stars were table2 rows, including the TOI-270 and TOI-1266 hosts.
+- **A TOI dispositioned FP or FA at P or an alias is a catalogue fail** (a known false positive), not tier K.
+- Pixel positions use the Gaia DR3 (2016) coordinates of the target and neighbours.
+- Pixel check on an injection (DEV, TIC 454682563, 2 sectors): S_t = 0.7, i.e. *uninformative*, as it must be,
+  since the injection is not in the pixels. The pixel test therefore cannot be scored on injections at all.
+
 ## Cut / known limitations (stated in advance)
 - No injection into pixels, so the pixel test cannot be calibrated on injections; it is run on real stars only
   (hold-out planets, real-control false alarms) and is the first thing dropped if time runs short.
