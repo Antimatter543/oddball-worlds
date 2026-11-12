@@ -46,7 +46,8 @@ PINS = ["numpy==2.5.4", "numba==0.68.1", "llvmlite==0.50.0", "scipy==1.18.1", "a
         "astropy-iers-data==0.2026.11.9.0.35.9", "pyerfa==2.0.1.5", "astroquery==0.4.11",
         "wotan==2.1", "pandas==2.3.3", "requests==2.34.2", "urllib3==2.8.0",
         "certifi==2026.10.23", "pyvo==1.10.0"]
-EMBED_PATHS = ["spikes/mdwarf_stack", "src/oddball"]
+# shell helpers with local absolute paths are left out of the embedded archive
+EMBED_PATHS = ["spikes/mdwarf_stack", "src/oddball", ":(exclude)spikes/mdwarf_stack/**/*.sh"]
 
 
 def git(*a) -> bytes:
