@@ -4,12 +4,23 @@ Status: **pre-registration committed 2026-11-13 12:11:48 +1000 (commit 359e1c1; 
 says 12:15, the commit time is the authority), before any light curve, image or catalogue other
 than the survey's own SPOC / TESS-SPOC light curves was looked at for these stars.** Results were
 added below the pre-registration on the same day ("Part 1 results", "Part 2 results"); the
-pre-registered text is unchanged except for this paragraph. The v2 vetting and its tiers are not
+pre-registered text is unchanged except for this paragraph and the summary below it. The v2 vetting and its tiers are not
 changed; everything here is extra evidence on top. Default for every signal stays "probably not a
 planet", and it still is for all five.
 
 Code: `spikes/mdwarf_stack/followup/` (`fu.py` shared statistic, `ephem.py` the tables below).
 Outputs: `outputs/planets_spike/followup/`.
+
+**Results in brief (2026-11-13).** (1) No new TESS photons exist for 3 of the 5 signals; the
+two new-photon windows that exist (TIC 234295610 S95, TIC 141816993 S75) give "no information"
+under the pre-registered rules, because the frozen detrend removes most of the injected test dip; a
+post-hoc matched test disfavours the 234295610 dip in one reduction. Re-reductions show that the
+deepest epoch of the best candidate, TIC 2102868, is not reproduced by other pipelines, and
+LAMOST shows that star is a spectroscopic binary. All five remain "probably not a planet".
+(2) Gap-filling: no-go. The survey searched 73% of its star-sectors; filling the gaps with QLP /
+TARS / TGLC would add ~14% detection power (~0.1-0.2 expected planets), and most of that comes
+free if TESS-SPOC delivers S87+. Extending to 50-100 pc with the same products is the bigger
+lever (roughly doubles the expected yield, ~+0.65-1.7 expected planets in the headline cell), at 3-4x the survey's cost.
 
 ## Part 1 pre-registration
 
@@ -263,13 +274,37 @@ a factor of two. Unequal depths point to two unrelated events, a systematic in o
 variable / eclipsing neighbour in the aperture rather than one planet.
 
 ### Archive sources (2-4)
-<<ARCHIVE>>
+Scripts: `followup/archive/` (run from a scratch copy with explicit paths; raw downloads, ~81 MB,
+deleted). Outputs and per-source evidence: `outputs/planets_spike/followup/archive/`
+(`archive_summary.json`, `ztf_neighbours.json`, `rv_*.json`, `tic2102868_background.json`,
+plate cutouts as PNG). Pre-registered rules applied unchanged; ZTF times converted from UTC MJD to
+BJD_TDB (astropy, Palomar, barycentric correction toward each neighbour) - 2457000.
+
+| source | 2102868 (G 86-37) | 234295610 | 146636926 | 141816993 | 57830249 (TWA 33) |
+|---|---|---|---|---|---|
+| K2 / Kepler | none (0 obs., not in EPIC) | none | none | none | none |
+| CHEOPS | not checked (archive unreachable) | not checked | not checked | not checked | not checked |
+| MEarth | not a target (nearest 2.66 deg) | not a target | not a target | not a target | not a target |
+| neighbour eclipses | no information for all 25 neighbours that could make the dip: 24 have ZTF (1,277-1,442 points) but a median of 2 points fall in transit per allowed ephemeris (rule needs 5); the 7.4" G 16.47 star has no ZTF object | outside ZTF; no Gaia epoch photometry for its 4 viable neighbours; no information | outside ZTF; no information | **blend excluded for 2 of 3 neighbours** (51.8" G 16.45 needs 3.7%: excluded at >= 7.3 sigma for all 153 allowed ephemerides; 31.4" G 19.04 needs 40%: excluded at >= 14 sigma); the 0.76" companion is not resolved by ZTF: no information | ZTF cone returned 0 rows; no Gaia epoch photometry; no information |
+| binarity (RVs) | **binary supported**: LAMOST MRS RVs on 4 nights 49.3 +- 2.1, 27.3 +- 1.3, 42.1 +- 1.2, 26.5 +- 1.3 km/s (chi^2 164 / 3 dof; 22.8 km/s peak to peak); Gaia DR3 RV variable (p ~ 0, amplitude 18.7 km/s, RUWE 2.94) | no RV anywhere: no information | Gaia p = 0.059 (< 3 sigma): no information | LAMOST 1 epoch, Gaia p = 0.22: no information | **binary supported, from Gaia DR3 summary statistics only** (44 transits, p = 0.0013, amplitude 18.9 km/s); no individual RVs |
+| background star at the 2026 position | **excluded to G ~ 19.5** (POSS-I E 1955, 21.9" from today's position; the dip needs G <= 18.2-19.0); POSS-II consistent; 2MASS too shallow; PS1 no information (saturated halo) | - | - | proper motion too small | - |
+
+Not checked: CHEOPS (all five; connect timeout / DNS failure), ASAS-SN (client not installed),
+GALAH DR4 (catalogue id not found; DR3 empty), ATLAS (needs an account: skipped). Failed then
+re-queried successfully: LAMOST DR11 (parse error on the first try), MAST K2/Kepler (first run
+timed out), the 66" ZTF cone around TIC 2102868 (HTTP 504, replaced by 1.5" cones per neighbour).
+The CfA VizieR mirror returned empty answers where IDIA had rows, so its empty answers count for
+nothing.
 
 ### Per-signal verdicts (all: probably not a planet)
 
 | signal | new photons (TESS) | artefact test (same photons) | other archives | verdict |
 |---|---|---|---|---|
-<<VERDICTS>>
+| 2102868 (G 86-37) | none: all three gap epochs are data gaps in every product | S43 and S44 reproduced by independent reductions (QLP, TGLC, TESScut; TARS for S44); **S86, the deepest epoch (2.05 ppt), is not reproduced at its time** by QLP, TARS or TESScut | **spectroscopic binary** (LAMOST RVs vary by 22.8 km/s; Gaia RV variable); background star at today's position excluded to G ~ 19.5; neighbour eclipses not testable | probably not a planet; weaker than before. The best epoch looks pipeline-specific, and in a binary a dip could be on either star and is diluted by the other. A cheap test is no longer "one more TESS epoch" (none is scheduled through S134) |
+| 234295610 | S95 (TARS, TESScut): pre-registered no information (the detrend kills the injected box); **post-hoc**, TESScut excludes the dip expected there (0.05 +- 0.46 vs 2.2 ppt) | S1 and S28 dips present in other reductions, mostly shallower (S1: 3.3-4.5 vs 6.9 ppt) | nothing testable (outside ZTF, no RVs) | probably not a planet; slightly weaker (one post-hoc, single-reduction non-detection) |
+| 146636926 | none (no gap epochs) | S106 reproduced (TESScut 1.09 +- 0.29); S97 at half depth in QLP; S3, S104 too weak | nothing testable | probably not a planet; unchanged |
+| 141816993 | S75: no information (QLP, TESScut; even post-hoc); S22: star not on science pixels | mostly too weak; S48 dip is 2x deeper in TESScut and TGLC than in the survey (wrong depth for a 0.52-ppt signal) | blend on 2 of 3 neighbours excluded by ZTF; the 0.76" companion untestable | probably not a planet; unchanged (a 0.52-ppt signal near the noise floor) |
+| 57830249 (TWA 33) | none (the S10 epoch is a gap in every product) | S36 event reproduced in all four re-reductions (12.7-18.6 ppt): real in the pixels, not a SPOC artefact. Its two epochs differ in depth by 3.8 sigma (18.8 vs 8.1 ppt). 43 of 180 period aliases allowed (14 in 15-50 d, incl. the nominal 45.07 d) | binary supported (Gaia RV statistics only); a young TW Hydrae member | probably not a planet; unchanged. Unequal depths fit two unrelated events (young star) or a companion better than one planet |
 
 ## Part 2 results: is gap-filling worth it?
 
@@ -443,3 +478,18 @@ detrend + `fu.Meter` on each product, and compare per-sector injected SES to TES
 for < 0.5 of a TESS-SPOC sector and B's gain over C shrinks to noise), or if the frozen search on
 null (inverted) QLP / TARS light curves of the same 50 stars throws more tau_long signals than on
 TESS-SPOC.
+
+### What was not checked
+- **Part 1:** CHEOPS (archive unreachable), ASAS-SN, ATLAS (account), GALAH DR4; individual RVs
+  for TIC 57830249; neighbour eclipses for 234295610, 146636926, 57830249 (no ZTF / Gaia epoch
+  photometry); the 0.76" companion of 141816993; pixel-level (centroid / difference-image) checks
+  on the re-reductions; why the frozen detrend keeps only 22% of a 4-h box in S95.
+- **Part 2:** whether QLP / TARS / TGLC / TESScut keep a 1-4 h transit as well as PDCSAP
+  (needs pixel-level injections: the kill test); the false-alarm rate of the frozen search on
+  mixed-product light curves; when (or whether) TESS-SPOC will deliver S87+ (scenario C assumes
+  it does, at its S56-S86 rate); TGLC presence was sampled (150 + 50 star-sectors), not checked
+  for every star-sector; the 100 pc numbers come from 30 random cones (two scalings differ by
+  1.6x) and assume the frozen search and vetting behave on 50-100 pc stars as on < 50 pc ones.
+- Local data deleted after use: TESScut cubes, downloaded light curves, rebuilt survey light
+  curves, archive downloads. Kept: tables, JSON records and figures under
+  `outputs/planets_spike/followup/`.

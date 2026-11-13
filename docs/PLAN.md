@@ -80,6 +80,12 @@ of 1.0-1.5 R_earth planets at 15-30 d, and missed LHS 1140 b.
   (57 in the fat-tail case), with no excess in any bin. All six predicted-detectable known transiting objects at
   10-60 d were recovered blind. Best signal: TIC 2102868, 39.4 d, ~2 R_e, but Gaia flags it as a possible
   binary. Nothing goes to ExoFOP. `docs/shortlist_planets_v1.md`.
+- **Follow-up (2026-11-13, pre-registered): still no planets; gap-filling is a no-go.** Other TESS
+  reductions and archives leave all five leftover signals "probably not a planet"; TIC 2102868 is a LAMOST
+  spectroscopic binary and its deepest epoch is not reproduced by other pipelines. Filling the survey's sector
+  gaps with QLP / TARS / TGLC adds ~14% sensitivity (~0.1-0.2 expected planets), mostly also gained if TESS-SPOC
+  delivers S87+; 50-100 pc with the same products roughly doubles the expected yield at 3-4x the cost.
+  `docs/spikes/mdwarf_followup.md`.
 - **Before looking at survey candidates:** pre-register vetting. The long-period false-alarm rate is only bounded
   at under 9% of stars, concentrated at 45-55 d with 2-4 transits; a 27.4 d systematic exists at low signal.
 - **Expected yield:** zero to one marginal candidate. The pipeline should be ready for PLATO public data (~2028).
