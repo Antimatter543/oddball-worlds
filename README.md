@@ -1,8 +1,30 @@
 # oddball-worlds
 
-**Hunting for the weirdest stars in NASA's TESS data: stars that behave like nothing in any catalogue.**
+**Citizen-science searches of NASA's TESS data: temperate planets around nearby red dwarfs, and the weirdest stars in the sky.**
 
-TESS has recorded the brightness of millions of stars every few minutes for years. Almost all of them do something boring or well understood. We're after the ones that don't.
+## Where things stand (November 2026)
+
+| Track | What it does | Result so far |
+|---|---|---|
+| **C: temperate planets** (active) | Stitches together every TESS visit of a nearby red dwarf and searches for small planets with 10-60 day orbits | 4,350 stars searched, **no new planets**: 13 signals survive vetting against about 26 expected from noise. Every known planet in range was re-found blind. |
+| **A: weirdest stars** (parked) | Ranks ~940,000 light curves by how anomalous they are and vets the top candidates | 150 stars vetted, **none unexplained**; a few minor catalogue additions |
+| **Rubin outbursts** (parked) | Watches the Rubin alert stream for young stars flaring up | Built; waiting for Rubin to cover the Galactic plane |
+
+Read [`docs/RESULTS.md`](docs/RESULTS.md) for the plain-English write-up, including how far each result can be trusted.
+Nothing in this repository is claimed as a discovery.
+
+## Track C: temperate planets around nearby red dwarfs
+
+A temperate planet around a small red star has a year of roughly 15-50 days, so TESS sees one transit per
+27-day visit and the visits have to be combined. The deepest published search joined at most four back-to-back
+visits; this one joins all of them, however far apart. Method, pre-registered gates and survey results:
+[`docs/spikes/mdwarf_stack.md`](docs/spikes/mdwarf_stack.md). Vetting: [`docs/spikes/mdwarf_vetting.md`](docs/spikes/mdwarf_vetting.md).
+Surviving signals: [`docs/shortlist_planets_v1.md`](docs/shortlist_planets_v1.md). Code: `spikes/mdwarf_stack/`
+(the survey ran as ten free Kaggle notebooks; see `spikes/mdwarf_stack/survey/kaggle/`).
+
+## Track A: the weirdest stars in TESS
+
+TESS has recorded the brightness of millions of stars every few minutes for years. Almost all of them do something boring or well understood. This track is after the ones that don't.
 
 | Target | What it looks like in the data | Example |
 |---|---|---|
@@ -33,9 +55,9 @@ See [`docs/PLAN.md`](docs/PLAN.md) for the full plan, validation strategy and fa
 
 This track watches the Vera Rubin Observatory's public alert stream for **young stars that suddenly flare up**. These are FU Orionis and EXor outbursts: a forming star swallows a burst of material from its disk and brightens 100-fold for months to years. The professional alert brokers mostly chase supernovae in other galaxies, so these young stars in our own galaxy get little attention. We'd check each candidate against catalogues of young stars and look back at its earlier TESS light curve.
 
-## Status
+## Running Track A
 
-🚧 Milestone 1a/1b: data pipeline and known-positive list.
+Track A is parked (see the table at the top). Its pipeline still runs:
 
 ```bash
 uv sync
