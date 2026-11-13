@@ -27,7 +27,7 @@ for _v in ("NUMBA_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_
     os.environ.setdefault(_v, "1")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -36,7 +36,7 @@ sys.path.insert(0, str(HERE.parent / "gate2"))
 sys.path.insert(0, str(HERE.parent / "survey"))
 sys.path.insert(0, str(ROOT / "src"))
 
-from common import BIN_D, DATA, OUT  # noqa: E402
+from common import BIN_D, DATA, OUT
 
 FU_OUT = OUT / "followup"
 FU_DATA = DATA / "followup"  # downloaded light curves / cutouts (deleted at the end)
@@ -163,7 +163,11 @@ class Meter:
         self.w = 1 / pp["sigma"] ** 2
         self.sec = pp["sector"]
         self.D = D
-        self.k = max(1, int(round(D / BIN_D)))
+        # bins expected in a box at this light curve's own cadence (30-min FFIs fill only every
+        # third 10-min bin; implementation note after the pre-registration)
+        d = np.diff(pp["idx"])
+        self.cad_bins = max(1, int(np.median(d[d > 0]))) if len(d) else 1
+        self.k = max(1, int(round(D / (BIN_D * self.cad_bins))))
         self.beta = {}
         for s in np.unique(self.sec):
             m = self.sec == s
