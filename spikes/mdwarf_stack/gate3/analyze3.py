@@ -435,15 +435,24 @@ def main():
       f"mean {dlw.mean():.1f} s (sequential, PDCSAP+SAP)")
     share_ok = okm.sum() / max(1, (okm | nd).sum())
     cpu_h = cpu.mean() * Nfull * share_ok / 3600
-    n_shards = int(math.ceil(cpu_h / (3 * 3.9)))
-    waves = int(math.ceil(n_shards / 5))
-    wall_h = cpu_h / (5 * 3) + waves * 0.3
+    # survey precedent: 89.9 CPU-h in 10 shards of 3 workers = 3.0 h of CPU per worker, planned
+    # and run as ~3.9 h shards (download, idle tail): overhead factor 1.3, plus ~0.3 h setup
+    n_shards = max(1, math.ceil(cpu_h / (3 * 3.0)))
+    waves = math.ceil(n_shards / 5)
+    per_shard = cpu_h / n_shards / 3 * 1.3
+    wall_h = waves * (per_shard + 0.3)
     P(f"- full list ({Nfull} stars, {share_ok:.2f} with data): {cpu_h:.0f} CPU-h; at 3 workers "
-      f"and ~3.9 h per shard: {n_shards} shards, {waves} waves of 5 -> about "
-      f"{wall_h:.0f} h wall ({wall_h / 24:.1f} d); limit 5 d")
-    disk_mb = Nfull * share_ok * 16.6 / 1e3
-    P(f"- local disk: result records {disk_mb:.0f} MB at 16.6 kB per star (survey value); "
-      f"limit 500 MB")
+      f"and <= 3.0 CPU-h per worker (the survey's packing): {n_shards} shards of ~"
+      f"{per_shard:.1f} h, {waves} waves of 5 -> about {wall_h:.0f} h wall "
+      f"({wall_h / 24:.1f} d); limit 5 d")
+    rec_mb = Nfull * share_ok * 16.6 / 1e3
+    vstars = Nfull * share_ok * n_st / max(1, nsearch)
+    work_mb = min(vstars, 200) * 0.6
+    disk_mb = rec_mb + work_mb
+    P(f"- local disk: result records {rec_mb:.0f} MB at 16.6 kB per star (survey value); vetting "
+      f"needs PDCSAP + SAP for ~{vstars:.0f} stars (~0.6 MB each, {vstars * 0.6:.0f} MB if kept): "
+      f"vetted in batches of <= 200 stars with the light curves deleted after each batch, peak "
+      f"working set {work_mb:.0f} MB; total peak {disk_mb:.0f} MB; limit 500 MB")
     d_pass = wall_h < 120 and disk_mb < 500
 
     # ------------------------------------------------ projection
