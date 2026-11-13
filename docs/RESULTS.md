@@ -94,6 +94,24 @@ had not used ([`spikes/mdwarf_followup.md`](spikes/mdwarf_followup.md)).
 - **Light-curve products.** We used only two products and got 78% of the visits predicted from the telescope's
   pointing history.
 
+### Would going out to 100 parsecs help? (gate 3, 13 Nov 2026)
+There are 19,827 red dwarfs at 50-100 parsecs that TESS looks at often enough, which is four times the
+survey's 4,681. A pre-registered test ran the unchanged search on 300 random stars from this list
+([`spikes/mdwarf_100pc.md`](spikes/mdwarf_100pc.md)). The farther stars are larger and fainter, so their
+transits are shallower and noisier: the search found only 0.6% of injected Earth-size planets (15-30 d),
+against 18% at 50 pc. False alarms were rarer, not more common.
+
+The projection for the whole list:
+- about 12 detectable planets of 1-3 Earth radii at 15-50 days, under the model as pre-registered;
+- about 4-5 after correcting the model by the ~2.7x it over-predicts the 50 pc survey's own finds;
+- about 5 false alarms surviving vetting;
+- ~21 hours of Kaggle and under 340 MB of disk.
+
+The run passes all four pre-registered criteria, so it is recommended. Nearly all of the yield is
+super-Earths and sub-Neptunes (1.5-3 Earth radii) around stars near the poles of the sky that TESS watches
+most. Only ~0.2 expected planets are Earth-size. Hosts are at T ~ 13.5, so masses would need 8-10 m
+telescopes.
+
 Details: [`spikes/mdwarf_stack.md`](spikes/mdwarf_stack.md) (method, gates, survey),
 [`spikes/mdwarf_vetting.md`](spikes/mdwarf_vetting.md) (vetting), [`shortlist_planets_v1.md`](shortlist_planets_v1.md)
 (every surviving signal, with a paragraph each).
