@@ -81,6 +81,11 @@ Earth's size with roughly Earth's sunlight. It probably is not real: Gaia flags 
 and the pixel data hint that the dip comes from a neighbouring star. Free tests: the predicted dips on
 2026-11-22, 2027-01-01 and 2027-02-09, and Gaia's fourth data release in December 2026.
 
+**Follow-up (13 Nov 2026):** archival LAMOST spectra show the star's radial velocity changing by 22.8 km/s over
+four nights, so it is a binary, and the deepest of the three dips is not seen at its time in three other
+reductions of the same TESS data. None of the five best leftover signals gained support from data the survey
+had not used ([`spikes/mdwarf_followup.md`](spikes/mdwarf_followup.md)).
+
 ### What limits it
 - **Too few visits per star.** Sensitivity climbs steeply with the number of TESS visits: about 3% of injected
   planets are found on stars with 1-3 visits, 20% with 6-12, and 58% with 13 or more.
