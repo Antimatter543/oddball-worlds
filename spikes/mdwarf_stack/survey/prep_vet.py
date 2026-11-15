@@ -9,8 +9,9 @@ changes. Each rebuilt NPZ's sector list is compared with the survey record's `se
 mismatch is printed and logged (the vetting would then see different data than the search).
 
 Usage: VET_LC_DIR is set here to DATA/lc_cache/lc.
-  python -I survey/prep_vet.py OUT/survey/vet/tics_long.txt [--max-mb 2000]
-  -> OUT/survey/vet/prep.jsonl (one line per star)
+  python -I survey/prep_vet.py OUT/survey/vet/tics_long.txt [--max-mb 2000] [--merged M] [--log L]
+  -> OUT/survey/vet/prep.jsonl (one line per star; --log moves it)
+  --max-mb is the LRU cap of the light-curve cache: keep it above one batch's NPZs.
 """
 
 from __future__ import annotations
@@ -42,6 +43,8 @@ def main() -> None:
     ap.add_argument("tics")
     ap.add_argument("--max-mb", type=float, default=2000)
     ap.add_argument("--merged", default=str(OUT / "survey" / "merged" / "results.jsonl.gz"))
+    ap.add_argument("--log", default=str(OUT / "survey" / "vet" / "prep.jsonl"),
+                    help="per-star log (the 100 pc run keeps its own: <OUT>/survey100/vet/prep.jsonl)")
     a = ap.parse_args()
     tics = [int(x) for x in Path(a.tics).read_text().split()]
     want = set(tics)
@@ -51,7 +54,7 @@ def main() -> None:
             r = json.loads(line)
             if r["tic"] in want:
                 found[r["tic"]] = sorted(int(s) for s in r.get("sectors_found", []))
-    logp = OUT / "survey" / "vet" / "prep.jsonl"
+    logp = Path(a.log)
     done = {json.loads(x)["tic"] for x in logp.read_text().splitlines()} if logp.exists() else set()
     with open(logp, "a") as log:
         for i, t in enumerate(tics):

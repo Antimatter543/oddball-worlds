@@ -14,6 +14,8 @@ OUT/survey/vet/research/<tic>.json. Each source records "ok" or its error; a fai
   prsa_eb    TESS EB catalogue (Prsa+2022, J/ApJS/258/16) within 42"
 
 Usage: python -I survey/research_candidates.py TIC [TIC ...]
+  RESEARCH_DIR / RESEARCH_INFO (env) move the cache and the star_info.json it reads (the 100 pc
+  survey: <OUT>/survey100/vet/research and <OUT>/survey100/vet/star_info.json).
 """
 
 from __future__ import annotations
@@ -29,7 +31,9 @@ sys.path.insert(0, str(HERE.parents[2] / "src"))
 
 from common import OUT
 
-RES = OUT / "survey" / "vet" / "research"
+import os
+
+RES = Path(os.environ.get("RESEARCH_DIR", OUT / "survey" / "vet" / "research"))
 MIRRORS = ("vizier.idia.ac.za", "vizier.cfa.harvard.edu")
 
 
@@ -152,7 +156,8 @@ def research(tic, ra, dec, refresh=False):
 
 
 def main():
-    info = json.loads((OUT / "vetting" / "star_info.json").read_text())
+    info = json.loads(Path(os.environ.get("RESEARCH_INFO", OUT / "vetting" / "star_info.json"))
+                      .read_text())
     for t in sys.argv[1:]:
         s = info.get(str(t), {})
         g = (s.get("gaia") or {}).get("target")

@@ -8,6 +8,9 @@ The detailed records are linked at the end of each section.
 - **Planet search (Track C):** we searched 4,350 nearby red dwarfs for temperate, small planets with
   10-60 day orbits and found **no new planets**. Thirteen signals survived vetting; noise alone was
   expected to leave about 26. The search re-found every known planet in its range that it should have.
+- **Planet search, 50-100 parsecs (16 Nov 2026):** 15,452 more distant red dwarfs searched, **no convincing new
+  planet**. 23 signals survived vetting, about the 22 that false alarms alone should leave. Two remain open, and
+  TESS will re-test both for free; nothing was submitted.
 - **Weird-star hunt (Track A):** 150 of the most anomalous stars in six TESS sectors were vetted one by one.
   **None is unexplained.** By-products: one known disk star with unreported deep dimming, three pulsating-star
   candidates and about 30 eclipsing binaries with no catalogued period.
@@ -111,6 +114,37 @@ The run passes all four pre-registered criteria, so it is recommended. Nearly al
 super-Earths and sub-Neptunes (1.5-3 Earth radii) around stars near the poles of the sky that TESS watches
 most. Only ~0.2 expected planets are Earth-size. Hosts are at T ~ 13.5, so masses would need 8-10 m
 telescopes.
+
+### The 50-100 parsec survey (16 Nov 2026)
+The frozen search ran unchanged on all 19,827 stars in 25 Kaggle notebooks (214 CPU-hours). 15,452 had TESS
+light curves; the other 22% are too faint for the products we use. The median searched star has only 5 TESS
+visits, so the survey's real sensitivity is low: a transiting planet of 2-3 Earth radii is found on about 16%
+of stars, 1.5-2 Earth radii on 4%, and Earth-size essentially never.
+
+| Outcome after vetting | Signals |
+|---|---|
+| Crossed the detection threshold | 809 on 404 stars |
+| Already-known planets and candidates (and their period multiples) | 53 |
+| Rejected | 733 |
+| Not rejected | 23 on 19 stars (4 top tier, 2 second, 17 third) |
+| Expected false alarms for this many signals | about 22 (95% range 12-35) |
+
+All six known planet candidates with 10-60 day periods on the searched stars were re-found blind. Of the 19
+leftover stars:
+
+- 8 have a specific false explanation. Two are spectroscopic binaries, one is a young star with a dusty disk,
+  and the rest are crowded fields or neighbouring stars. One is proven: ZTF images show a faint background star
+  28″ away eclipsing at exactly the TESS times.
+- 9 look like noise or instrument effects.
+- 2 stay open:
+  - **TIC 230081659:** a 0.12% dip every 34.6 days over 22 transits. It would be about 1.5 Earth radii in the
+    habitable zone, but more likely noise.
+  - **TIC 447890696:** a 2%, 1-hour, 16.8-day dip seen three times in 2021. It is clearly in the data, but it is
+    too short for a planet crossing the middle of the star: a grazing eclipse or a background star is more likely.
+
+None meets the bar for a community planet candidate. TESS is observing TIC 447890696 now and returns to TIC
+230081659 in 2027-28. The full list, with odds and next dip times:
+[`shortlist_planets_100pc_v1.md`](shortlist_planets_100pc_v1.md).
 
 Details: [`spikes/mdwarf_stack.md`](spikes/mdwarf_stack.md) (method, gates, survey),
 [`spikes/mdwarf_vetting.md`](spikes/mdwarf_vetting.md) (vetting), [`shortlist_planets_v1.md`](shortlist_planets_v1.md)

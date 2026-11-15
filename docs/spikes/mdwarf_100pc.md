@@ -413,3 +413,42 @@ uncertain until the pixel check, the catalogues and follow-up have all been done
 
 Kaggle kernels used here: `antimatter543/transit-gate3-000of005` to `-004of005` (private). They
 are safe to delete; their outputs are fetched to `<OUT>/gate3/kaggle_out/`.
+
+## R10. Survey result (2026-11-16)
+The run happened as launched in R9: 25 shards, git 111f07a, frozen hash 4194793b on every record. It was then
+vetted with frozen v2. Full write-up: [`../shortlist_planets_100pc_v1.md`](../shortlist_planets_100pc_v1.md).
+Code: `spikes/mdwarf_stack/survey100/`. Outputs: `outputs/planets_spike/survey100/vet/`.
+
+**Health**
+- 15,452 of 19,827 stars searched; 4,375 no-data (22.1%, against 21.7% in the gate-3 sample).
+- Real/predicted sectors 0.688; median 5 real sectors.
+- 213.9 CPU-h (221 predicted).
+- 43 sectors lost on 41 stars (no usable PDCSAP).
+
+**Sensitivity per searched star** (gate-3 far per-bucket rates × real sector counts): 0.0065 / 0 / 0.040 / 0.160
+for 1-1.5 R_e 15-30 d / 1-1.5 R_e 30-50 d / 1.5-2 R_e / 2-3 R_e.
+
+**Against R4's expectations**
+- **Vetting load: 809 signals on 404 stars, not ~195.** 733 are C. 48 stars fill all six signal slots, a
+  systematics-dominated population that the 300-star far sample under-sampled.
+- **Surviving false alarms: 23 not-C observed (A+ 4, A 2, B 17).**
+  - The pre-registered F = 5.5 [0, 16] was computed for ~195 signals.
+  - The same survival share (13/462) times the 756 non-K signals that occurred gives 22.1 [12.0, 34.9].
+  - The per-star noise estimates are higher: 74 [32, 137] from far nulls, 94 from the 50 pc method.
+  - So there is no excess. One bin (P 30-40 d: 8 against 2.5 [0.2, 7.7]) is above its interval. Its members
+    include a proven blend, a young disk star and four noise-like signals.
+- **Planets: R6's corrected ~4.6 (model 12.2) would sit mostly at 5+ transits on 13+ sector stars.** That
+  corner holds 4 survivors, against 2.4 [0.2, 7.3] false alarms and ~3.3 planets expected, so counts cannot tell.
+  - TIC 353875121 is a background EB (ZTF: the 28″ neighbour, G 17.2, is 20% faint at 11 TESS-predicted times).
+  - TIC 294328887 and TIC 233719663 look like noise.
+  - TIC 230081659 (34.61 d, 22 transits, 1.23 ppt, 1.4-1.7 R_e) stays open; more likely noise.
+- **Known objects:** all 6 TOIs at 10-60 d on searched stars were recovered blind (tier K), plus 16 short-period
+  objects at period multiples.
+
+**Open after research:** TIC 230081659 and TIC 447890696 (16.84 d, 19 ppt, 1 h V-shaped; in all four other
+reductions, but a 9.8″ background star cannot be excluded and the duration suggests a grazing eclipse). Neither
+clears the community-TOI bar, and no CTOI was drafted. TESS re-tests 447890696 in S110-S113 (now) and 230081659
+in S118+.
+
+**R9's expectation was optimistic.** It said "roughly 10 A/B signals, about half of them false alarms". Instead
+23 survived, and per-signal checks leave none of them more likely real than false.

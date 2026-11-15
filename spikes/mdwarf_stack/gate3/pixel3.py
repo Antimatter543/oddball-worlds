@@ -1,6 +1,8 @@
 """Pixel check (frozen vetting/pixel_check.pixel_check, unchanged) for gate-3 real signals,
 with star info from <OUT>/gate3/star_info.json and results in <OUT>/gate3/pixel.jsonl.
 Usage: python -I gate3/pixel3.py VET_ROWS.jsonl KEY [KEY ...]
+  The 100 pc survey sets PIXEL3_INFO / PIXEL3_OUT (its own star_info.json and pixel file), so its
+  results stay apart from the gate-3 sample's and the 50 pc survey's.
 """
 
 from __future__ import annotations
@@ -22,14 +24,16 @@ G3 = OUT / "gate3"
 def main():
     from pixel_check import pixel_check
 
-    info = json.loads((G3 / "star_info.json").read_text())
+    import os
+
+    info = json.loads(Path(os.environ.get("PIXEL3_INFO", G3 / "star_info.json")).read_text())
     rows = {}
     for f in sys.argv[1].split(","):
         for x in open(f):
             if x.strip():
                 r = json.loads(x)
                 rows[r["key"]] = r
-    outp = G3 / "pixel.jsonl"
+    outp = Path(os.environ.get("PIXEL3_OUT", G3 / "pixel.jsonl"))
     done = {json.loads(x)["key"] for x in open(outp)} if outp.exists() else set()
     with open(outp, "a") as fh:
         for k in sys.argv[2:]:

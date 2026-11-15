@@ -6,7 +6,7 @@
 
 | Track | What it does | Result so far |
 |---|---|---|
-| **C: temperate planets** (active) | Stitches together every TESS visit of a nearby red dwarf and searches for small planets with 10-60 day orbits | 4,350 stars searched, **no new planets**: 13 signals survive vetting against about 26 expected from noise. Every known planet in range was re-found blind. |
+| **C: temperate planets** (active) | Stitches together every TESS visit of a nearby red dwarf and searches for small planets with 10-60 day orbits | 4,350 stars within 50 pc searched, **no new planets**: 13 signals survive vetting against about 26 expected from noise. 15,452 more at 50-100 pc (Nov 2026): **no convincing planet**, 23 survivors against about 22 expected from false alarms, 2 left open for TESS to re-test. Every known planet in range was re-found blind. |
 | **A: weirdest stars** (parked) | Ranks ~940,000 light curves by how anomalous they are and vets the top candidates | 150 stars vetted, **none unexplained**; a few minor catalogue additions |
 | **Rubin outbursts** (parked) | Watches the Rubin alert stream for young stars flaring up | Built; waiting for Rubin to cover the Galactic plane |
 

@@ -86,6 +86,16 @@ of 1.0-1.5 R_earth planets at 15-30 d, and missed LHS 1140 b.
   gaps with QLP / TARS / TGLC adds ~14% sensitivity (~0.1-0.2 expected planets), mostly also gained if TESS-SPOC
   delivers S87+; 50-100 pc with the same products roughly doubles the expected yield at 3-4x the cost.
   `docs/spikes/mdwarf_followup.md`.
+- **50-100 pc survey (2026-11-16): no convincing planet; consistent with noise and blends.**
+  - **Searched:** 15,452 of 19,827 stars (22% have no SPOC/TESS-SPOC product). Median 5 real sectors; 54% have
+    fewer than 6. Sensitivity per searched star: 0.16 at 2-3 R_e, 0.04 at 1.5-2 R_e, ~0 at 1-1.5 R_e.
+  - **Vetting:** frozen v2 on 809 signals on 404 stars (4x the pre-registered load) gave K 53, A+ 4, A 2, B 17,
+    C 733. The 23 not rejected match the 22 [12, 35] false alarms expected at the realised signal count.
+  - **Known objects:** all 6 TOIs at 10-60 d on searched stars were recovered blind.
+  - **Open signals:** TIC 230081659 (34.6 d, 22 transits, ~1.5 R_e if real; more likely noise) and TIC 447890696
+    (16.8 d, 2%, 1 h V-shaped; grazing or a background star). TESS re-tests both: S110-S113 now, and S118+.
+  - **Solved:** TIC 353875121 (32.3 d, 23 transits) is a background eclipsing binary, shown by ZTF.
+  - Nothing clears the community-TOI bar; no CTOI. `docs/shortlist_planets_100pc_v1.md`.
 - **Before looking at survey candidates:** pre-register vetting. The long-period false-alarm rate is only bounded
   at under 9% of stars, concentrated at 45-55 d with 2-4 transits; a 27.4 d systematic exists at low signal.
 - **Expected yield:** zero to one marginal candidate. The pipeline should be ready for PLATO public data (~2028).
