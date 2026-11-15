@@ -6,6 +6,9 @@ vetting/star_info.json (Gaia neighbours), the SAP files' CROWDSAP, and OUT/surve
 Writes OUT/survey/vet/dossier.json and prints a text block per key.
 
 Usage: python -I survey/dossier.py KEY [KEY ...]
+  The 100 pc survey sets DOSSIER_VET (its vet dir: graded.jsonl, research/, star_info.json,
+  sap_meta.json, dossier.json), DOSSIER_TARGETS (gate3/targets_100pc.csv) and DOSSIER_NOW (BTJD).
+  Without a SAP file the per-sector CROWDSAP comes from DOSSIER_VET/sap_meta.json.
 """
 
 from __future__ import annotations
@@ -22,15 +25,20 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "vetting"))
 sys.path.insert(0, str(HERE))
 
+import os
+
 from common import OUT
 from physics import implied, next_transits, tess_sectors, timing_sigma
 
-NOW_BTJD = 4356.5  # 2026-11-12
+VET = Path(os.environ.get("DOSSIER_VET", OUT / "survey" / "vet"))
+TARGETS = Path(os.environ.get("DOSSIER_TARGETS", OUT / "gate2" / "survey_targets.csv"))
+INFO = VET / "star_info.json" if "DOSSIER_VET" in os.environ else OUT / "vetting" / "star_info.json"
+NOW_BTJD = float(os.environ.get("DOSSIER_NOW", 4356.5))  # default 2026-11-12
 LAST_DATA_SECTOR = 107  # latest sector in the survey's downloads
 
 
 def research_summary(tic: int) -> dict:
-    fp = OUT / "survey" / "vet" / "research" / f"{tic}.json"
+    fp = VET / "research" / f"{tic}.json"
     if not fp.exists():
         return {"status": "not run"}
     d = json.loads(fp.read_text())
@@ -103,10 +111,11 @@ def text(o: dict) -> str:
 
 def main():
     keys = set(sys.argv[1:])
-    rows = [json.loads(x) for x in (OUT / "survey" / "vet" / "graded.jsonl").read_text().splitlines()]
+    rows = [json.loads(x) for x in (VET / "graded.jsonl").read_text().splitlines()]
     rows = [r for r in rows if r["key"] in keys]
-    tg = pd.read_csv(OUT / "gate2" / "survey_targets.csv").set_index("tic")
-    info = json.loads((OUT / "vetting" / "star_info.json").read_text())
+    tg = pd.read_csv(TARGETS).set_index("tic")
+    info = json.loads(INFO.read_text())
+    sm = json.loads((VET / "sap_meta.json").read_text()) if (VET / "sap_meta.json").exists() else {}
     res = {}
     for r in rows:
         s, tic = r["stats"], r["tic"]
@@ -115,8 +124,10 @@ def main():
         st = info.get(str(tic), {})
         g = (st.get("gaia") or {})
         ra, dec = (g["target"]["ra"], g["target"]["dec"]) if "target" in g else (t["ra"], t["dec"])
-        z = np.load(OUT / "vetting" / "sap" / f"tic{tic}.npz", allow_pickle=False)
-        crowd = {int(m["sector"]): m.get("crowdsap") for m in json.loads(str(z["meta"]))["sectors"]}
+        zp = OUT / "vetting" / "sap" / f"tic{tic}.npz"
+        smeta = json.loads(str(np.load(zp, allow_pickle=False)["meta"])) if zp.exists() \
+            else sm.get(str(tic), {"sectors": []})
+        crowd = {int(m["sector"]): m.get("crowdsap") for m in smeta["sectors"]}
         imp = implied(s["P"], s["depth"], r["mass"], r["radius"], teff)
         nxt = next_transits(s["t0"], s["P"], NOW_BTJD, 3)
         sig = [timing_sigma(s["P"], s["dur_h"] / 24, s["epochs"], x) for x in nxt]
@@ -154,7 +165,7 @@ def main():
         res[r["key"]] = out
         print(text(out))
         print("-" * 80)
-    fp = OUT / "survey" / "vet" / "dossier.json"
+    fp = VET / "dossier.json"
     old = json.loads(fp.read_text()) if fp.exists() else {}
     old.update(res)
     fp.write_text(json.dumps(old, indent=1, default=float))

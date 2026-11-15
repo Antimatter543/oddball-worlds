@@ -12,7 +12,8 @@ frozen preprocessing (`search2.preprocess2`, rot from gate2/frozen.json):
             (`inject.match`: P or an n <= 6 alias within 1%, and >= 80% of epochs line up);
             recovered = a match with MES >= tau_long
 Planets with P outside 10-60 d are listed (aliases can still match) but only 10-60 d ones count
-for the long-range check. Usage: python -I survey/known_check.py  -> OUT/survey/vet/known.csv
+for the long-range check. Usage: python -I survey/known_check.py [--vet-dir D --targets T]
+  -> D/known.csv (default D = OUT/survey/vet)
 """
 
 from __future__ import annotations
@@ -47,8 +48,8 @@ def _f(x):
     return float(v) if np.isfinite(v) else None
 
 
-def objects(searched: dict) -> list[dict]:
-    tg = pd.read_csv(OUT / "gate2" / "survey_targets.csv")
+def objects(searched: dict, targets=None) -> list[dict]:
+    tg = pd.read_csv(targets or OUT / "gate2" / "survey_targets.csv")
     tg = tg[tg.tic.isin(set(searched))]
     out = []
     toi = pd.read_csv(CAT_DIR / "toi.csv", low_memory=False)
@@ -97,15 +98,24 @@ def objects(searched: dict) -> list[dict]:
 
 
 def main() -> None:
+    import argparse
+
     from get_lightcurve import get_lightcurve
     from inject import duration_14, epochs_in_data, match
     from search2 import preprocess2
 
     cfg = json.loads((OUT / "gate2" / "frozen.json").read_text())
     tau, eff, rot = cfg["tau_long"], cfg["pred_eff"], cfg["rot"]
-    rows = {r["tic"]: r for r in map(json.loads, (OUT / "survey" / "vet" / "rows_long.jsonl").read_text().splitlines())}
-    jobs = {j["tic"]: j for j in map(json.loads, (OUT / "survey" / "vet" / "jobs_long.jsonl").read_text().splitlines())}
-    objs = objects(rows)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--vet-dir", default=str(OUT / "survey" / "vet"),
+                    help="rows_long / jobs_long in, known.csv out (100 pc: <OUT>/survey100/vet)")
+    ap.add_argument("--targets", default=None, help="target CSV with tic, ra, dec "
+                    "(default gate2/survey_targets.csv; 100 pc: gate3/targets_100pc.csv)")
+    a = ap.parse_args()
+    vd = Path(a.vet_dir)
+    rows = {r["tic"]: r for r in map(json.loads, (vd / "rows_long.jsonl").read_text().splitlines())}
+    jobs = {j["tic"]: j for j in map(json.loads, (vd / "jobs_long.jsonl").read_text().splitlines())}
+    objs = objects(rows, a.targets)
     print(len(objs), "objects on", len({o["tic"] for o in objs}), "searched stars", flush=True)
     res = []
     pp_cache = {}
@@ -156,7 +166,7 @@ def main() -> None:
         print(o["name"], tic, o["P"], rec.get("n_tr"), rec.get("mes_pred"), rec.get("match_mes"),
               rec["recovered"], flush=True)
     df = pd.DataFrame(res)
-    df.to_csv(OUT / "survey" / "vet" / "known.csv", index=False)
+    df.to_csv(vd / "known.csv", index=False)
     print(df.to_string())
 
 

@@ -3,7 +3,9 @@ For each Gaia neighbour inside 63" with required eclipse depth = depth * 10^(0.4
 ZTF light curves around it (1.5" cone), convert to BTJD, and test every ephemeris in the 3-sigma
 (T0, P) error ellipse: in-transit points |t - tc_n| <= D/2, depth = weighted mean deficit.
 Blend excluded: for EVERY allowed ephemeris >= 5 in-transit points and req - depth > 5 sigma.
-Blend supported: some allowed ephemeris with depth/sigma >= 5 and |depth - req| < 2 sigma.
+Blend supported: some allowed ephemeris with depth/sigma >= 5 and depth > req - 2 sigma (a deeper eclipse
+than required is still the source: req assumes ALL of the neighbour's light is in the aperture; fixed
+2026-11-15, the old rule |depth - req| < 2 sigma missed a 20% eclipse that needed only 2.5%).
 Usage: ztf_neighbours.py EPHEM_JSON DOSSIER_JSON DLDIR OUTJSON TIC [TIC ...]"""
 import io
 import json
@@ -93,7 +95,7 @@ def test(t, f, s, eph, D, req, parity=None, nsig=3.0):
     k, dep, sig = r[:, 2], r[:, 3], r[:, 4]
     ok = k >= 5
     excl_each = ok & ((req - dep) > 5 * sig)
-    supp_each = (k >= 1) & (dep / sig >= 5) & (np.abs(dep - req) < 2 * sig)
+    supp_each = (k >= 1) & (dep / sig >= 5) & (dep > req - 2 * sig)
     excluded = bool(np.all(excl_each))
     supported = bool(np.any(supp_each))
     i_worst = int(np.nanargmax(np.where(np.isfinite(dep), (dep - req) / np.where(sig > 0, sig, np.nan), -np.inf))) if np.any(np.isfinite(dep)) else None
