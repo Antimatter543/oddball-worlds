@@ -97,6 +97,9 @@ def main() -> None:
             print(f"WARNING: {commit[:12]} is not on origin yet; push it before the kernels run")
     t = pd.read_csv(a.targets)
     t = t[t["n_sectors"] >= a.min_sectors]
+    # Embed only the columns run_survey.py reads. Kaggle refuses kernel sources over ~1 MB
+    # (a 1.3 MB script got "400 Bad Request" on SaveKernel; 0.6 MB is accepted).
+    t = t[[c for c in ("tic", "n_sectors", "mass", "rad", "sectors") if c in t.columns]]
     buf = io.StringIO()
     t.to_csv(buf, index=False)
     targets = b64gz(buf.getvalue().encode())
@@ -125,6 +128,9 @@ def main() -> None:
         src = (tmpl.replace("@@CFG@@", base64.b64encode(json.dumps(cfg).encode()).decode())
                .replace("@@TARGETS@@", targets).replace("@@SKIP@@", skip)
                .replace("@@CODE@@", code))
+        if len(src.encode()) > 950_000:
+            raise SystemExit(f"shard {i}: kernel source is {len(src.encode()) / 1e6:.2f} MB; Kaggle "
+                             "refuses sources over ~1 MB. Use fewer targets per list or slimmer columns.")
         (d / "survey_shard.py").write_text(src)
         meta = dict(meta_t, id=f"{user}/{slug}", title=slug.replace("-", " "),
                     code_file="survey_shard.py")
