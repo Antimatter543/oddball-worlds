@@ -1,0 +1,2 @@
+# 446169146: coherent 3% V-shaped dip every 0.40488 d over 13 sectors (tc 2421.2170); eight consecutive dips in S41
+446169146 2421.217 2421.622 2422.027 2422.432 2422.837 2423.242 2423.647 2424.051 1
