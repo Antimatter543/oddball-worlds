@@ -183,6 +183,28 @@ for TESS's position raised the share of candidates explained by known asteroids 
 Details: [`PLAN.md`](PLAN.md) (results log), [`shortlist_candidates_v1.md`](shortlist_candidates_v1.md),
 [`VETTING.md`](VETTING.md), [`ML_DESIGN.md`](ML_DESIGN.md).
 
+## By-products: non-planet objects in the red-dwarf surveys (16 Nov 2026)
+
+The 1,256 stars that the two Track C surveys flagged (long-range signals of any grade, short-range signals above
+threshold) were gone through again for real objects that are not planets, without changing the frozen search or
+vetting. Each kept object got a pixel check at its eclipses, period work and a cross-match against VSX, the TESS
+eclipsing-binary catalogues, Gaia DR3 (EBs, classes, orbits, neighbours), ASAS-SN, ZTF, ATLAS, a TESS dipper
+list and SIMBAD (references read).
+
+- **14 objects appear in none of the catalogues checked:** 9 eclipsing pairs of red dwarfs, 3 young stars with
+  sharp, changing dips (complex periodic variables), 1 star with three deep eclipses (TIC 308186412, period
+  258 d or a multiple) and 1 single deep dip (TIC 35665763). **4 more are partly known:** catalogued as a binary
+  or variable, but not with these eclipses. All 18 are in the 50-100 pc survey.
+- **Best:** TIC 238891168 (SCR J0241-7719). Gaia DR3 has an astrometric orbit for it (152.4 ± 0.5 d, nearly
+  edge-on); TESS caught two eclipses that fall at that orbit's two conjunctions, which pins the period to
+  152.74-152.82 d.
+- Everything else real was already catalogued (110 eclipsing binaries including CM Dra, 13 known young stars
+  with dips). Nothing among the 142 stars looked at by eye is unexplained.
+- AAVSO VSX fields are prepared for 8 eclipsing binaries that VSX does not list (plus 5 with caveats). Nothing
+  has been submitted.
+
+Details: [`cool_objects_v1.md`](cool_objects_v1.md); labels per star in `labels/cool_objects_v1.csv`.
+
 ## What is not claimed
 - No planet, planet candidate or new class of star is claimed anywhere in this repository.
 - Recovering known planets shows the method works; it is not a discovery.
